@@ -5,7 +5,8 @@
 #include <QJsonParseError>
 #include <QNetworkAddressEntry>
 #include <QNetworkDatagram>
-#include <QRandomGenerator>
+#include <QUuid>
+#include <algorithm>
 #include <QXmlStreamReader>
 
 namespace {
@@ -104,7 +105,6 @@ void DiscoveryService::addInterfaceSocket(const QNetworkInterface &interface,
         socket->deleteLater();
         return;
     }
-    socket->setSocketOption(QAbstractSocket::BroadcastTtlOption, 1);
     socket->setSocketOption(QAbstractSocket::MulticastTtlOption, 1);
     connect(socket, &QUdpSocket::readyRead, this, [this, socket] { processDatagram(socket); });
     sockets_.push_back({socket, interface, localAddress});
@@ -135,7 +135,8 @@ void DiscoveryService::sendProjectProbe(InterfaceSocket &entry)
     QJsonObject request;
     request.insert(QStringLiteral("magic"), QStringLiteral("CAM_DISCOVER"));
     request.insert(QStringLiteral("version"), 1);
-    request.insert(QStringLiteral("seq"), static_cast<qint64>(++sequence_));
+    entry.requestSequence = ++sequence_;
+    request.insert(QStringLiteral("seq"), static_cast<qint64>(entry.requestSequence));
     request.insert(QStringLiteral("cmd"), QStringLiteral("PROBE_REQUEST"));
     entry.socket->writeDatagram(QJsonDocument(request).toJson(QJsonDocument::Compact),
                                 QHostAddress::Broadcast, kProjectPort);
@@ -170,7 +171,8 @@ void DiscoveryService::processProjectResponse(const QByteArray &payload,
     const auto root = document.object();
     if (root.value(QStringLiteral("magic")).toString() != QStringLiteral("CAM_DISCOVER") ||
         root.value(QStringLiteral("version")).toInt(-1) != 1 ||
-        root.value(QStringLiteral("cmd")).toString() != QStringLiteral("PROBE_RESPONSE")) return;
+        root.value(QStringLiteral("cmd")).toString() != QStringLiteral("PROBE_RESPONSE") ||
+        root.value(QStringLiteral("seq")).toVariant().toULongLong() != entry.requestSequence) return;
     const auto deviceObject = root.value(QStringLiteral("device")).toObject();
     if (deviceObject.isEmpty()) return;
 
@@ -228,9 +230,9 @@ void DiscoveryService::processOnvifResponse(const QByteArray &payload,
 void DiscoveryService::mergeAndEmit(DeviceRecord device)
 {
     const QString key = !device.macAddress.isEmpty() ? device.macAddress
-                                                      : (!device.onvifEndpoint.isEmpty()
-                                                             ? device.onvifEndpoint
-                                                             : device.ipAddress);
+                                                      : (!device.ipAddress.isEmpty()
+                                                             ? device.ipAddress
+                                                             : device.onvifEndpoint);
     if (key.isEmpty()) return;
     if (devices_.contains(key)) {
         auto &existing = devices_[key];

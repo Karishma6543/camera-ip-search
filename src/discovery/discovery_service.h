@@ -30,6 +30,7 @@ private:
         QPointer<QUdpSocket> socket;
         QNetworkInterface interface;
         QHostAddress localAddress;
+        quint32 requestSequence{0};
     };
 
     void addInterfaceSocket(const QNetworkInterface &interface,
