@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QHostAddress>
 #include <QNetworkInterface>
+#include <QNetworkAddressEntry>
 #include <QPointer>
 #include <QSet>
 #include <QTimer>
@@ -40,10 +41,8 @@ private:
     QVector<Probe> active_;
     QVector<QPair<QString, quint16>> pending_;
     QSet<QString> emitted_;
-    QSet<QString> openServices_;
     QTimer scheduler_;
     bool running_{false};
-    int completed_{0};
     int candidates_{0};
     int maxConcurrent_{48};
 };

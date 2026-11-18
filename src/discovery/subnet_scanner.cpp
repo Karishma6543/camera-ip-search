@@ -30,8 +30,6 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     pending_.clear();
     active_.clear();
     emitted_.clear();
-    openServices_.clear();
-    completed_ = 0;
     candidates_ = 0;
 
     const quint32 ip = entry.ip().toIPv4Address();
@@ -134,10 +132,8 @@ void SubnetScanner::completeProbe(QTcpSocket *socket, bool connected)
         socket->deleteLater();
     }
     active_.erase(it);
-    ++completed_;
 
     if (connected) {
-        openServices_.insert(ip + QLatin1Char(':') + QString::number(port));
         if (!emitted_.contains(ip)) {
             emitted_.insert(ip);
             ++candidates_;
