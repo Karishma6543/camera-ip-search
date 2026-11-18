@@ -38,4 +38,5 @@ private:
     QPushButton *subnetScanButton_{nullptr};
     QLineEdit *searchEdit_{nullptr};
     QComboBox *interfaceSelector_{nullptr};
+    QLabel *deviceDetailsLabel_{nullptr};
 };

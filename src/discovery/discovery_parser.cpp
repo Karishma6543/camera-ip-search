@@ -133,6 +133,11 @@ bool parseOnvifProbeMatch(const QByteArray &payload, const QHostAddress &sender,
     DeviceRecord parsed;
     parsed.ipAddress = sender.toString();
     parsed.onvifEndpoint = endpoint;
+    const QString firstXAddr = xaddrs.section(QRegularExpression(QStringLiteral("\\s+")), 0, 0);
+    const QUrl serviceUrl(firstXAddr);
+    if ((serviceUrl.scheme() == QStringLiteral("http") || serviceUrl.scheme() == QStringLiteral("https")) &&
+        serviceUrl.host() == sender.toString())
+        parsed.deviceServiceUrl = serviceUrl.toString();
     parsed.discoverySources << QStringLiteral("ONVIF WS-Discovery");
     parsed.interfaceName = interfaceName;
     parsed.manufacturer = QStringLiteral("ONVIF device (manufacturer unknown)");

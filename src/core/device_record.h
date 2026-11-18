@@ -11,6 +11,10 @@ struct DeviceRecord
     QString manufacturer;
     QString model;
     QString firmwareVersion;
+    QString hardwareId;
+    QString serialNumber;
+    QString deviceServiceUrl;
+    QString networkSummary;
     QString activationState{QStringLiteral("Unknown")};
     QStringList discoverySources;
     QString interfaceName;

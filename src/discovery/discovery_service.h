@@ -6,6 +6,8 @@
 #include <QHash>
 #include <QHostAddress>
 #include <QNetworkInterface>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPointer>
 #include <QTimer>
 #include <QUdpSocket>
@@ -37,10 +39,13 @@ private:
     void sendProjectProbe(InterfaceSocket &entry);
     void processDatagram(QUdpSocket *socket);
     void mergeAndEmit(DeviceRecord device);
+    void requestOnvifDeviceInformation(const DeviceRecord &device);
+    void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
 
     QVector<InterfaceSocket> sockets_;
     QHash<QString, DeviceRecord> devices_;
     QTimer timeout_;
+    QNetworkAccessManager networkManager_;
     bool running_{false};
     quint32 sequence_{0};
 };

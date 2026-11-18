@@ -336,6 +336,16 @@ void MainWindow::buildUi()
     connect(settings, &QPushButton::clicked, this, [this] { updateStatus(tr("Application preferences are planned; no settings have been changed.")); });
     connect(selectAll, &QPushButton::clicked, this, [this] { updateStatus(tr("Bulk selection actions will be enabled with the bulk configuration implementation.")); });
     connect(clearSelection, &QPushButton::clicked, this, [this] { deviceTable_->clearSelection(); });
+    connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
+        if (row < 0 || !deviceDetailsLabel_) return;
+        QStringList details;
+        for (int col = 1; col < deviceTable_->columnCount(); ++col) {
+            const auto *item = deviceTable_->item(row, col);
+            if (item && !item->text().isEmpty())
+                details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + item->text();
+        }
+        deviceDetailsLabel_->setText(details.join(QStringLiteral("\\n")));
+    });
     updateDeviceSummary();
 }
 
@@ -343,7 +353,9 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
-    layout->addWidget(mutedLabel(tr("Select a discovered device to inspect its identity, network settings, services and supported capabilities. Detailed device-information requests are the next discovery milestone."), page));
+    deviceDetailsLabel_ = new QLabel(tr("Select a discovered device to view its details. ONVIF information is queried automatically when the device exposes a reachable device service."), page);
+    deviceDetailsLabel_->setWordWrap(true);
+    layout->addWidget(deviceDetailsLabel_);
     layout->addStretch();
     return page;
 }

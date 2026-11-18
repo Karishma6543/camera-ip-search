@@ -5,6 +5,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkDatagram>
+#include <QNetworkRequest>
+#include <QXmlStreamReader>
+#include <QUrl>
 #include <QUuid>
 #include <algorithm>
 
@@ -174,5 +177,66 @@ void DiscoveryService::mergeAndEmit(DeviceRecord device)
     }
     devices_.insert(key, device);
     emit deviceFound(device);
+    if (!device.deviceServiceUrl.isEmpty()) requestOnvifDeviceInformation(device);
 }
 
+
+
+void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
+{
+    const QUrl url(device.deviceServiceUrl);
+    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
+                           url.scheme() != QStringLiteral("https")) ||
+        url.host() != device.ipAddress)
+        return;
+
+    const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetDeviceInformation/></s:Body>
+</s:Envelope>)";
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(3500);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+        handleOnvifDeviceInformation(reply, key);
+    });
+}
+
+void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey)
+{
+    const QByteArray payload = reply->readAll();
+    const bool success = reply->error() == QNetworkReply::NoError &&
+                         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 200 &&
+                         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() < 300;
+    reply->deleteLater();
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+        return;
+
+    QXmlStreamReader xml(payload);
+    QString manufacturer, model, firmware, serial, hardware;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement()) continue;
+        const QString name = xml.name().toString();
+        if (name == QStringLiteral("Manufacturer")) manufacturer = xml.readElementText().trimmed();
+        else if (name == QStringLiteral("Model")) model = xml.readElementText().trimmed();
+        else if (name == QStringLiteral("FirmwareVersion")) firmware = xml.readElementText().trimmed();
+        else if (name == QStringLiteral("SerialNumber")) serial = xml.readElementText().trimmed();
+        else if (name == QStringLiteral("HardwareId")) hardware = xml.readElementText().trimmed();
+    }
+    if (xml.hasError()) return;
+
+    DeviceRecord &device = devices_[deviceKey];
+    if (!manufacturer.isEmpty()) device.manufacturer = manufacturer;
+    if (!model.isEmpty()) device.model = model;
+    if (!firmware.isEmpty()) device.firmwareVersion = firmware;
+    if (!serial.isEmpty()) device.serialNumber = serial;
+    if (!hardware.isEmpty()) device.hardwareId = hardware;
+    if (!device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")))
+        device.discoverySources << QStringLiteral("ONVIF GetDeviceInformation");
+    emit deviceFound(device);
+}

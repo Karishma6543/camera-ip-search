@@ -24,8 +24,10 @@ This roadmap is the working sequence for contributors. Checkboxes represent repo
 - [ ] Validate Windows, macOS and Linux behavior with hardware.
 
 ## Milestone 3 — Device information and inventory
-- [ ] Query ONVIF device information/capabilities when available.
-- [ ] Populate the unified inventory and device details view.
+- [x] Query ONVIF GetDeviceInformation when a same-device HTTP(S) endpoint is advertised.
+- [x] Populate manufacturer, model, firmware, serial and hardware ID where returned.
+- [x] Add a selectable device-details view from the inventory.
+- [ ] Query ONVIF capabilities and network interfaces.
 - [ ] Persist non-sensitive device history and operation metadata in SQLite.
 - [ ] Add manual device entry and open-web-interface action.
 
