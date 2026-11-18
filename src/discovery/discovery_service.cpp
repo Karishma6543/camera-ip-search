@@ -172,7 +172,11 @@ void DiscoveryService::mergeAndEmit(DeviceRecord device)
             existing.model = device.model;
         if (existing.firmwareVersion.isEmpty()) existing.firmwareVersion = device.firmwareVersion;
         if (existing.onvifEndpoint.isEmpty()) existing.onvifEndpoint = device.onvifEndpoint;
+        const bool needsOnvifInfo = existing.deviceServiceUrl.isEmpty() &&
+                                    !device.deviceServiceUrl.isEmpty();
+        if (needsOnvifInfo) existing.deviceServiceUrl = device.deviceServiceUrl;
         emit deviceFound(existing);
+        if (needsOnvifInfo) requestOnvifDeviceInformation(existing);
         return;
     }
     devices_.insert(key, device);
