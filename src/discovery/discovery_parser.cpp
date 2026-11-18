@@ -5,6 +5,8 @@
 #include <QJsonParseError>
 #include <QJsonValue>
 #include <QRegularExpression>
+#include <QUrl>
+#include <QtMath>
 #include <QXmlStreamReader>
 
 namespace {
