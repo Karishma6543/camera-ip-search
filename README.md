@@ -1,59 +1,54 @@
 # Camera IP Search
 
-A cross-platform desktop utility for discovering and provisioning supported IP cameras on a local network.
+A cross-platform desktop utility for discovering IP cameras from multiple manufacturers and provisioning only the capabilities verified for each device.
 
-**Status:** Early scaffold — the Qt desktop shell and project documentation are in place. Device discovery and configuration are not implemented yet.
+**Status:** Early scaffold. The Qt desktop shell is present; universal discovery and camera management are being implemented in milestones.
+
+## Compatibility objective
+
+Target devices include CP Plus, Hikvision, Prama, the project's own camera firmware, generic ONVIF cameras and other manufacturers. Compatibility is model- and firmware-specific: discovery does not guarantee activation, network configuration or firmware-upgrade support.
+
+Discovery strategy:
+- ONVIF WS-Discovery (UDP 3702) for standards-based devices.
+- Project firmware discovery (UDP 9988) only for our own firmware.
+- Verified vendor adapters when official protocol/SDK details and licensing permit.
+- Bounded, opt-in local network scanning to find additional candidate endpoints.
+- Manual device entry for devices that cannot be discovered automatically.
+
+See [Universal compatibility strategy](docs/universal-compatibility.md) before adding integrations.
 
 ## Technology
 
 - C++20
-- Qt 6 Widgets and Qt Network
+- Qt 6 Widgets, Network and Sql
 - CMake
-- SQLite (planned for local settings, device history and operation logs)
+- SQLite
 - Windows, macOS and Linux
-
-## Current application
-
-The initial application opens a desktop window with a camera inventory table and status area. The discovery action remains disabled until the firmware protocol adapter is implemented and tested.
 
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with the Widgets, Network and Sql modules.
+Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network and Sql modules.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-Run the executable:
+Run `./build/camera-ip-search` (on Windows, use the executable under the build configuration directory).
 
-```bash
-./build/camera-ip-search
-```
-
-See [docs/development.md](docs/development.md) for setup details.
-
-## Architecture and protocol
+## Developer documentation
 
 - [Architecture](docs/architecture.md)
+- [Universal compatibility strategy](docs/universal-compatibility.md)
+- [Adapter development guide](docs/adapter-development.md)
+- [Implementation roadmap](docs/implementation-roadmap.md)
+- [Compatibility and hardware test matrix](docs/compatibility-matrix.md)
+- [Firmware communication contracts](docs/protocol-contract.md)
 - [Development setup](docs/development.md)
-- [Firmware communication contract](docs/protocol-contract.md)
 - [Contributing](CONTRIBUTING.md)
 
-The proprietary camera discovery protocol uses UDP port **9988**. ONVIF WS-Discovery on UDP port **3702** is a separate mechanism.
+## Safety and limitations
 
-We will implement packet handling only against the agreed firmware contract. Unknown response, activation and network-configuration schemas must be confirmed before the application sends those commands.
+The tool will not guess passwords, bypass authentication or send undocumented configuration/activation commands. It will show unknown capabilities honestly. Firmware upgrades require verified model compatibility and integrity checks. Network scans are local, bounded and user initiated.
 
-## Planned milestones
-
-1. Desktop shell and build system
-2. Network interface selection and UDP camera discovery
-3. Device inventory and detail view
-4. Activation and network configuration
-5. Batch configuration with per-device results
-6. Firmware upgrade workflow
-7. Windows, macOS and Linux packaging and hardware validation
-
-## Safety
-
-The application will not embed default camera credentials or log passwords. High-impact operations (activation, network changes, batch changes and firmware upgrades) will require explicit confirmation.
+No software can guarantee support for every proprietary camera model. Actual support is recorded against exact model and firmware combinations in the compatibility matrix.

@@ -1,0 +1,65 @@
+# Implementation roadmap
+
+This roadmap is the working sequence for contributors. Checkboxes represent repository work, not promises that a vendor or device has passed hardware validation.
+
+## Milestone 0 — Documentation and architecture baseline
+- [x] Define universal, capability-based compatibility strategy.
+- [x] Separate ONVIF, vendor-specific, project firmware and fallback discovery paths.
+- [x] Define contributor requirements for adapters and hardware validation.
+- [x] Record security boundaries and unsupported/unknown states.
+
+## Milestone 1 — Application foundations
+- [ ] Introduce normalized device, observation, capability and structured error models.
+- [ ] Add network-interface enumeration and explicit interface selection.
+- [ ] Add a discovery coordinator with cancellation and progress reporting.
+- [ ] Add deterministic unit-test fixtures and logging redaction.
+- [ ] Keep UI responsive by running network work outside the GUI thread.
+
+## Milestone 2 — Universal discovery
+- [ ] Implement ONVIF WS-Discovery Probe/ProbeMatch parsing and endpoint extraction.
+- [ ] Implement the project's UDP 9988 Contract B probe/response codec.
+- [ ] Add bounded opt-in IPv4 subnet candidate scanning.
+- [ ] Merge duplicate observations and preserve discovery provenance.
+- [ ] Add unknown-device and false-positive handling.
+- [ ] Validate Windows, macOS and Linux behavior.
+
+## Milestone 3 — Device information and inventory
+- [ ] Query ONVIF device information/capabilities when available.
+- [ ] Populate the unified inventory and device details view.
+- [ ] Persist non-sensitive device history and operation metadata in SQLite.
+- [ ] Add manual device entry and open-web-interface action.
+
+## Milestone 4 — Vendor integrations
+- [ ] Research and document official SDK/protocol options for CP Plus.
+- [ ] Research and document official SDK/protocol options for Hikvision.
+- [ ] Research and document official SDK/protocol options for Prama.
+- [ ] Add vendor adapters only after exact models, licenses and wire behavior are verified.
+- [ ] Add hardware results to the compatibility matrix.
+
+## Milestone 5 — Safe provisioning
+- [ ] Implement ONVIF network configuration only for devices advertising support.
+- [ ] Implement project-camera activation and network configuration after firmware command contracts are frozen.
+- [ ] Implement verified vendor-specific activation/configuration where authorized.
+- [ ] Add batch preview, explicit confirmation, per-device result and rollback/recovery guidance.
+
+## Milestone 6 — Firmware management
+- [ ] Define per-vendor firmware package metadata and compatibility rules.
+- [ ] Verify package integrity and model/hardware/region compatibility.
+- [ ] Implement only vendor-authorized upgrade transports and recovery behavior.
+- [ ] Add progress, cancellation policy and per-device results.
+
+## Milestone 7 — Release readiness
+- [ ] Complete Windows, macOS and Linux packaging.
+- [ ] Complete automated tests and hardware validation matrix.
+- [ ] Publish known limitations and supported model/firmware combinations.
+- [ ] Review security, privacy, licensing and support documentation.
+
+## Release policy
+
+A feature is not “supported” merely because it compiles or passes a mock test. Use these labels:
+- **Implemented:** code exists and automated tests pass.
+- **Protocol-tested:** validated against a simulator or protocol fixture.
+- **Hardware-tested:** validated against the exact documented physical model/firmware.
+- **Vendor-certified:** only if the vendor has explicitly certified it.
+
+Do not mark a whole brand as supported based on one model.
