@@ -17,9 +17,13 @@ public:
 private:
     void buildUi();
     void updateStatus(const QString &message);
+    void updateDeviceSummary();
     void upsertDevice(const DeviceRecord &device);
     DiscoveryService *discovery_{nullptr};
     QTableWidget *deviceTable_{nullptr};
     QLabel *statusLabel_{nullptr};
+    QLabel *emptyState_{nullptr};
+    QLabel *summaryLabel_{nullptr};
+    QLabel *deviceCountValue_{nullptr};
     QPushButton *scanButton_{nullptr};
 };
