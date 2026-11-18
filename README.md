@@ -2,7 +2,7 @@
 
 A cross-platform desktop utility for discovering IP cameras from multiple manufacturers and provisioning only the capabilities verified for each device.
 
-**Status:** Early scaffold. The Qt desktop shell is present; universal discovery and camera management are being implemented in milestones.
+**Status:** Early implementation. The Qt desktop shell now runs active-interface discovery using ONVIF WS-Discovery (UDP 3702) and the project's own Contract B protocol (UDP 9988). Vendor-specific discovery and fallback subnet scanning are next.
 
 ## Compatibility objective
 
@@ -15,26 +15,14 @@ Discovery strategy:
 - Bounded, opt-in local network scanning to find additional candidate endpoints.
 - Manual device entry for devices that cannot be discovered automatically.
 
-See [Universal compatibility strategy](docs/universal-compatibility.md) before adding integrations.
-
-## Technology
-
-- C++20
-- Qt 6 Widgets, Network and Sql
-- CMake
-- SQLite
-- Windows, macOS and Linux
-
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network and Sql modules.
+Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql and Xml modules.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
-
-Run `./build/camera-ip-search` (on Windows, use the executable under the build configuration directory).
 
 ## Developer documentation
 
@@ -47,8 +35,18 @@ Run `./build/camera-ip-search` (on Windows, use the executable under the build c
 - [Development setup](docs/development.md)
 - [Contributing](CONTRIBUTING.md)
 
+## Current implementation
+
+- [x] Qt desktop shell
+- [x] Active IPv4 interface enumeration
+- [x] ONVIF WS-Discovery probe and basic ProbeMatch parsing
+- [x] Project firmware UDP 9988 probe and Contract B response parsing
+- [x] Basic device inventory population
+- [ ] Vendor-specific adapters
+- [ ] Bounded fallback subnet scanning
+- [ ] ONVIF device-information and capability queries
+- [ ] SQLite history, credentials integration and provisioning
+
 ## Safety and limitations
 
-The tool will not guess passwords, bypass authentication or send undocumented configuration/activation commands. It will show unknown capabilities honestly. Firmware upgrades require verified model compatibility and integrity checks. Network scans are local, bounded and user initiated.
-
-No software can guarantee support for every proprietary camera model. Actual support is recorded against exact model and firmware combinations in the compatibility matrix.
+The tool will not guess passwords, bypass authentication or send undocumented configuration/activation commands. It shows unknown capabilities honestly. Firmware upgrades require verified model compatibility and integrity checks. Discovery is limited to active local IPv4 interfaces; it does not scan remote routed subnets.
