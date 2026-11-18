@@ -243,6 +243,8 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")))
         device.discoverySources << QStringLiteral("ONVIF GetDeviceInformation");
     emit deviceFound(device);
+    requestOnvifCapabilities(device);
+    requestOnvifNetworkInterfaces(device);
 }
 
 void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
