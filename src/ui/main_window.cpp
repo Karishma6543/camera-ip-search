@@ -194,6 +194,8 @@ void MainWindow::buildUi()
     tools->addWidget(addDeviceButton_);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
     tools->addWidget(renameButton);
+    auto *renameButton = actionButton(tr("Rename label"), toolbar);
+    tools->addWidget(renameButton);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
     tools->addWidget(scanButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
@@ -423,12 +425,13 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
             (ipItem && ipItem->text() == device.ipAddress)) { row = i; break; }
     }
     if (row < 0) { row = deviceTable_->rowCount(); deviceTable_->insertRow(row); }
+    const QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
     auto *check = new QTableWidgetItem();
     check->setFlags(check->flags() | Qt::ItemIsUserCheckable);
     check->setCheckState(Qt::Unchecked);
     deviceTable_->setItem(row, 0, check);
     const QStringList values = {
-        device.ipAddress, device.isCandidate ? QStringLiteral("Unverified candidate") : QString(),
+        device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
         device.firmwareVersion, device.activationState,
         device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId
@@ -436,7 +439,8 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));
     updateDeviceSummary();
-    persistDevice(device);
+    applyFilters();
+    if (!loadingInventory_) persistDevice(device);
 }
 
 void MainWindow::initializeInventory()
@@ -453,8 +457,11 @@ void MainWindow::initializeInventory()
         return;
     }
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)")))
+    if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"))) {
         updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
+        return;
+    }
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN user_label TEXT DEFAULT ''"));
 }
 
 void MainWindow::persistDevice(const DeviceRecord &device)
@@ -462,13 +469,14 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
     const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
     QSqlQuery query(inventoryDb_);
-    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,last_seen=CURRENT_TIMESTAMP"));
+    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,last_seen=CURRENT_TIMESTAMP"));
     query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
     query.bindValue(":manufacturer", device.manufacturer); query.bindValue(":model", device.model);
     query.bindValue(":firmware", device.firmwareVersion); query.bindValue(":serial", device.serialNumber);
     query.bindValue(":hardware", device.hardwareId); query.bindValue(":activation", device.activationState);
     query.bindValue(":source", device.discoverySources.join(QStringLiteral(", ")));
     query.bindValue(":candidate", device.isCandidate ? 1 : 0);
+    query.bindValue(":label", device.userLabel);
     if (!query.exec()) updateStatus(tr("Inventory save failed: %1").arg(query.lastError().text()));
 }
 
@@ -476,7 +484,8 @@ void MainWindow::loadInventory()
 {
     if (!inventoryDb_.isOpen()) return;
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate FROM devices ORDER BY last_seen DESC"))) return;
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label FROM devices ORDER BY last_seen DESC"))) return;
+    loadingInventory_ = true;
     while (query.next()) {
         DeviceRecord device;
         device.ipAddress=query.value(0).toString(); device.macAddress=query.value(1).toString();
@@ -485,8 +494,11 @@ void MainWindow::loadInventory()
         device.hardwareId=query.value(6).toString(); device.activationState=query.value(7).toString();
         device.discoverySources=query.value(8).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         device.isCandidate=query.value(9).toInt()!=0;
+        device.userLabel=query.value(10).toString();
         upsertDevice(device);
     }
+    loadingInventory_ = false;
+    applyFilters();
 }
 
 void MainWindow::addManualDevice()
@@ -565,7 +577,57 @@ void MainWindow::editSelectedLabel()
     applyFilters();
 }
 
-void MainWindow::openSelectedWebInterface()
+
+void MainWindow::applyFilters()
+{
+    const QString needle = searchEdit_ ? searchEdit_->text().trimmed() : QString();
+    const QString vendor = manufacturerFilter_ ? manufacturerFilter_->currentText() : tr("All manufacturers");
+    const QString status = statusFilter_ ? statusFilter_->currentText() : tr("All statuses");
+    int visible = 0;
+    for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+        bool textMatch = needle.isEmpty();
+        for (int col = 1; col < deviceTable_->columnCount() && !textMatch; ++col) {
+            const auto *item = deviceTable_->item(row, col);
+            textMatch = item && item->text().contains(needle, Qt::CaseInsensitive);
+        }
+        const QString source = deviceTable_->item(row, 8) ? deviceTable_->item(row, 8)->text() : QString();
+        const QString activation = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QString();
+        const bool vendorMatch = vendor == tr("All manufacturers") ||
+            (vendor == tr("ONVIF devices") && source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive)) ||
+            (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
+            (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) && !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
+        const bool statusMatch = status == tr("All statuses") ||
+            (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
+            (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
+        const bool show = textMatch && vendorMatch && statusMatch;
+        deviceTable_->setRowHidden(row, !show);
+        if (show) ++visible;
+    }
+    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 / %2 devices").arg(visible).arg(deviceTable_->rowCount()));
+}
+
+void MainWindow::editSelectedLabel()
+{
+    const int row = deviceTable_->currentRow();
+    if (row < 0) { updateStatus(tr("Select a device before renaming its label.")); return; }
+    const QString current = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+    bool accepted = false;
+    const QString label = QInputDialog::getText(this, tr("Rename device label"), tr("Friendly device name:"), QLineEdit::Normal, current, &accepted).trimmed();
+    if (!accepted) return;
+    if (deviceTable_->item(row, 2)) deviceTable_->item(row, 2)->setText(label);
+    const QString ip = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
+    const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
+    if (inventoryDb_.isOpen()) {
+        QSqlQuery query(inventoryDb_);
+        query.prepare(QStringLiteral("UPDATE devices SET user_label=:label WHERE device_key=:key"));
+        query.bindValue(":label", label);
+        query.bindValue(":key", !mac.isEmpty() ? mac : ip);
+        if (!query.exec()) updateStatus(tr("Could not save label: %1").arg(query.lastError().text()));
+        else updateStatus(tr("Device label saved."));
+    } else updateStatus(tr("Label changed for this session only."));
+    applyFilters();
+}
+\nvoid MainWindow::openSelectedWebInterface()
 {
     const int row=deviceTable_->currentRow();
     if (row<0) return;
