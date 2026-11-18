@@ -2,6 +2,8 @@
 #include "discovery_parser.h"
 
 #include <QNetworkAddressEntry>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QNetworkDatagram>
 #include <QUuid>
 #include <algorithm>
@@ -173,10 +175,4 @@ void DiscoveryService::mergeAndEmit(DeviceRecord device)
     devices_.insert(key, device);
     emit deviceFound(device);
 }
-
-QString DiscoveryService::normalizedMac(const QString &mac)
-{
-    QString value = mac.trimmed().toUpper();
-    value.replace('-', ':');
-    return value;
-}
+\n
