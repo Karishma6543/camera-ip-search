@@ -15,4 +15,6 @@ struct DeviceRecord
     QStringList discoverySources;
     QString interfaceName;
     QString onvifEndpoint;
+    QStringList openPorts;
+    bool isCandidate{false};
 };

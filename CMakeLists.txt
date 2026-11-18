@@ -19,6 +19,8 @@ qt_add_executable(camera-ip-search
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
     src/discovery/discovery_service.cpp
+    src/discovery/subnet_scanner.h
+    src/discovery/subnet_scanner.cpp
     src/ui/main_window.cpp
     src/ui/main_window.h
 )

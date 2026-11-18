@@ -1,6 +1,7 @@
 #include "main_window.h"
 
 #include "discovery/discovery_service.h"
+#include "discovery/subnet_scanner.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -19,6 +20,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QWidget>
+#include <QNetworkAddressEntry>
+#include <QNetworkInterface>
 
 namespace {
 QLabel *mutedLabel(const QString &text, QWidget *parent)
@@ -45,8 +48,10 @@ QGroupBox *panel(const QString &title, QWidget *parent)
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     discovery_ = new DiscoveryService(this);
+    subnetScanner_ = new SubnetScanner(this);
     buildUi();
-    updateStatus(tr("Ready — connect cameras to the local network and start discovery."));
+    populateInterfaces();
+    updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
@@ -55,6 +60,33 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateDeviceSummary();
         updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
     });
+    connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
+    connect(subnetScanner_, &SubnetScanner::statusChanged, this, &MainWindow::updateStatus);
+    connect(subnetScanner_, &SubnetScanner::finished, this, [this](int count) {
+        subnetScanButton_->setText(tr("Scan selected subnet"));
+        subnetScanButton_->setEnabled(true);
+        updateDeviceSummary();
+        updateStatus(tr("Subnet scan finished — %1 unverified candidate(s).").arg(count));
+    });
+}
+
+void MainWindow::populateInterfaces()
+{
+    if (!interfaceSelector_) return;
+    interfaceSelector_->clear();
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        bool hasIpv4 = false;
+        for (const auto &entry : interface.addressEntries())
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                !entry.ip().isLoopback() && entry.prefixLength() >= 1) hasIpv4 = true;
+        if (hasIpv4) interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
+    }
+    if (interfaceSelector_->count() == 0)
+        interfaceSelector_->addItem(tr("No active IPv4 interface"), QString());
 }
 
 void MainWindow::buildUi()
@@ -130,7 +162,9 @@ void MainWindow::buildUi()
     tools->setContentsMargins(9, 7, 9, 7);
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setPlaceholderText(tr("Search IP, MAC, model or manufacturer"));
-    searchEdit_->setMinimumWidth(270);
+    searchEdit_->setMinimumWidth(250);
+    interfaceSelector_ = new QComboBox(toolbar);
+    interfaceSelector_->setMinimumWidth(155);
     auto *vendorFilter = new QComboBox(toolbar);
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     auto *statusFilter = new QComboBox(toolbar);
@@ -138,12 +172,15 @@ void MainWindow::buildUi()
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("metric"));
     tools->addWidget(searchEdit_, 2);
+    tools->addWidget(interfaceSelector_);
     tools->addWidget(vendorFilter);
     tools->addWidget(statusFilter);
     tools->addStretch();
     tools->addWidget(deviceCountValue_);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
     tools->addWidget(scanButton_);
+    subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
+    tools->addWidget(subnetScanButton_);
     root->addWidget(toolbar);
 
     auto *mainRow = new QHBoxLayout();
@@ -183,7 +220,6 @@ void MainWindow::buildUi()
     tabs->addTab(makeMaintenanceTab(tabs), tr("Maintenance"));
     tabs->addTab(makeNvrTab(tabs), tr("NVR Channels"));
     leftLayout->addWidget(tabs);
-    mainRow->addWidget(left, 3);
 
     auto *rightScroll = new QScrollArea(central);
     rightScroll->setWidgetResizable(true);
@@ -245,6 +281,7 @@ void MainWindow::buildUi()
     rightLayout->addWidget(bulkPanel);
     rightLayout->addStretch();
     rightScroll->setWidget(rightContent);
+    mainRow->addWidget(left, 3);
     mainRow->addWidget(rightScroll, 1);
     root->addLayout(mainRow, 1);
 
@@ -264,6 +301,25 @@ void MainWindow::buildUi()
             scanButton_->setText(tr("Cancel discovery"));
             discovery_->start();
         }
+    });
+    connect(subnetScanButton_, &QPushButton::clicked, this, [this] {
+        if (subnetScanner_->isRunning()) {
+            subnetScanner_->cancel();
+            subnetScanButton_->setText(tr("Scan selected subnet"));
+            return;
+        }
+        const QString selectedName = interfaceSelector_->currentData().toString();
+        const QNetworkInterface interface = QNetworkInterface::interfaceFromName(selectedName);
+        for (const auto &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
+                if (subnetScanner_->start(interface, entry)) {
+                    subnetScanButton_->setText(tr("Cancel subnet scan"));
+                    return;
+                }
+            }
+        }
+        updateStatus(tr("Could not start subnet scan. Select an active IPv4 interface."));
     });
     connect(searchEdit_, &QLineEdit::textChanged, this, [this](const QString &value) {
         const QString needle = value.trimmed();
@@ -343,8 +399,9 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     check->setCheckState(Qt::Unchecked);
     deviceTable_->setItem(row, 0, check);
     const QStringList values = {
-        device.ipAddress, QString(), device.manufacturer, device.model,
-        device.macAddress, device.firmwareVersion, device.activationState,
+        device.ipAddress, device.isCandidate ? QStringLiteral("Unverified candidate") : QString(),
+        device.manufacturer, device.model, device.macAddress,
+        device.firmwareVersion, device.activationState,
         device.discoverySources.join(QStringLiteral(", "))
     };
     for (int col = 0; col < values.size(); ++col)

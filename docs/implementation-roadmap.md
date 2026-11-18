@@ -16,12 +16,12 @@ This roadmap is the working sequence for contributors. Checkboxes represent repo
 - [ ] Keep UI responsive by running network work outside the GUI thread.
 
 ## Milestone 2 — Universal discovery
-- [ ] Implement ONVIF WS-Discovery Probe/ProbeMatch parsing and endpoint extraction.
-- [ ] Implement the project's UDP 9988 Contract B probe/response codec.
-- [ ] Add bounded opt-in IPv4 subnet candidate scanning.
-- [ ] Merge duplicate observations and preserve discovery provenance.
-- [ ] Add unknown-device and false-positive handling.
-- [ ] Validate Windows, macOS and Linux behavior.
+- [x] Implement ONVIF WS-Discovery Probe/ProbeMatch parsing and endpoint extraction.
+- [x] Implement the project's UDP 9988 Contract B probe/response codec.
+- [x] Add bounded opt-in IPv4 subnet candidate scanning.
+- [x] Merge duplicate observations and preserve discovery provenance.
+- [x] Add unknown-device and false-positive handling.
+- [ ] Validate Windows, macOS and Linux behavior with hardware.
 
 ## Milestone 3 — Device information and inventory
 - [ ] Query ONVIF device information/capabilities when available.
