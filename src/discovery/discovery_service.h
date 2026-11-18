@@ -41,6 +41,10 @@ private:
     void mergeAndEmit(DeviceRecord device);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
+    void requestOnvifCapabilities(const DeviceRecord &device);
+    void handleOnvifCapabilities(QNetworkReply *reply, const QString &deviceKey);
+    void requestOnvifNetworkInterfaces(const DeviceRecord &device);
+    void handleOnvifNetworkInterfaces(QNetworkReply *reply, const QString &deviceKey);
 
     QVector<InterfaceSocket> sockets_;
     QHash<QString, DeviceRecord> devices_;

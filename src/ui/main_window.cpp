@@ -199,8 +199,8 @@ void MainWindow::buildUi()
     listHeading->addWidget(summaryLabel_);
     leftLayout->addLayout(listHeading);
 
-    deviceTable_ = new QTableWidget(0, 9, left);
-    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE")});
+    deviceTable_ = new QTableWidget(0, 11, left);
+    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID")});
     deviceTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     deviceTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
     deviceTable_->horizontalHeader()->setStretchLastSection(true);
@@ -414,7 +414,7 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
         device.ipAddress, device.isCandidate ? QStringLiteral("Unverified candidate") : QString(),
         device.manufacturer, device.model, device.macAddress,
         device.firmwareVersion, device.activationState,
-        device.discoverySources.join(QStringLiteral(", "))
+        device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId
     };
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));

@@ -16,6 +16,7 @@ struct DeviceRecord
     QString deviceServiceUrl;
     QString networkSummary;
     QString activationState{QStringLiteral("Unknown")};
+    QStringList capabilities;
     QStringList discoverySources;
     QString interfaceName;
     QString onvifEndpoint;

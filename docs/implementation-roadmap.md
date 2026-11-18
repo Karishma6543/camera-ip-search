@@ -27,7 +27,7 @@ This roadmap is the working sequence for contributors. Checkboxes represent repo
 - [x] Query ONVIF GetDeviceInformation when a same-device HTTP(S) endpoint is advertised.
 - [x] Populate manufacturer, model, firmware, serial and hardware ID where returned.
 - [x] Add a selectable device-details view from the inventory.
-- [ ] Query ONVIF capabilities and network interfaces.
+- [x] Query ONVIF capabilities and network interfaces (read-only; device/model hardware validation remains outstanding).
 - [ ] Persist non-sensitive device history and operation metadata in SQLite.
 - [ ] Add manual device entry and open-web-interface action.
 

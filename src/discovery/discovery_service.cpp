@@ -244,3 +244,123 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
         device.discoverySources << QStringLiteral("ONVIF GetDeviceInformation");
     emit deviceFound(device);
 }
+
+void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
+{
+    const QUrl url(device.deviceServiceUrl);
+    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
+                           url.scheme() != QStringLiteral("https")) ||
+        url.host() != device.ipAddress)
+        return;
+    const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetCapabilities><tds:Category>All</tds:Category></tds:GetCapabilities></s:Body>
+</s:Envelope>)";
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(3500);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+        handleOnvifCapabilities(reply, key);
+    });
+}
+
+void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QString &deviceKey)
+{
+    const QByteArray payload = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    reply->deleteLater();
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+        return;
+
+    QXmlStreamReader xml(payload);
+    QStringList capabilities;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement()) continue;
+        const QString name = xml.name().toString();
+        if (name == QStringLiteral("Analytics") || name == QStringLiteral("Device") ||
+            name == QStringLiteral("Events") || name == QStringLiteral("Imaging") ||
+            name == QStringLiteral("Media") || name == QStringLiteral("PTZ") ||
+            name == QStringLiteral("Extension"))
+            if (!capabilities.contains(name)) capabilities.append(name);
+    }
+    if (xml.hasError()) return;
+    DeviceRecord &device = devices_[deviceKey];
+    device.capabilities = capabilities;
+    if (!device.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
+        device.discoverySources << QStringLiteral("ONVIF GetCapabilities");
+    emit deviceFound(device);
+}
+
+void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
+{
+    const QUrl url(device.deviceServiceUrl);
+    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
+                           url.scheme() != QStringLiteral("https")) ||
+        url.host() != device.ipAddress)
+        return;
+    const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetNetworkInterfaces/></s:Body>
+</s:Envelope>)";
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(3500);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+        handleOnvifNetworkInterfaces(reply, key);
+    });
+}
+
+void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const QString &deviceKey)
+{
+    const QByteArray payload = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    reply->deleteLater();
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+        return;
+
+    QXmlStreamReader xml(payload);
+    QStringList interfaces;
+    QString currentName;
+    QString currentMac;
+    QString currentAddress;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isStartElement()) {
+            const QString name = xml.name().toString();
+            if (name == QStringLiteral("NetworkInterface")) {
+                currentName.clear();
+                currentMac.clear();
+                currentAddress.clear();
+            } else if (name == QStringLiteral("Name")) {
+                currentName = xml.readElementText().trimmed();
+            } else if (name == QStringLiteral("HwAddress")) {
+                currentMac = xml.readElementText().trimmed();
+            } else if (name == QStringLiteral("Address")) {
+                currentAddress = xml.readElementText().trimmed();
+            }
+        } else if (xml.isEndElement() && xml.name() == QStringLiteral("NetworkInterface")) {
+            QStringList parts;
+            if (!currentName.isEmpty()) parts << currentName;
+            if (!currentAddress.isEmpty()) parts << currentAddress;
+            if (!currentMac.isEmpty()) parts << currentMac;
+            if (!parts.isEmpty()) interfaces << parts.join(QStringLiteral(" | "));
+        }
+    }
+    if (xml.hasError()) return;
+    DeviceRecord &device = devices_[deviceKey];
+    device.networkSummary = interfaces.join(QStringLiteral("; "));
+    if (!device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces")))
+        device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
+    emit deviceFound(device);
+}
