@@ -175,4 +175,4 @@ void DiscoveryService::mergeAndEmit(DeviceRecord device)
     devices_.insert(key, device);
     emit deviceFound(device);
 }
-\n
+
