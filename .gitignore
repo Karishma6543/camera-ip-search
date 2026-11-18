@@ -1,0 +1,17 @@
+# Build output
+/build/
+/cmake-build-/
+/out/
+/dist/
+/*.user
+*.user.*
+*.autosave
+CMakeUserPresets.json
+.idea/
+.vscode/
+.DS_Store
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
