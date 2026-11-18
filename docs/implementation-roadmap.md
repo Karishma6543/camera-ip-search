@@ -28,8 +28,8 @@ This roadmap is the working sequence for contributors. Checkboxes represent repo
 - [x] Populate manufacturer, model, firmware, serial and hardware ID where returned.
 - [x] Add a selectable device-details view from the inventory.
 - [x] Query ONVIF capabilities and network interfaces (read-only; device/model hardware validation remains outstanding).
-- [ ] Persist non-sensitive device history and operation metadata in SQLite.
-- [ ] Add manual device entry and open-web-interface action.
+- [x] Persist non-sensitive device inventory and last-seen metadata in local SQLite (no credentials stored).
+- [x] Add manual device entry and open-web-interface action.
 
 ## Milestone 4 — Vendor integrations
 - [ ] Research and document official SDK/protocol options for CP Plus.

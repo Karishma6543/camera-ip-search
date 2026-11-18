@@ -22,6 +22,15 @@
 #include <QWidget>
 #include <QNetworkAddressEntry>
 #include <QNetworkInterface>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QStandardPaths>
+#include <QDir>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QHostAddress>
 
 namespace {
 QLabel *mutedLabel(const QString &text, QWidget *parent)
@@ -50,6 +59,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     discovery_ = new DiscoveryService(this);
     subnetScanner_ = new SubnetScanner(this);
     buildUi();
+    initializeInventory();
+    loadInventory();
     populateInterfaces();
     updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
@@ -177,6 +188,8 @@ void MainWindow::buildUi()
     tools->addWidget(statusFilter);
     tools->addStretch();
     tools->addWidget(deviceCountValue_);
+    addDeviceButton_ = actionButton(tr("Add device"), toolbar);
+    tools->addWidget(addDeviceButton_);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
     tools->addWidget(scanButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
@@ -332,6 +345,11 @@ void MainWindow::buildUi()
             deviceTable_->setRowHidden(row, !match);
         }
     });
+    connect(addDeviceButton_, &QPushButton::clicked, this, &MainWindow::addManualDevice);
+    connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
+    connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
+        openWebButton_->setEnabled(deviceTable_->currentRow() >= 0);
+    });
     connect(help, &QPushButton::clicked, this, [this] { updateStatus(tr("See the project documentation for supported discovery protocols and current feature status.")); });
     connect(settings, &QPushButton::clicked, this, [this] { updateStatus(tr("Application preferences are planned; no settings have been changed.")); });
     connect(selectAll, &QPushButton::clicked, this, [this] { updateStatus(tr("Bulk selection actions will be enabled with the bulk configuration implementation.")); });
@@ -373,7 +391,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *layout = new QHBoxLayout(page);
     auto *reboot = actionButton(tr("Reboot selected"), page); reboot->setEnabled(false);
     auto *refresh = actionButton(tr("Refresh device info"), page); refresh->setEnabled(false);
-    auto *web = actionButton(tr("Open web interface"), page); web->setEnabled(false);
+    openWebButton_ = actionButton(tr("Open web interface"), page);
+    openWebButton_->setEnabled(false);
+    auto *web = openWebButton_;
     layout->addWidget(reboot); layout->addWidget(refresh); layout->addWidget(web); layout->addStretch();
     return page;
 }
@@ -419,4 +439,89 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));
     updateDeviceSummary();
+    persistDevice(device);
+}
+
+void MainWindow::initializeInventory()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (!QDir().mkpath(directory)) {
+        updateStatus(tr("Local inventory unavailable; devices remain session-only."));
+        return;
+    }
+    inventoryDb_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("camera_inventory"));
+    inventoryDb_.setDatabaseName(directory + QStringLiteral("/inventory.sqlite"));
+    if (!inventoryDb_.open()) {
+        updateStatus(tr("Could not open local inventory: %1").arg(inventoryDb_.lastError().text()));
+        return;
+    }
+    QSqlQuery query(inventoryDb_);
+    if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)")))
+        updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
+}
+
+void MainWindow::persistDevice(const DeviceRecord &device)
+{
+    if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    QSqlQuery query(inventoryDb_);
+    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,last_seen=CURRENT_TIMESTAMP"));
+    query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
+    query.bindValue(":manufacturer", device.manufacturer); query.bindValue(":model", device.model);
+    query.bindValue(":firmware", device.firmwareVersion); query.bindValue(":serial", device.serialNumber);
+    query.bindValue(":hardware", device.hardwareId); query.bindValue(":activation", device.activationState);
+    query.bindValue(":source", device.discoverySources.join(QStringLiteral(", ")));
+    query.bindValue(":candidate", device.isCandidate ? 1 : 0);
+    if (!query.exec()) updateStatus(tr("Inventory save failed: %1").arg(query.lastError().text()));
+}
+
+void MainWindow::loadInventory()
+{
+    if (!inventoryDb_.isOpen()) return;
+    QSqlQuery query(inventoryDb_);
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate FROM devices ORDER BY last_seen DESC"))) return;
+    while (query.next()) {
+        DeviceRecord device;
+        device.ipAddress=query.value(0).toString(); device.macAddress=query.value(1).toString();
+        device.manufacturer=query.value(2).toString(); device.model=query.value(3).toString();
+        device.firmwareVersion=query.value(4).toString(); device.serialNumber=query.value(5).toString();
+        device.hardwareId=query.value(6).toString(); device.activationState=query.value(7).toString();
+        device.discoverySources=query.value(8).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.isCandidate=query.value(9).toInt()!=0;
+        upsertDevice(device);
+    }
+}
+
+void MainWindow::addManualDevice()
+{
+    bool accepted=false;
+    const QString input=QInputDialog::getText(this,tr("Add device manually"),tr("Camera IPv4 address or hostname:"),QLineEdit::Normal,QString(),&accepted).trimmed();
+    if (!accepted) return;
+    const QHostAddress address(input);
+    if (input.isEmpty() || (address.isNull() && (input.contains(QLatin1Char('/')) || input.contains(QLatin1Char(' '))))) {
+        QMessageBox::warning(this,tr("Invalid address"),tr("Enter a valid IP address or hostname."));
+        return;
+    }
+    DeviceRecord device;
+    device.ipAddress=address.isNull()?input:address.toString();
+    device.discoverySources << QStringLiteral("Manual");
+    device.activationState=QStringLiteral("Unknown");
+    upsertDevice(device);
+    updateStatus(tr("Added %1 manually. No credentials were requested or stored.").arg(device.ipAddress));
+}
+
+void MainWindow::openSelectedWebInterface()
+{
+    const int row=deviceTable_->currentRow();
+    if (row<0) return;
+    const auto *item=deviceTable_->item(row,1);
+    if (!item || item->text().isEmpty()) return;
+    const QString host=item->text().trimmed();
+    const QUrl url=host.startsWith(QStringLiteral("https://"),Qt::CaseInsensitive) || host.startsWith(QStringLiteral("http://"),Qt::CaseInsensitive)
+        ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://")+host);
+    if (!url.isValid() || url.host().isEmpty()) {
+        QMessageBox::warning(this,tr("Invalid address"),tr("Selected device has no valid web address."));
+        return;
+    }
+    QDesktopServices::openUrl(url);
 }

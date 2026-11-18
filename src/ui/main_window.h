@@ -3,6 +3,7 @@
 #include "core/device_record.h"
 
 #include <QMainWindow>
+#include <QSqlDatabase>
 
 class QLabel;
 class QTableWidget;
@@ -28,6 +29,11 @@ private:
     void updateStatus(const QString &message);
     void updateDeviceSummary();
     void upsertDevice(const DeviceRecord &device);
+    void initializeInventory();
+    void persistDevice(const DeviceRecord &device);
+    void loadInventory();
+    void addManualDevice();
+    void openSelectedWebInterface();
     DiscoveryService *discovery_{nullptr};
     SubnetScanner *subnetScanner_{nullptr};
     QTableWidget *deviceTable_{nullptr};
@@ -39,4 +45,7 @@ private:
     QLineEdit *searchEdit_{nullptr};
     QComboBox *interfaceSelector_{nullptr};
     QLabel *deviceDetailsLabel_{nullptr};
+    QPushButton *addDeviceButton_{nullptr};
+    QPushButton *openWebButton_{nullptr};
+    QSqlDatabase inventoryDb_;
 };
