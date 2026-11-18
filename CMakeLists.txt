@@ -9,13 +9,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Test)
 qt_standard_project_setup()
 
 qt_add_executable(camera-ip-search
     src/main.cpp
     src/core/device_record.h
     src/discovery/discovery_service.h
+    src/discovery/discovery_parser.h
+    src/discovery/discovery_parser.cpp
     src/discovery/discovery_service.cpp
     src/ui/main_window.cpp
     src/ui/main_window.h
@@ -30,5 +32,18 @@ else()
     target_compile_options(camera-ip-search PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(discovery-parser-tests
+        tests/discovery_parser_test.cpp
+        src/core/device_record.h
+        src/discovery/discovery_parser.h
+        src/discovery/discovery_parser.cpp
+    )
+    target_include_directories(discovery-parser-tests PRIVATE src)
+    target_link_libraries(discovery-parser-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
+    add_test(NAME discovery-parser-tests COMMAND discovery-parser-tests)
+endif()
+
 include(GNUInstallDirs)
-install(TARGETS camera-ip-search RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} BUNDLE DESTINATION .)
+install(TARGETS camera-ip-search RUNTIME DESTINATION \${CMAKE_INSTALL_BINDIR} BUNDLE DESTINATION .)

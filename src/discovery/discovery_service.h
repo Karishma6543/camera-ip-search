@@ -32,18 +32,11 @@ private:
         QHostAddress localAddress;
         quint32 requestSequence{0};
     };
-
-    void addInterfaceSocket(const QNetworkInterface &interface,
-                            const QHostAddress &localAddress);
+    void addInterfaceSocket(const QNetworkInterface &interface, const QHostAddress &localAddress);
     void sendOnvifProbe(InterfaceSocket &entry);
     void sendProjectProbe(InterfaceSocket &entry);
     void processDatagram(QUdpSocket *socket);
-    void processProjectResponse(const QByteArray &payload, const QHostAddress &sender,
-                                const InterfaceSocket &entry);
-    void processOnvifResponse(const QByteArray &payload, const QHostAddress &sender,
-                              const InterfaceSocket &entry);
     void mergeAndEmit(DeviceRecord device);
-    static QString normalizedMac(const QString &mac);
 
     QVector<InterfaceSocket> sockets_;
     QHash<QString, DeviceRecord> devices_;

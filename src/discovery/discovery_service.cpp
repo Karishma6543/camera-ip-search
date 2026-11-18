@@ -1,23 +1,15 @@
 #include "discovery_service.h"
+#include "discovery_parser.h"
 
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
 #include <QNetworkAddressEntry>
 #include <QNetworkDatagram>
 #include <QUuid>
 #include <algorithm>
-#include <QXmlStreamReader>
 
 namespace {
 constexpr quint16 kProjectPort = 9988;
 constexpr quint16 kOnvifPort = 3702;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
-
-QString firstNonEmpty(const QString &a, const QString &b)
-{
-    return a.trimmed().isEmpty() ? b : a.trimmed();
-}
 }
 
 DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
@@ -36,10 +28,7 @@ DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
     });
 }
 
-bool DiscoveryService::isRunning() const
-{
-    return running_;
-}
+bool DiscoveryService::isRunning() const { return running_; }
 
 void DiscoveryService::start()
 {
@@ -54,14 +43,10 @@ void DiscoveryService::start()
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
             !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack)) {
-            continue;
-        }
+            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
         for (const auto &address : interface.addressEntries()) {
             if (address.ip().protocol() != QAbstractSocket::IPv4Protocol ||
-                address.ip().isLoopback()) {
-                continue;
-            }
+                address.ip().isLoopback()) continue;
             addInterfaceSocket(interface, address.ip());
         }
     }
@@ -145,101 +130,38 @@ void DiscoveryService::sendProjectProbe(InterfaceSocket &entry)
 void DiscoveryService::processDatagram(QUdpSocket *socket)
 {
     while (socket->hasPendingDatagrams()) {
-        QNetworkDatagram datagram = socket->receiveDatagram();
-        const QByteArray payload = datagram.data();
+        const QNetworkDatagram datagram = socket->receiveDatagram();
         const auto it = std::find_if(sockets_.begin(), sockets_.end(),
-                                     [socket](const InterfaceSocket &entry) {
-                                         return entry.socket == socket;
-                                     });
+                                     [socket](const InterfaceSocket &entry) { return entry.socket == socket; });
         if (it == sockets_.end()) continue;
+        const QByteArray payload = datagram.data();
         if (payload.size() > 65507) continue;
+        DeviceRecord device;
+        const QHostAddress sender = datagram.senderAddress();
         if (payload.contains("CAM_DISCOVER")) {
-            processProjectResponse(payload, datagram.senderAddress(), *it);
+            if (DiscoveryParser::parseProjectResponse(payload, it->requestSequence, sender,
+                    it->interface.humanReadableName(), &device))
+                mergeAndEmit(device);
         } else if (payload.contains("ProbeMatches") || payload.contains("ProbeMatch")) {
-            processOnvifResponse(payload, datagram.senderAddress(), *it);
+            if (DiscoveryParser::parseOnvifProbeMatch(payload, sender,
+                    it->interface.humanReadableName(), &device))
+                mergeAndEmit(device);
         }
     }
-}
-
-void DiscoveryService::processProjectResponse(const QByteArray &payload,
-                                              const QHostAddress &sender,
-                                              const InterfaceSocket &entry)
-{
-    QJsonParseError error{};
-    const auto document = QJsonDocument::fromJson(payload, &error);
-    if (error.error != QJsonParseError::NoError || !document.isObject()) return;
-    const auto root = document.object();
-    if (root.value(QStringLiteral("magic")).toString() != QStringLiteral("CAM_DISCOVER") ||
-        root.value(QStringLiteral("version")).toInt(-1) != 1 ||
-        root.value(QStringLiteral("cmd")).toString() != QStringLiteral("PROBE_RESPONSE") ||
-        root.value(QStringLiteral("seq")).toVariant().toULongLong() != entry.requestSequence) return;
-    const auto deviceObject = root.value(QStringLiteral("device")).toObject();
-    if (deviceObject.isEmpty()) return;
-
-    DeviceRecord device;
-    device.ipAddress = firstNonEmpty(deviceObject.value(QStringLiteral("ipv4")).toString(),
-                                     sender.toString());
-    device.macAddress = normalizedMac(deviceObject.value(QStringLiteral("mac")).toString());
-    device.manufacturer = QStringLiteral("Project camera");
-    device.model = deviceObject.value(QStringLiteral("soc")).toString();
-    device.firmwareVersion = deviceObject.value(QStringLiteral("firmware_version")).toString();
-    device.activationState = deviceObject.contains(QStringLiteral("activated"))
-        ? (deviceObject.value(QStringLiteral("activated")).toBool() ? tr("Activated") : tr("Not activated"))
-        : tr("Unknown");
-    device.discoverySources << QStringLiteral("Project UDP 9988");
-    device.interfaceName = entry.interface.humanReadableName();
-    device.id = device.macAddress.isEmpty() ? device.ipAddress : device.macAddress;
-    mergeAndEmit(device);
-}
-
-void DiscoveryService::processOnvifResponse(const QByteArray &payload,
-                                            const QHostAddress &sender,
-                                            const InterfaceSocket &entry)
-{
-    QXmlStreamReader xml(payload);
-    QString endpoint;
-    QString xaddrs;
-    QString scopes;
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (!xml.isStartElement()) continue;
-        const QString name = xml.name().toString();
-        if (name == QStringLiteral("Address")) endpoint = xml.readElementText();
-        else if (name == QStringLiteral("XAddrs")) xaddrs = xml.readElementText();
-        else if (name == QStringLiteral("Scopes")) scopes = xml.readElementText();
-    }
-    if (xml.hasError() || (endpoint.isEmpty() && xaddrs.isEmpty())) return;
-
-    DeviceRecord device;
-    device.ipAddress = sender.toString();
-    device.onvifEndpoint = endpoint;
-    device.discoverySources << QStringLiteral("ONVIF WS-Discovery");
-    device.interfaceName = entry.interface.humanReadableName();
-    device.manufacturer = tr("ONVIF device (manufacturer unknown)");
-    device.model = tr("Model unknown");
-    const QString lowerScopes = scopes.toLower();
-    if (lowerScopes.contains(QStringLiteral("onvif://www.onvif.org/name/"))) {
-        const auto marker = QStringLiteral("onvif://www.onvif.org/name/");
-        const int index = lowerScopes.indexOf(marker);
-        device.model = scopes.mid(index + marker.size()).section(' ', 0, 0);
-    }
-    device.id = !endpoint.isEmpty() ? endpoint : device.ipAddress;
-    mergeAndEmit(device);
 }
 
 void DiscoveryService::mergeAndEmit(DeviceRecord device)
 {
     const QString key = !device.macAddress.isEmpty() ? device.macAddress
-                                                      : (!device.ipAddress.isEmpty()
-                                                             ? device.ipAddress
-                                                             : device.onvifEndpoint);
+        : (!device.ipAddress.isEmpty() ? device.ipAddress : device.onvifEndpoint);
     if (key.isEmpty()) return;
     if (devices_.contains(key)) {
         auto &existing = devices_[key];
-        if (existing.discoverySources.contains(device.discoverySources.value(0))) return;
-        existing.discoverySources.append(device.discoverySources);
+        for (const auto &source : device.discoverySources)
+            if (!existing.discoverySources.contains(source)) existing.discoverySources.append(source);
         if (existing.macAddress.isEmpty()) existing.macAddress = device.macAddress;
-        if (existing.manufacturer.isEmpty() || existing.manufacturer.startsWith(QStringLiteral("ONVIF")))
+        if (existing.manufacturer.isEmpty() ||
+            existing.manufacturer.startsWith(QStringLiteral("ONVIF")))
             existing.manufacturer = device.manufacturer;
         if (existing.model.isEmpty() || existing.model == tr("Model unknown"))
             existing.model = device.model;
