@@ -4,6 +4,7 @@
 
 #include <QAbstractItemView>
 #include <QFont>
+#include <QFrame>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
