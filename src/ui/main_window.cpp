@@ -176,9 +176,11 @@ void MainWindow::buildUi()
     searchEdit_->setMinimumWidth(250);
     interfaceSelector_ = new QComboBox(toolbar);
     interfaceSelector_->setMinimumWidth(155);
-    auto *vendorFilter = new QComboBox(toolbar);
+    manufacturerFilter_ = new QComboBox(toolbar);
+    auto *vendorFilter = manufacturerFilter_;
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
-    auto *statusFilter = new QComboBox(toolbar);
+    statusFilter_ = new QComboBox(toolbar);
+    auto *statusFilter = statusFilter_;
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("metric"));
@@ -190,6 +192,8 @@ void MainWindow::buildUi()
     tools->addWidget(deviceCountValue_);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
     tools->addWidget(addDeviceButton_);
+    auto *renameButton = actionButton(tr("Rename label"), toolbar);
+    tools->addWidget(renameButton);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
     tools->addWidget(scanButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
@@ -334,17 +338,10 @@ void MainWindow::buildUi()
         }
         updateStatus(tr("Could not start subnet scan. Select an active IPv4 interface."));
     });
-    connect(searchEdit_, &QLineEdit::textChanged, this, [this](const QString &value) {
-        const QString needle = value.trimmed();
-        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
-            bool match = needle.isEmpty();
-            for (int col = 1; col < deviceTable_->columnCount() && !match; ++col) {
-                const auto *item = deviceTable_->item(row, col);
-                match = item && item->text().contains(needle, Qt::CaseInsensitive);
-            }
-            deviceTable_->setRowHidden(row, !match);
-        }
-    });
+    connect(searchEdit_, &QLineEdit::textChanged, this, &MainWindow::applyFilters);
+    connect(vendorFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
+    connect(statusFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
+    connect(renameButton, &QPushButton::clicked, this, &MainWindow::editSelectedLabel);
     connect(addDeviceButton_, &QPushButton::clicked, this, &MainWindow::addManualDevice);
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
     connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
@@ -508,6 +505,64 @@ void MainWindow::addManualDevice()
     device.activationState=QStringLiteral("Unknown");
     upsertDevice(device);
     updateStatus(tr("Added %1 manually. No credentials were requested or stored.").arg(device.ipAddress));
+}
+
+
+void MainWindow::applyFilters()
+{
+    const QString needle = searchEdit_ ? searchEdit_->text().trimmed() : QString();
+    const QString vendor = manufacturerFilter_ ? manufacturerFilter_->currentText() : tr("All manufacturers");
+    const QString status = statusFilter_ ? statusFilter_->currentText() : tr("All statuses");
+    int visible = 0;
+    for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+        bool textMatch = needle.isEmpty();
+        for (int col = 1; col < deviceTable_->columnCount() && !textMatch; ++col) {
+            const auto *item = deviceTable_->item(row, col);
+            textMatch = item && item->text().contains(needle, Qt::CaseInsensitive);
+        }
+        const QString source = deviceTable_->item(row, 8) ? deviceTable_->item(row, 8)->text() : QString();
+        const QString activation = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QString();
+        const bool vendorMatch = vendor == tr("All manufacturers") ||
+            (vendor == tr("ONVIF devices") && source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive)) ||
+            (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
+            (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
+             !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
+        const bool statusMatch = status == tr("All statuses") ||
+            (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
+            (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
+        const bool show = textMatch && vendorMatch && statusMatch;
+        deviceTable_->setRowHidden(row, !show);
+        if (show) ++visible;
+    }
+    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 / %2 devices").arg(visible).arg(deviceTable_->rowCount()));
+}
+
+void MainWindow::editSelectedLabel()
+{
+    const int row = deviceTable_->currentRow();
+    if (row < 0) {
+        updateStatus(tr("Select a device before renaming its label."));
+        return;
+    }
+    const QString current = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+    bool accepted = false;
+    const QString label = QInputDialog::getText(this, tr("Rename device label"),
+        tr("Friendly device name:"), QLineEdit::Normal, current, &accepted).trimmed();
+    if (!accepted) return;
+    if (deviceTable_->item(row, 2)) deviceTable_->item(row, 2)->setText(label);
+    const QString ip = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
+    const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
+    if (inventoryDb_.isOpen()) {
+        QSqlQuery query(inventoryDb_);
+        query.prepare(QStringLiteral("UPDATE devices SET user_label=:label WHERE device_key=:key"));
+        query.bindValue(":label", label);
+        query.bindValue(":key", !mac.isEmpty() ? mac : ip);
+        if (!query.exec()) updateStatus(tr("Could not save label: %1").arg(query.lastError().text()));
+        else updateStatus(tr("Device label saved."));
+    } else {
+        updateStatus(tr("Label changed for this session only; inventory database is unavailable."));
+    }
+    applyFilters();
 }
 
 void MainWindow::openSelectedWebInterface()

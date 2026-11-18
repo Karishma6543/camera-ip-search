@@ -6,6 +6,7 @@
 struct DeviceRecord
 {
     QString id;
+    QString userLabel;
     QString ipAddress;
     QString macAddress;
     QString manufacturer;

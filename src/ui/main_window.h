@@ -34,6 +34,8 @@ private:
     void loadInventory();
     void addManualDevice();
     void openSelectedWebInterface();
+    void applyFilters();
+    void editSelectedLabel();
     DiscoveryService *discovery_{nullptr};
     SubnetScanner *subnetScanner_{nullptr};
     QTableWidget *deviceTable_{nullptr};
@@ -44,6 +46,9 @@ private:
     QPushButton *subnetScanButton_{nullptr};
     QLineEdit *searchEdit_{nullptr};
     QComboBox *interfaceSelector_{nullptr};
+    QComboBox *manufacturerFilter_{nullptr};
+    QComboBox *statusFilter_{nullptr};
+    bool loadingInventory_{false};
     QLabel *deviceDetailsLabel_{nullptr};
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
