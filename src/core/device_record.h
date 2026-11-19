@@ -23,4 +23,7 @@ struct DeviceRecord
     QString onvifEndpoint;
     QStringList openPorts;
     bool isCandidate{false};
+    QString reachabilityStatus{QStringLiteral("Not checked")};
+    QString reachabilityCheckedAt;
+    QString lastSuccessfulResponseAt;
 };
