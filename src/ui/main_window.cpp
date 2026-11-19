@@ -312,6 +312,52 @@ void MainWindow::buildUi()
     statusLabel_ = new QLabel(this);
     statusBar()->addWidget(statusLabel_, 1);
 
+    connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
+        if (reachabilityChecker_->isRunning()) return;
+        QVector<DeviceRecord> devices;
+        const auto selected = deviceTable_->selectionModel()->selectedRows();
+        for (const QModelIndex &index : selected) {
+            DeviceRecord device;
+            device.ipAddress = deviceTable_->item(index.row(), 1) ? deviceTable_->item(index.row(), 1)->text() : QString();
+            if (!device.ipAddress.isEmpty()) devices.append(device);
+        }
+        if (devices.isEmpty()) {
+            for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+                DeviceRecord device;
+                device.ipAddress = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
+                if (!device.ipAddress.isEmpty()) devices.append(device);
+            }
+        }
+        if (devices.isEmpty()) { updateStatus(tr("Add or discover devices before checking reachability.")); return; }
+        reachabilityButton_->setEnabled(false);
+        reachabilityButton_->setText(tr("Checking…"));
+        updateStatus(tr("Checking TCP reachability. Selected rows only; if none are selected, all devices are checked."));
+        reachabilityChecker_->start(devices);
+    });
+    connect(reachabilityChecker_, &ReachabilityChecker::deviceChecked, this,
+        [this](const QString &ip, const QString &status, const QString &checkedAt, const QString &lastSuccessAt) {
+            for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+                if (!deviceTable_->item(row, 1) || deviceTable_->item(row, 1)->text() != ip) continue;
+                deviceTable_->setItem(row, 11, new QTableWidgetItem(status));
+                const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
+                if (inventoryDb_.isOpen()) {
+                    QSqlQuery query(inventoryDb_);
+                    query.prepare(QStringLiteral("UPDATE devices SET reachability_status=:status, reachability_checked_at=:checked, last_successful_response_at=:success WHERE device_key=:key"));
+                    query.bindValue(":status", status);
+                    query.bindValue(":checked", checkedAt);
+                    query.bindValue(":success", lastSuccessAt);
+                    query.bindValue(":key", !mac.isEmpty() ? mac : ip);
+                    if (!query.exec()) updateStatus(tr("Could not save reachability result: %1").arg(query.lastError().text()));
+                }
+                break;
+            }
+            applyFilters();
+        });
+    connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
+        reachabilityButton_->setEnabled(true);
+        reachabilityButton_->setText(tr("Check reachability"));
+        updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
+    });
     connect(scanButton_, &QPushButton::clicked, this, [this] {
         if (discovery_->isRunning()) {
             discovery_->cancel();
@@ -475,7 +521,7 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
     const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
     QSqlQuery query(inventoryDb_);
-    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,last_seen=CURRENT_TIMESTAMP"));
+    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,last_seen=CURRENT_TIMESTAMP"));
     query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
     query.bindValue(":manufacturer", device.manufacturer); query.bindValue(":model", device.model);
     query.bindValue(":firmware", device.firmwareVersion); query.bindValue(":serial", device.serialNumber);
