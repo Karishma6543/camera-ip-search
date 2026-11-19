@@ -465,7 +465,20 @@ void MainWindow::buildUi()
             if (item && !item->text().isEmpty())
                 details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + item->text();
         }
-        deviceDetailsLabel_->setText(details.join(QStringLiteral("\\n")));
+        const auto *ipItem = deviceTable_->item(row, 1);
+        if (ipItem) {
+            const auto addDetail = [&details, ipItem](int role, const QString &title) {
+                const QString value = ipItem->data(role).toString();
+                if (!value.isEmpty()) details << title + QStringLiteral(": ") + value;
+            };
+            addDetail(Qt::UserRole + 1, tr("Network interface"));
+            addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
+            addDetail(Qt::UserRole + 3, tr("Device service URL"));
+            addDetail(Qt::UserRole + 4, tr("Network interfaces"));
+            addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
+            addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
+        }
+        deviceDetailsLabel_->setText(details.join(QLatin1Char('\\n')));
     });
     updateDeviceSummary();
 }
@@ -534,6 +547,13 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     check->setFlags(check->flags() | Qt::ItemIsUserCheckable);
     check->setCheckState(Qt::Unchecked);
     deviceTable_->setItem(row, 0, check);
+    auto *ipItem = new QTableWidgetItem(device.ipAddress);
+    ipItem->setData(Qt::UserRole + 1, device.interfaceName);
+    ipItem->setData(Qt::UserRole + 2, device.onvifEndpoint);
+    ipItem->setData(Qt::UserRole + 3, device.deviceServiceUrl);
+    ipItem->setData(Qt::UserRole + 4, device.networkSummary);
+    ipItem->setData(Qt::UserRole + 5, device.capabilities.join(QStringLiteral(", ")));
+    ipItem->setData(Qt::UserRole + 6, device.openPorts.join(QStringLiteral(", ")));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
@@ -543,7 +563,7 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
             ? deviceTable_->item(row, 11)->text() : device.reachabilityStatus)
     };
     for (int col = 0; col < values.size(); ++col)
-        deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));
+        deviceTable_->setItem(row, col + 1, col == 0 ? ipItem : new QTableWidgetItem(values.at(col)));
     updateDeviceSummary();
     applyFilters();
     if (!loadingInventory_) persistDevice(device);
@@ -571,6 +591,12 @@ void MainWindow::initializeInventory()
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN reachability_status TEXT DEFAULT 'Not checked'"));
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN reachability_checked_at TEXT DEFAULT ''"));
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN last_successful_response_at TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN interface_name TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN onvif_endpoint TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN device_service_url TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN network_summary TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN capabilities TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN open_ports TEXT DEFAULT ''"));
 }
 
 void MainWindow::persistDevice(const DeviceRecord &device)
@@ -578,7 +604,7 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
     const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
     QSqlQuery query(inventoryDb_);
-    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,last_seen=CURRENT_TIMESTAMP"));
+    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,:interface,:endpoint,:service,:network,:capabilities,:ports,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,interface_name=CASE WHEN excluded.interface_name='' THEN devices.interface_name ELSE excluded.interface_name END,onvif_endpoint=CASE WHEN excluded.onvif_endpoint='' THEN devices.onvif_endpoint ELSE excluded.onvif_endpoint END,device_service_url=CASE WHEN excluded.device_service_url='' THEN devices.device_service_url ELSE excluded.device_service_url END,network_summary=CASE WHEN excluded.network_summary='' THEN devices.network_summary ELSE excluded.network_summary END,capabilities=CASE WHEN excluded.capabilities='' THEN devices.capabilities ELSE excluded.capabilities END,open_ports=CASE WHEN excluded.open_ports='' THEN devices.open_ports ELSE excluded.open_ports END,last_seen=CURRENT_TIMESTAMP"));
     query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
     query.bindValue(":manufacturer", device.manufacturer); query.bindValue(":model", device.model);
     query.bindValue(":firmware", device.firmwareVersion); query.bindValue(":serial", device.serialNumber);
@@ -589,6 +615,12 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     query.bindValue(":reachability", device.reachabilityStatus);
     query.bindValue(":checked", device.reachabilityCheckedAt);
     query.bindValue(":success", device.lastSuccessfulResponseAt);
+    query.bindValue(":interface", device.interfaceName);
+    query.bindValue(":endpoint", device.onvifEndpoint);
+    query.bindValue(":service", device.deviceServiceUrl);
+    query.bindValue(":network", device.networkSummary);
+    query.bindValue(":capabilities", device.capabilities.join(QStringLiteral(", ")));
+    query.bindValue(":ports", device.openPorts.join(QStringLiteral(", ")));
     if (!query.exec()) updateStatus(tr("Inventory save failed: %1").arg(query.lastError().text()));
 }
 
@@ -596,7 +628,7 @@ void MainWindow::loadInventory()
 {
     if (!inventoryDb_.isOpen()) return;
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at FROM devices ORDER BY last_seen DESC"))) return;
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports FROM devices ORDER BY last_seen DESC"))) return;
     loadingInventory_ = true;
     while (query.next()) {
         DeviceRecord device;
@@ -611,6 +643,12 @@ void MainWindow::loadInventory()
         if (device.reachabilityStatus.isEmpty()) device.reachabilityStatus=QStringLiteral("Not checked");
         device.reachabilityCheckedAt=query.value(12).toString();
         device.lastSuccessfulResponseAt=query.value(13).toString();
+        device.interfaceName=query.value(14).toString();
+        device.onvifEndpoint=query.value(15).toString();
+        device.deviceServiceUrl=query.value(16).toString();
+        device.networkSummary=query.value(17).toString();
+        device.capabilities=query.value(18).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.openPorts=query.value(19).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         upsertDevice(device);
     }
     loadingInventory_ = false;
