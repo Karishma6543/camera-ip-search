@@ -2,6 +2,7 @@
 
 #include "discovery/discovery_service.h"
 #include "discovery/subnet_scanner.h"
+#include "discovery/reachability_checker.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -58,6 +59,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     discovery_ = new DiscoveryService(this);
     subnetScanner_ = new SubnetScanner(this);
+    reachabilityChecker_ = new ReachabilityChecker(this);
     buildUi();
     initializeInventory();
     loadInventory();
@@ -198,6 +200,8 @@ void MainWindow::buildUi()
     tools->addWidget(scanButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
     tools->addWidget(subnetScanButton_);
+    reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
+    tools->addWidget(reachabilityButton_);
     root->addWidget(toolbar);
 
     auto *mainRow = new QHBoxLayout();
@@ -216,8 +220,8 @@ void MainWindow::buildUi()
     listHeading->addWidget(summaryLabel_);
     leftLayout->addLayout(listHeading);
 
-    deviceTable_ = new QTableWidget(0, 11, left);
-    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID")});
+    deviceTable_ = new QTableWidget(0, 12, left);
+    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
     deviceTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     deviceTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
     deviceTable_->horizontalHeader()->setStretchLastSection(true);
@@ -432,7 +436,8 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
         device.firmwareVersion, device.activationState,
-        device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId
+        device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId,
+        device.reachabilityStatus
     };
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));
@@ -460,6 +465,9 @@ void MainWindow::initializeInventory()
         return;
     }
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN user_label TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN reachability_status TEXT DEFAULT 'Not checked'"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN reachability_checked_at TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN last_successful_response_at TEXT DEFAULT ''"));
 }
 
 void MainWindow::persistDevice(const DeviceRecord &device)
@@ -475,6 +483,9 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     query.bindValue(":source", device.discoverySources.join(QStringLiteral(", ")));
     query.bindValue(":candidate", device.isCandidate ? 1 : 0);
     query.bindValue(":label", device.userLabel);
+    query.bindValue(":reachability", device.reachabilityStatus);
+    query.bindValue(":checked", device.reachabilityCheckedAt);
+    query.bindValue(":success", device.lastSuccessfulResponseAt);
     if (!query.exec()) updateStatus(tr("Inventory save failed: %1").arg(query.lastError().text()));
 }
 
@@ -482,7 +493,7 @@ void MainWindow::loadInventory()
 {
     if (!inventoryDb_.isOpen()) return;
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label FROM devices ORDER BY last_seen DESC"))) return;
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at FROM devices ORDER BY last_seen DESC"))) return;
     loadingInventory_ = true;
     while (query.next()) {
         DeviceRecord device;
@@ -493,6 +504,10 @@ void MainWindow::loadInventory()
         device.discoverySources=query.value(8).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         device.isCandidate=query.value(9).toInt()!=0;
         device.userLabel=query.value(10).toString();
+        device.reachabilityStatus=query.value(11).toString();
+        if (device.reachabilityStatus.isEmpty()) device.reachabilityStatus=QStringLiteral("Not checked");
+        device.reachabilityCheckedAt=query.value(12).toString();
+        device.lastSuccessfulResponseAt=query.value(13).toString();
         upsertDevice(device);
     }
     loadingInventory_ = false;
@@ -537,7 +552,9 @@ void MainWindow::applyFilters()
             (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
             (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
              !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
+        const QString reachability = deviceTable_->item(row, 11) ? deviceTable_->item(row, 11)->text() : QStringLiteral("Not checked");
         const bool statusMatch = status == tr("All statuses") ||
+            (status == tr("Online") && reachability == QStringLiteral("Reachable")) ||
             (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
             (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
         const bool show = textMatch && vendorMatch && statusMatch;
