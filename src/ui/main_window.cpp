@@ -194,8 +194,6 @@ void MainWindow::buildUi()
     tools->addWidget(addDeviceButton_);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
     tools->addWidget(renameButton);
-    auto *renameButton = actionButton(tr("Rename label"), toolbar);
-    tools->addWidget(renameButton);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
     tools->addWidget(scanButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
