@@ -483,7 +483,8 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
         device.manufacturer, device.model, device.macAddress,
         device.firmwareVersion, device.activationState,
         device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId,
-        device.reachabilityStatus
+        (device.reachabilityStatus == QStringLiteral("Not checked") && deviceTable_->item(row, 11)
+            ? deviceTable_->item(row, 11)->text() : device.reachabilityStatus)
     };
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, new QTableWidgetItem(values.at(col)));
