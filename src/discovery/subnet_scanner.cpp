@@ -31,6 +31,8 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     active_.clear();
     emitted_.clear();
     candidates_ = 0;
+    completedProbes_ = 0;
+    totalProbes_ = 0;
 
     const quint32 ip = entry.ip().toIPv4Address();
     const quint32 mask = entry.netmask().toIPv4Address();
@@ -59,6 +61,8 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     }
 
     if (pending_.isEmpty()) return false;
+    totalProbes_ = pending_.size();
+    emit progressChanged(completedProbes_, totalProbes_, candidates_);
     running_ = true;
     scheduler_.start();
     schedule();
@@ -132,6 +136,8 @@ void SubnetScanner::completeProbe(QTcpSocket *socket, bool connected)
         socket->deleteLater();
     }
     active_.erase(it);
+    ++completedProbes_;
+    emit progressChanged(completedProbes_, totalProbes_, candidates_);
 
     if (connected) {
         if (!emitted_.contains(ip)) {
