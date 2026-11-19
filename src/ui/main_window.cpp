@@ -32,6 +32,11 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QHostAddress>
+#include <QFileDialog>
+#include <QFile>
+#include <QFileInfo>
+#include <QStringConverter>
+#include <QTextStream>
 
 namespace {
 QLabel *mutedLabel(const QString &text, QWidget *parent)
@@ -200,6 +205,8 @@ void MainWindow::buildUi()
     tools->addWidget(deviceCountValue_);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
     tools->addWidget(addDeviceButton_);
+    auto *exportButton = actionButton(tr("Export CSV"), toolbar);
+    tools->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
     tools->addWidget(renameButton);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
@@ -399,6 +406,49 @@ void MainWindow::buildUi()
     connect(statusFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
     connect(renameButton, &QPushButton::clicked, this, &MainWindow::editSelectedLabel);
     connect(addDeviceButton_, &QPushButton::clicked, this, &MainWindow::addManualDevice);
+    connect(exportButton, &QPushButton::clicked, this, [this] {
+        if (!deviceTable_ || deviceTable_->rowCount() == 0) {
+            updateStatus(tr("There are no devices to export."));
+            return;
+        }
+        const QString path = QFileDialog::getSaveFileName(
+            this, tr("Export device inventory"), QStringLiteral("camera-inventory.csv"),
+            tr("CSV files (*.csv)"));
+        if (path.isEmpty()) return;
+
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, tr("Export failed"),
+                                 tr("Could not write the CSV file: %1").arg(file.errorString()));
+            return;
+        }
+
+        QTextStream stream(&file);
+        stream.setEncoding(QStringConverter::Utf8);
+        stream << QChar(0xFEFF);
+        const auto csvField = [](QString value) {
+            value.replace(QStringLiteral("\\""), QStringLiteral("\\"\\""));
+            return QStringLiteral("\\"") + value + QStringLiteral("\\"");
+        };
+
+        QStringList headers;
+        for (int column = 1; column < deviceTable_->columnCount(); ++column)
+            headers << csvField(deviceTable_->horizontalHeaderItem(column)->text());
+        stream << headers.join(QLatin1Char(',')) << Qt::endl;
+
+        int exported = 0;
+        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+            QStringList fields;
+            for (int column = 1; column < deviceTable_->columnCount(); ++column) {
+                const auto *item = deviceTable_->item(row, column);
+                fields << csvField(item ? item->text() : QString());
+            }
+            stream << fields.join(QLatin1Char(',')) << Qt::endl;
+            ++exported;
+        }
+        file.close();
+        updateStatus(tr("Exported %1 device(s) to %2.").arg(exported).arg(QFileInfo(path).fileName()));
+    });
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
     connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
         openWebButton_->setEnabled(deviceTable_->currentRow() >= 0);
