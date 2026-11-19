@@ -578,56 +578,7 @@ void MainWindow::editSelectedLabel()
 }
 
 
-void MainWindow::applyFilters()
-{
-    const QString needle = searchEdit_ ? searchEdit_->text().trimmed() : QString();
-    const QString vendor = manufacturerFilter_ ? manufacturerFilter_->currentText() : tr("All manufacturers");
-    const QString status = statusFilter_ ? statusFilter_->currentText() : tr("All statuses");
-    int visible = 0;
-    for (int row = 0; row < deviceTable_->rowCount(); ++row) {
-        bool textMatch = needle.isEmpty();
-        for (int col = 1; col < deviceTable_->columnCount() && !textMatch; ++col) {
-            const auto *item = deviceTable_->item(row, col);
-            textMatch = item && item->text().contains(needle, Qt::CaseInsensitive);
-        }
-        const QString source = deviceTable_->item(row, 8) ? deviceTable_->item(row, 8)->text() : QString();
-        const QString activation = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QString();
-        const bool vendorMatch = vendor == tr("All manufacturers") ||
-            (vendor == tr("ONVIF devices") && source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) && !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
-        const bool statusMatch = status == tr("All statuses") ||
-            (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
-            (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
-        const bool show = textMatch && vendorMatch && statusMatch;
-        deviceTable_->setRowHidden(row, !show);
-        if (show) ++visible;
-    }
-    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 / %2 devices").arg(visible).arg(deviceTable_->rowCount()));
-}
-
-void MainWindow::editSelectedLabel()
-{
-    const int row = deviceTable_->currentRow();
-    if (row < 0) { updateStatus(tr("Select a device before renaming its label.")); return; }
-    const QString current = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
-    bool accepted = false;
-    const QString label = QInputDialog::getText(this, tr("Rename device label"), tr("Friendly device name:"), QLineEdit::Normal, current, &accepted).trimmed();
-    if (!accepted) return;
-    if (deviceTable_->item(row, 2)) deviceTable_->item(row, 2)->setText(label);
-    const QString ip = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
-    const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
-    if (inventoryDb_.isOpen()) {
-        QSqlQuery query(inventoryDb_);
-        query.prepare(QStringLiteral("UPDATE devices SET user_label=:label WHERE device_key=:key"));
-        query.bindValue(":label", label);
-        query.bindValue(":key", !mac.isEmpty() ? mac : ip);
-        if (!query.exec()) updateStatus(tr("Could not save label: %1").arg(query.lastError().text()));
-        else updateStatus(tr("Device label saved."));
-    } else updateStatus(tr("Label changed for this session only."));
-    applyFilters();
-}
-\nvoid MainWindow::openSelectedWebInterface()
+void MainWindow::openSelectedWebInterface()
 {
     const int row=deviceTable_->currentRow();
     if (row<0) return;
