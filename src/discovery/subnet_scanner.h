@@ -24,6 +24,7 @@ public:
 signals:
     void candidateFound(const DeviceRecord &device);
     void statusChanged(const QString &message);
+    void progressChanged(int completedProbes, int totalProbes, int candidateCount);
     void finished(int candidateCount);
 
 private:
@@ -44,5 +45,7 @@ private:
     QTimer scheduler_;
     bool running_{false};
     int candidates_{0};
+    int completedProbes_{0};
+    int totalProbes_{0};
     int maxConcurrent_{48};
 };
