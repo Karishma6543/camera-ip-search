@@ -547,13 +547,19 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     check->setFlags(check->flags() | Qt::ItemIsUserCheckable);
     check->setCheckState(Qt::Unchecked);
     deviceTable_->setItem(row, 0, check);
+    const auto *previousIpItem = deviceTable_->item(row, 1);
     auto *ipItem = new QTableWidgetItem(device.ipAddress);
-    ipItem->setData(Qt::UserRole + 1, device.interfaceName);
-    ipItem->setData(Qt::UserRole + 2, device.onvifEndpoint);
-    ipItem->setData(Qt::UserRole + 3, device.deviceServiceUrl);
-    ipItem->setData(Qt::UserRole + 4, device.networkSummary);
-    ipItem->setData(Qt::UserRole + 5, device.capabilities.join(QStringLiteral(", ")));
-    ipItem->setData(Qt::UserRole + 6, device.openPorts.join(QStringLiteral(", ")));
+    const auto keepExistingWhenEmpty = [previousIpItem, ipItem](int role, const QString &incoming) {
+        const QString value = incoming.isEmpty() && previousIpItem
+            ? previousIpItem->data(role).toString() : incoming;
+        ipItem->setData(role, value);
+    };
+    keepExistingWhenEmpty(Qt::UserRole + 1, device.interfaceName);
+    keepExistingWhenEmpty(Qt::UserRole + 2, device.onvifEndpoint);
+    keepExistingWhenEmpty(Qt::UserRole + 3, device.deviceServiceUrl);
+    keepExistingWhenEmpty(Qt::UserRole + 4, device.networkSummary);
+    keepExistingWhenEmpty(Qt::UserRole + 5, device.capabilities.join(QStringLiteral(", ")));
+    keepExistingWhenEmpty(Qt::UserRole + 6, device.openPorts.join(QStringLiteral(", ")));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
