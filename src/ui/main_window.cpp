@@ -75,6 +75,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     });
     connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
     connect(subnetScanner_, &SubnetScanner::statusChanged, this, &MainWindow::updateStatus);
+    connect(subnetScanner_, &SubnetScanner::progressChanged, this,
+            [this](int completed, int total, int candidates) {
+        if (total > 0)
+            updateStatus(tr("Subnet scan: %1 / %2 connection checks completed; %3 unverified candidate(s) found.")
+                             .arg(completed).arg(total).arg(candidates));
+    });
     connect(subnetScanner_, &SubnetScanner::finished, this, [this](int count) {
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
