@@ -427,8 +427,8 @@ void MainWindow::buildUi()
         stream.setEncoding(QStringConverter::Utf8);
         stream << QChar(0xFEFF);
         const auto csvField = [](QString value) {
-            value.replace(QStringLiteral("\\""), QStringLiteral("\\"\\""));
-            return QStringLiteral("\\"") + value + QStringLiteral("\\"");
+            value.replace(QStringLiteral("\""), QStringLiteral("\"\""));
+            return QStringLiteral("\"") + value + QStringLiteral("\"");
         };
 
         QStringList headers;
