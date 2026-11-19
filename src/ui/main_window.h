@@ -12,6 +12,7 @@ class QLineEdit;
 class QComboBox;
 class DiscoveryService;
 class SubnetScanner;
+class ReachabilityChecker;
 class QWidget;
 
 class MainWindow final : public QMainWindow
@@ -44,6 +45,8 @@ private:
     QLabel *deviceCountValue_{nullptr};
     QPushButton *scanButton_{nullptr};
     QPushButton *subnetScanButton_{nullptr};
+    QPushButton *reachabilityButton_{nullptr};
+    ReachabilityChecker *reachabilityChecker_{nullptr};
     QLineEdit *searchEdit_{nullptr};
     QComboBox *interfaceSelector_{nullptr};
     QComboBox *manufacturerFilter_{nullptr};
