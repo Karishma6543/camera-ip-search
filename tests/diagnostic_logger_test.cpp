@@ -16,13 +16,19 @@ void DiagnosticLoggerTest::redactsCommonCredentialForms()
 {
     const QString input = QStringLiteral(
         "password=hunter2 username:admin Authorization: BearerSecret "
-        "https://admin:secret@camera.local/api?token=abc123");
+        "https://admin:secret@camera.local/api?token=abc123 "
+        "Authorization: Bearer bearer-secret "
+        "{\\"password\\":\\"json-secret\\"} "
+        "<Password>soap-secret</Password>");
     const QString output = DiagnosticLogger::redact(input);
     QVERIFY(!output.contains(QStringLiteral("hunter2")));
     QVERIFY(!output.contains(QStringLiteral("admin")));
     QVERIFY(!output.contains(QStringLiteral("BearerSecret")));
     QVERIFY(!output.contains(QStringLiteral("secret@")));
     QVERIFY(!output.contains(QStringLiteral("abc123")));
+    QVERIFY(!output.contains(QStringLiteral("bearer-secret")));
+    QVERIFY(!output.contains(QStringLiteral("json-secret")));
+    QVERIFY(!output.contains(QStringLiteral("soap-secret")));
     QVERIFY(output.contains(QStringLiteral("[REDACTED]")));
 }
 
