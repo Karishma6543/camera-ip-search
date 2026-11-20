@@ -3,6 +3,7 @@
 #include "adapters/adapter_registry.h"
 
 #include <QMetaObject>
+#include <utility>
 
 BatchOperationRunner::BatchOperationRunner(const AdapterRegistry &registry,
                                            QObject *parent)
