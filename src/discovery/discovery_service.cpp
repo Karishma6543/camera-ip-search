@@ -1,4 +1,5 @@
 #include "discovery_service.h"
+#include "onvif_network_config.h"
 #include "discovery_parser.h"
 #include "adapters/network_config_validator.h"
 
@@ -282,24 +283,14 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const bool accepted = setReply->error() == QNetworkReply::NoError &&
-                              status >= 200 && status < 300 && !response.isEmpty() &&
-                              response.size() <= 1024 * 1024 &&
-                              !response.contains("<Fault") && !response.contains(":Fault");
-        const QString errorText = setReply->errorString();
         bool rebootNeeded = false;
-        if (accepted) {
-            QXmlStreamReader responseXml(response);
-            while (!responseXml.atEnd()) {
-                responseXml.readNext();
-                if (responseXml.isStartElement() && responseXml.name() == QStringLiteral("RebootNeeded"))
-                    rebootNeeded = responseXml.readElementText(QXmlStreamReader::SkipChildElements)
-                                       .trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0;
-            }
-            if (responseXml.hasError()) {
-                emit networkConfigurationFinished(device, false,
-                    tr("The camera response could not be parsed safely; the network change was not verified."));
-                setReply->deleteLater();
+        QString responseError;
+        const bool transportOk = setReply->error() == QNetworkReply::NoError &&
+            status >= 200 && status < 300;
+        const bool accepted = transportOk &&
+            OnvifNetworkConfig::parseSetNetworkInterfacesResponse(response, &rebootNeeded, &responseError);
+        const QString errorText = setReply->errorString();
+        setReply->deleteLater();
                 return;
             }
         }
@@ -342,29 +333,9 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         tr("The camera accepted the request, but verification at the new IP failed. Check the new address and reconnect manually if needed."));
                     return;
                 }
-                QXmlStreamReader xml(payload);
-                bool addressSeen = false;
-                QString currentToken;
-                while (!xml.atEnd()) {
-                    xml.readNext();
-                    if (xml.isStartElement()) {
-                        const QString name = xml.name().toString();
-                        if (name == QStringLiteral("NetworkInterface"))
-                            currentToken = xml.attributes().value(QStringLiteral("token")).toString();
-                        else if (name == QStringLiteral("IPv4Address")) {
-                            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-                            if (currentToken == device.networkInterfaceToken && value == address)
-                                addressSeen = true;
-                        } else if (name == QStringLiteral("Address")) {
-                            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-                            if (currentToken == device.networkInterfaceToken && value == address)
-                                addressSeen = true;
-                        }
-                    }
-                    if (xml.isEndElement() && xml.name() == QStringLiteral("NetworkInterface"))
-                        currentToken.clear();
-                }
-                if (xml.hasError() || !addressSeen) {
+                QString verificationError;
+                if (!OnvifNetworkConfig::verifyInterfaceIpv4Address(
+                        payload, device.networkInterfaceToken, address, &verificationError)) {
                     emit networkConfigurationFinished(device, false,
                         tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
                     return;
@@ -389,13 +360,8 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                     finishVerified();
                     return;
                 }
-                const QByteArray gatewaySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
-<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
- xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
- <s:Body><tds:SetNetworkDefaultGateway><tds:IPv4Address>)" +
-                    gateway.trimmed().toUtf8() +
-                    R"(</tds:IPv4Address></tds:SetNetworkDefaultGateway></s:Body>
-</s:Envelope>)";
+                const QByteArray gatewaySoap =
+                    OnvifNetworkConfig::buildSetNetworkDefaultGatewayRequest(gateway.trimmed());
                 QNetworkRequest gatewayRequest(verifyUrl);
                 gatewayRequest.setHeader(QNetworkRequest::ContentTypeHeader,
                                          QStringLiteral("application/soap+xml; charset=utf-8"));
