@@ -3,6 +3,7 @@
 #include "discovery/discovery_service.h"
 #include "discovery/subnet_scanner.h"
 #include "discovery/reachability_checker.h"
+#include "adapters/network_config_validator.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -30,6 +31,9 @@
 #include <QInputDialog>
 #include <QAuthenticator>
 #include <QMessageBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QHostAddress>
@@ -542,6 +546,64 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     openWebButton_->setEnabled(false);
     auto *web = openWebButton_;
     layout->addWidget(reboot); layout->addWidget(refreshDeviceButton_); layout->addWidget(web); layout->addStretch();
+    auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), page);
+    layout->addWidget(previewNetworkButton);
+    connect(previewNetworkButton, &QPushButton::clicked, this, [this] {
+        const int row = deviceTable_->currentRow();
+        if (row < 0) {
+            QMessageBox::information(this, tr("IP configuration"), tr("Select one camera first."));
+            return;
+        }
+        const auto *ipItem = deviceTable_->item(row, 1);
+        if (!ipItem) return;
+        const QString token = ipItem->data(Qt::UserRole + 7).toString();
+        const QString currentIp = ipItem->data(Qt::UserRole + 8).toString();
+        const QString currentMask = ipItem->data(Qt::UserRole + 9).toString();
+        if (token.isEmpty() || currentIp.isEmpty() || currentMask.isEmpty()) {
+            QMessageBox::warning(this, tr("IP configuration unavailable"),
+                tr("Refresh this camera and confirm it exposes ONVIF network-interface details before preparing a configuration."));
+            return;
+        }
+
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Preview static IPv4 configuration"));
+        dialog.setMinimumWidth(430);
+        auto *form = new QFormLayout(&dialog);
+        auto *current = new QLabel(
+            tr("Current: %1 / %2\nGateway: %3\nDNS: %4\nInterface token: %5")
+                .arg(currentIp, currentMask,
+                     ipItem->data(Qt::UserRole + 10).toString().isEmpty()
+                         ? tr("not reported") : ipItem->data(Qt::UserRole + 10).toString(),
+                     ipItem->data(Qt::UserRole + 11).toString().isEmpty()
+                         ? tr("not reported") : ipItem->data(Qt::UserRole + 11).toString(),
+                     token), &dialog);
+        current->setWordWrap(true);
+        auto *address = new QLineEdit(currentIp, &dialog);
+        auto *mask = new QLineEdit(currentMask, &dialog);
+        auto *gateway = new QLineEdit(ipItem->data(Qt::UserRole + 10).toString(), &dialog);
+        auto *dns = new QLineEdit(ipItem->data(Qt::UserRole + 11).toString(), &dialog);
+        form->addRow(tr("Current camera settings"), current);
+        form->addRow(tr("Proposed IPv4 address"), address);
+        form->addRow(tr("Subnet mask"), mask);
+        form->addRow(tr("Gateway (optional)"), gateway);
+        form->addRow(tr("DNS server (optional)"), dns);
+        form->addRow(mutedLabel(tr("This is a validation and preview only. It does not send SetNetworkInterfaces or change the camera."), &dialog));
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        buttons->button(QDialogButtonBox::Ok)->setText(tr("Validate preview"));
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, address, mask, gateway, dns] {
+            QString error;
+            if (!NetworkConfigValidator::validateStaticIpv4(
+                    address->text(), mask->text(), gateway->text(), dns->text(), &error)) {
+                QMessageBox::warning(&dialog, QObject::tr("Invalid network configuration"), error);
+                return;
+            }
+            QMessageBox::information(&dialog, QObject::tr("Configuration validated"),
+                QObject::tr("The proposed static IPv4 values passed local validation. No network request was sent and the camera has not been changed."));
+        });
+        dialog.exec();
+    });
     connect(refreshDeviceButton_, &QPushButton::clicked, this, [this] {
         const int row = deviceTable_->currentRow();
         if (row < 0) return;
