@@ -14,6 +14,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Active IPv4 interface enumeration.
 - [ ] Normalized device, observation and structured error models.
 - [x] Explicit typed device-operation capability contract with conservative unsupported defaults.
+- [ ] Extensible vendor adapter registration with unique-ID enforcement and registry tests added; await CI validation before marking complete.
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
 - [x] Capability-gated batch-operation preflight with per-device outcomes, duplicate stable-ID detection and canonical duplicate-IPv4 endpoint rejection.
 - [x] Sequential batch runner with per-device success/failure results, progress signals and cancellation between targets; concrete protocol handlers remain gated until verified.
@@ -62,6 +63,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 ## Milestone 6 — Firmware management
 - [ ] Define firmware package metadata (vendor, product series, model, hardware revision, region, version).
 - [ ] Verify package hash/signature and compatibility before enabling an update.
+  - Package metadata and SHA-256 candidate validation are implemented; signature verification and update authorization remain separate, unimplemented gates.
 - [ ] Implement vendor-authorized update transport only.
 - [ ] Show progress and device-specific outcomes; handle power-loss and recovery warnings.
 - [ ] Never offer a generic firmware flash operation for unknown devices.
