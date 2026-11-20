@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/device_record.h"
+#include "adapters/adapter_registry.h"
 
 #include <QObject>
 #include <QHash>
@@ -21,6 +22,7 @@ public:
     void start();
     void cancel();
     bool isRunning() const;
+    void refreshDeviceInfo(const DeviceRecord &device);
 
 signals:
     void deviceFound(const DeviceRecord &device);
@@ -50,6 +52,7 @@ private:
     QHash<QString, DeviceRecord> devices_;
     QTimer timeout_;
     QNetworkAccessManager networkManager_;
+    AdapterRegistry adapterRegistry_;
     bool running_{false};
     quint32 sequence_{0};
 };
