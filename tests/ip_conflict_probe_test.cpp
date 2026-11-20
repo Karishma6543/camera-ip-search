@@ -1,6 +1,8 @@
 #include "discovery/ip_conflict_probe.h"
 
 #include <QFile>
+#include <QHostAddress>
+#include <QNetworkAddressEntry>
 #include <QNetworkInterface>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -13,6 +15,8 @@ private slots:
     void requiresExplicitInterface();
     void rejectsUnknownInterface();
     void rejectsMissingArpingProgram();
+    void rejectsTargetOutsideSelectedSubnet();
+    void detectsSelectedInterfaceAddressAsConflict();
     void classifiesVerifiedZeroResponseAsClear();
     void classifiesPositiveResponseAsConflict();
     void classifiesAmbiguousOutputAsUnknown();
@@ -93,6 +97,40 @@ void IpConflictProbeTest::rejectsMissingArpingProgram()
     QCOMPARE(IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
                                     QStringLiteral("eth0"), {}).state,
              IpAddressProbeState::Unknown);
+}
+
+
+void IpConflictProbeTest::rejectsTargetOutsideSelectedSubnet()
+{
+#ifdef Q_OS_LINUX
+    const QString interfaceName = usableInterfaceName();
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface is available.");
+    QCOMPARE(IpConflictProbe::probe(QStringLiteral("203.0.113.254"),
+                                    interfaceName).state,
+             IpAddressProbeState::Unknown);
+#else
+    QSKIP("The validated arping backend is Linux-only.");
+#endif
+}
+
+void IpConflictProbeTest::detectsSelectedInterfaceAddressAsConflict()
+{
+#ifdef Q_OS_LINUX
+    const QString interfaceName = usableInterfaceName();
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface is available.");
+    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
+    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+            !entry.ip().isLoopback()) {
+            QCOMPARE(IpConflictProbe::probe(entry.ip().toString(), interfaceName).state,
+                     IpAddressProbeState::Conflict);
+            return;
+        }
+    }
+    QSKIP("No usable IPv4 address found on the selected interface.");
+#else
+    QSKIP("The validated arping backend is Linux-only.");
+#endif
 }
 
 void IpConflictProbeTest::classifiesVerifiedZeroResponseAsClear()
