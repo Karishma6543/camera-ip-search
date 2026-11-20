@@ -11,6 +11,7 @@ private slots:
     void marksVerifiedReadAsReady();
     void keepsManagementOperationsDisabled();
     void reportsMissingAndDuplicateIds();
+    void reportsDuplicateIpv4Addresses();
     void reportsDevicesWithoutAdapter();
 };
 
@@ -59,6 +60,20 @@ void BatchOperationPreflightTest::reportsMissingAndDuplicateIds()
     QCOMPARE(results.at(1).state, BatchTargetState::Ready);
     QCOMPARE(results.at(2).state, BatchTargetState::DuplicateTarget);
     QCOMPARE(results.at(3).state, BatchTargetState::DuplicateTarget);
+}
+
+void BatchOperationPreflightTest::reportsDuplicateIpv4Addresses()
+{
+    AdapterRegistry registry;
+    const auto results = BatchOperationPreflight::build(
+        {onvifDevice(QStringLiteral("cam-a"), QStringLiteral("192.168.1.20")),
+         onvifDevice(QStringLiteral("cam-b"), QStringLiteral("192.168.1.20")),
+         onvifDevice(QStringLiteral("cam-c"), QStringLiteral("192.168.1.21"))},
+        registry, DeviceOperation::ReadNetworkInterfaces);
+    QCOMPARE(results.size(), 3);
+    QCOMPARE(results.at(0).state, BatchTargetState::DuplicateAddress);
+    QCOMPARE(results.at(1).state, BatchTargetState::DuplicateAddress);
+    QCOMPARE(results.at(2).state, BatchTargetState::Ready);
 }
 
 void BatchOperationPreflightTest::reportsDevicesWithoutAdapter()
