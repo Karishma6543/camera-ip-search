@@ -94,7 +94,7 @@ Do not mark a whole brand as supported based on one model. Do not mark a workflo
 
 ## Live ARP conflict probe — current implementation
 
-- `IpConflictProbe` accepts an IPv4 target and an explicit Qt network-interface name; it refuses to send if the interface is down or the target is not in a directly attached IPv4 subnet.
+- `IpConflictProbe` accepts an IPv4 target and an explicit Qt network-interface name; it refuses to send if the interface is down, the target is not in a directly attached IPv4 subnet, or the target is that subnet's network/directed-broadcast address (for ordinary `/1`–`/30` networks).
 - It invokes `arping -D -c 2 -w 3 -I <interface> <target>` using `QProcess` arguments (no shell).
 - A result is Clear only when the process exits normally with code 0 and output explicitly reports zero responses. An ARP reply is Conflict. Missing tools, permission errors, timeouts, crashes, unfamiliar output and all other results are Unknown.
 - This requires an iputils-compatible `arping` implementation and sufficient privileges for raw ARP. Other `arping` variants may be rejected as Unknown by design.
