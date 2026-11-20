@@ -35,7 +35,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Verify the configured address after reconnecting.
 - [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping.
 - [x] Add a collision-aware preflight gate that rejects inventory/local-address conflicts, duplicate targets and inconclusive probe results.
-- [ ] Complete and validate cross-platform live address-conflict probes (ARP/neighbor discovery). Initial `IpConflictProbe` now performs interface-scoped IPv4 DAD using an iputils-compatible `arping -D`; unsupported utilities, permissions, timeouts and ambiguous output remain Unknown/fail-closed. Windows/macOS/Linux packaging and hardware validation are still pending.
+- [ ] Complete and validate cross-platform live address-conflict probes (ARP/neighbor discovery). Implemented Linux iputils backend with interface/subnet validation, strict output classification, fail-closed handling and asynchronous bulk-preflight integration. Deterministic tests cover clear/conflict/unknown classifications. Windows and macOS native backends, Linux distribution/permission validation and physical-network testing remain pending.
 - [x] Add bulk IP planning UI with multi-row selection, stable MAC/serial mapping, range/mask inputs, manual reservations, local/interface and inventory reservations, per-device preview and preflight results.
 - [ ] Connect a live probe and verified ONVIF write adapter to an explicit batch apply workflow with confirmation, progress, cancellation policy and per-camera recovery guidance.
 - [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
@@ -97,4 +97,5 @@ Do not mark a whole brand as supported based on one model. Do not mark a workflo
 - It invokes `arping -D -c 2 -w 3 -I <interface> <target>` using `QProcess` arguments (no shell).
 - A result is Clear only when the process exits normally with code 0 and output explicitly reports zero responses. An ARP reply is Conflict. Missing tools, permission errors, timeouts, crashes, unfamiliar output and all other results are Unknown.
 - This requires an iputils-compatible `arping` implementation and sufficient privileges for raw ARP. Other `arping` variants may be rejected as Unknown by design.
-- This probe is not yet connected to the bulk assignment UI. It does not enable IP writes. Validate the exact command/output and privileges on each supported OS before marking platform support complete.
+- The bulk planner now runs this probe asynchronously on the currently selected interface and displays per-target READY/CONFLICT/BLOCKED results. The Apply action remains disabled; a successful ARP check is only a point-in-time observation, not a guarantee that an address cannot be claimed later.
+- Windows and macOS intentionally return Unknown. Do not mark those platforms supported until native interface-scoped DAD backends and tests exist.
