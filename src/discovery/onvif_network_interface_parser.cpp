@@ -18,7 +18,7 @@ bool OnvifNetworkInterfaceParser::parse(const QByteArray &payload,
         if (xml.isStartElement()) {
             const QString name = xml.name().toString();
             path.append(name);
-            if (name == QStringLiteral("NetworkInterface")) {
+            if (name == QStringLiteral("NetworkInterface") || name == QStringLiteral("NetworkInterfaces")) {
                 inInterface = true; current = OnvifNetworkInterface{};
                 current.token = xml.attributes().value(QStringLiteral("token")).toString();
                 continue;
@@ -26,8 +26,8 @@ bool OnvifNetworkInterfaceParser::parse(const QByteArray &payload,
             if (!inInterface) continue;
             const QString joined = path.join(QLatin1Char('/'));
             const bool field =
-                joined.endsWith(QStringLiteral("/NetworkInterface/Name")) ||
-                joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress")) ||
+                joined.endsWith(QStringLiteral("/NetworkInterface/Name")) || joined.endsWith(QStringLiteral("/NetworkInterfaces/Info/Name")) ||
+                joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress")) || joined.endsWith(QStringLiteral("/NetworkInterfaces/Info/HwAddress")) ||
                 joined.endsWith(QStringLiteral("/IPv4/Config/DHCP")) ||
                 joined.endsWith(QStringLiteral("/IPv4/Config/Manual/Address")) ||
                 joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/Address")) ||
@@ -38,8 +38,8 @@ bool OnvifNetworkInterfaceParser::parse(const QByteArray &payload,
                 joined.endsWith(QStringLiteral("/IPv4/Config/Gateway/IPv4Address"));
             if (!field) continue;
             const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-            if (joined.endsWith(QStringLiteral("/NetworkInterface/Name"))) current.name = value;
-            else if (joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress"))) current.macAddress = value;
+            if (joined.endsWith(QStringLiteral("/NetworkInterface/Name")) || joined.endsWith(QStringLiteral("/NetworkInterfaces/Info/Name"))) current.name = value;
+            else if (joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress")) || joined.endsWith(QStringLiteral("/NetworkInterfaces/Info/HwAddress"))) current.macAddress = value;
             else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP"))) current.dhcp = value;
             else if (joined.endsWith(QStringLiteral("/IPv4/Config/Manual/Address"))) current.ipv4Address = value;
             else if (joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/Address")) && current.ipv4Address.isEmpty()) current.ipv4Address = value;
@@ -51,7 +51,7 @@ bool OnvifNetworkInterfaceParser::parse(const QByteArray &payload,
                      joined.endsWith(QStringLiteral("/IPv4/Config/Gateway/Address"))) current.gateway = value;
             path.removeLast();
         } else if (xml.isEndElement()) {
-            if (xml.name() == QStringLiteral("NetworkInterface") && inInterface) {
+            if ((xml.name() == QStringLiteral("NetworkInterface") || xml.name() == QStringLiteral("NetworkInterfaces")) && inInterface) {
                 interfaces->append(current); inInterface = false;
             }
             if (!path.isEmpty()) path.removeLast();
