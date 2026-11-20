@@ -14,6 +14,11 @@ qt_standard_project_setup()
 
 qt_add_executable(camera-ip-search
     src/main.cpp
+    src/adapters/device_adapter.h
+    src/adapters/onvif_adapter.h
+    src/adapters/onvif_adapter.cpp
+    src/adapters/adapter_registry.h
+    src/adapters/adapter_registry.cpp
     src/core/device_record.h
     src/discovery/discovery_service.h
     src/discovery/discovery_parser.h
