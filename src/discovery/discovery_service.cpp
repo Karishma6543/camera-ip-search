@@ -2,6 +2,7 @@
 #include "onvif_network_config.h"
 #include "discovery_parser.h"
 #include "onvif_network_interface_parser.h"
+#include "onvif_dns_parser.h"
 #include "adapters/network_config_validator.h"
 
 #include <QNetworkAddressEntry>
@@ -610,28 +611,10 @@ void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &devic
     if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
         return;
 
-    QXmlStreamReader xml(payload);
-    QStringList path;
-    QString manualDnsAddress;
-    QString dhcpDnsAddress;
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (xml.isStartElement()) {
-            path.append(xml.name().toString());
-            const QString joined = path.join(QLatin1Char('/'));
-            if (joined.endsWith(QStringLiteral("/DNSManual/IPv4Address"))) {
-                manualDnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-                path.removeLast();
-            } else if (joined.endsWith(QStringLiteral("/DNSFromDHCP/IPv4Address"))) {
-                dhcpDnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-                path.removeLast();
-            }
-        } else if (xml.isEndElement() && !path.isEmpty()) {
-            path.removeLast();
-        }
-    }
-    if (xml.hasError()) return;
-    const QString dnsAddress = !manualDnsAddress.isEmpty() ? manualDnsAddress : dhcpDnsAddress;
+    QString dnsAddress;
+    QString parseError;
+    if (!OnvifDnsParser::parseIpv4DnsAddress(payload, &dnsAddress, &parseError))
+        return;
     if (!dnsAddress.isEmpty()) {
         DeviceRecord &device = devices_[deviceKey];
         device.ipv4DnsServer = dnsAddress;
