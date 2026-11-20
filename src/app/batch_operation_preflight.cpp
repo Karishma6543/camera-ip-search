@@ -2,7 +2,7 @@
 
 #include "adapters/adapter_registry.h"
 
-#include <QSet>
+#include <QHash>
 
 QVector<BatchTargetResult> BatchOperationPreflight::build(
     const QVector<DeviceRecord> &devices,
@@ -12,7 +12,13 @@ QVector<BatchTargetResult> BatchOperationPreflight::build(
     QVector<BatchTargetResult> results;
     results.reserve(devices.size());
 
-    QSet<QString> seenIds;
+    QHash<QString, int> idCounts;
+    for (const DeviceRecord &device : devices) {
+        const QString id = device.id.trimmed();
+        if (!id.isEmpty())
+            ++idCounts[id];
+    }
+
     for (const DeviceRecord &device : devices) {
         BatchTargetResult result;
         result.deviceId = device.id.trimmed();
@@ -21,11 +27,11 @@ QVector<BatchTargetResult> BatchOperationPreflight::build(
         if (result.deviceId.isEmpty()) {
             result.state = BatchTargetState::MissingIdentity;
             result.message = QStringLiteral("Device has no stable inventory ID");
-        } else if (seenIds.contains(result.deviceId)) {
+        } else if (idCounts.value(result.deviceId) > 1) {
+            // Mark every occurrence, not just the later duplicate, as unsafe.
             result.state = BatchTargetState::DuplicateTarget;
-            result.message = QStringLiteral("Duplicate device ID in batch");
+            result.message = QStringLiteral("Device ID occurs more than once in batch");
         } else {
-            seenIds.insert(result.deviceId);
             const DeviceAdapter *adapter = registry.adapterFor(device);
             if (!adapter) {
                 result.state = BatchTargetState::NoCompatibleAdapter;
