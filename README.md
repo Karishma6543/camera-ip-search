@@ -18,6 +18,7 @@ The goal is a multi-vendor device manager with capability-based operations. It m
 - Bounded, opt-in local IPv4 subnet candidate scanning.
 - ONVIF GetDeviceInformation, GetCapabilities and GetNetworkInterfaces read queries.
 - SQLite inventory for non-sensitive device metadata; credentials are not stored.
+- Bounded application diagnostics with credential redaction and a user-triggered redacted support-log export.
 - Manual device entry, device labels, search/filtering, CSV export and open-web-interface action.
 - TCP reachability checks with explicit “no response” semantics.
 - Interface-scoped IPv4 conflict checks integrated into bulk IP preflight and executed off the UI thread. Linux uses iputils `arping -D` and can classify explicit zero-response results as Clear; Windows uses native `SendARP` for positive conflict evidence only (no reply remains Unknown). macOS remains fail-closed as Unknown.
