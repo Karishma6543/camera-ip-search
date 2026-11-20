@@ -562,7 +562,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     layout->addWidget(previewNetworkButton);
     auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), page, true);
     layout->addWidget(applyNetworkButton);
-    connect(applyNetworkButton, &QPushButton::clicked, this, [this] {
+    connect(applyNetworkButton, &QPushButton::clicked, this, [this, applyNetworkButton] {
         const int row = deviceTable_->currentRow();
         if (row < 0) {
             QMessageBox::information(this, tr("IP configuration"), tr("Select one camera first."));
