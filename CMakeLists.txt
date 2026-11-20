@@ -17,6 +17,8 @@ qt_add_executable(camera-ip-search
     src/adapters/device_adapter.h
     src/app/batch_operation_preflight.h
     src/app/batch_operation_preflight.cpp
+    src/app/batch_operation_runner.h
+    src/app/batch_operation_runner.cpp
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
     src/adapters/adapter_registry.h
@@ -115,6 +117,23 @@ if(BUILD_TESTING)
     target_include_directories(batch-operation-preflight-tests PRIVATE src)
     target_link_libraries(batch-operation-preflight-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME batch-operation-preflight-tests COMMAND batch-operation-preflight-tests)
+
+    qt_add_executable(batch-operation-runner-tests
+        tests/batch_operation_runner_test.cpp
+        src/core/device_record.h
+        src/adapters/device_adapter.h
+        src/adapters/onvif_adapter.h
+        src/adapters/onvif_adapter.cpp
+        src/adapters/adapter_registry.h
+        src/adapters/adapter_registry.cpp
+        src/app/batch_operation_preflight.h
+        src/app/batch_operation_preflight.cpp
+        src/app/batch_operation_runner.h
+        src/app/batch_operation_runner.cpp
+    )
+    target_include_directories(batch-operation-runner-tests PRIVATE src)
+    target_link_libraries(batch-operation-runner-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME batch-operation-runner-tests COMMAND batch-operation-runner-tests)
 endif()
 
 include(GNUInstallDirs)
