@@ -289,11 +289,8 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
             status >= 200 && status < 300;
         const bool accepted = transportOk &&
             OnvifNetworkConfig::parseSetNetworkInterfacesResponse(response, &rebootNeeded, &responseError);
-        const QString errorText = setReply->errorString();
-        setReply->deleteLater();
-                return;
-            }
-        }
+        const QString errorText = accepted ? QString() : (responseError.isEmpty()
+            ? setReply->errorString() : responseError);
         setReply->deleteLater();
         if (!accepted) {
             emit networkConfigurationFinished(device, false,
