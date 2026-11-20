@@ -17,6 +17,8 @@ qt_add_executable(camera-ip-search
     src/adapters/device_adapter.h
     src/app/batch_operation_preflight.h
     src/app/batch_operation_preflight.cpp
+    src/app/ip_assignment_preflight.h
+    src/app/ip_assignment_preflight.cpp
     src/app/batch_operation_runner.h
     src/app/batch_operation_runner.cpp
     src/adapters/onvif_adapter.h
@@ -124,6 +126,16 @@ if(BUILD_TESTING)
     target_include_directories(ip-assignment-planner-tests PRIVATE src)
     target_link_libraries(ip-assignment-planner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME ip-assignment-planner-tests COMMAND ip-assignment-planner-tests)
+
+    qt_add_executable(ip-assignment-preflight-tests
+        tests/ip_assignment_preflight_test.cpp
+        src/discovery/ip_assignment_planner.h
+        src/app/ip_assignment_preflight.h
+        src/app/ip_assignment_preflight.cpp
+    )
+    target_include_directories(ip-assignment-preflight-tests PRIVATE src)
+    target_link_libraries(ip-assignment-preflight-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME ip-assignment-preflight-tests COMMAND ip-assignment-preflight-tests)
 
     qt_add_executable(batch-operation-preflight-tests
         tests/batch_operation_preflight_test.cpp
