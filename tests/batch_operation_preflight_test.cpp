@@ -50,13 +50,15 @@ void BatchOperationPreflightTest::reportsMissingAndDuplicateIds()
     AdapterRegistry registry;
     const auto results = BatchOperationPreflight::build(
         {onvifDevice({}, QStringLiteral("192.168.1.10")),
-         onvifDevice(QStringLiteral("cam-1"), QStringLiteral("192.168.1.11")),
-         onvifDevice(QStringLiteral("cam-1"), QStringLiteral("192.168.1.12"))},
+         onvifDevice(QStringLiteral("cam-ok"), QStringLiteral("192.168.1.11")),
+         onvifDevice(QStringLiteral("cam-dup"), QStringLiteral("192.168.1.12")),
+         onvifDevice(QStringLiteral("cam-dup"), QStringLiteral("192.168.1.13"))},
         registry, DeviceOperation::ReadCapabilities);
-    QCOMPARE(results.size(), 3);
+    QCOMPARE(results.size(), 4);
     QCOMPARE(results.at(0).state, BatchTargetState::MissingIdentity);
     QCOMPARE(results.at(1).state, BatchTargetState::Ready);
     QCOMPARE(results.at(2).state, BatchTargetState::DuplicateTarget);
+    QCOMPARE(results.at(3).state, BatchTargetState::DuplicateTarget);
 }
 
 void BatchOperationPreflightTest::reportsDevicesWithoutAdapter()
