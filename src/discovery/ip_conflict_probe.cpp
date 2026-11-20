@@ -4,6 +4,7 @@
 #include <QNetworkAddressEntry>
 #include <QNetworkInterface>
 #include <QProcess>
+#include <QRegularExpression>
 
 namespace {
 bool isIpv4(const QString &text, QHostAddress *parsed = nullptr)
@@ -73,9 +74,12 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
     const QString output = QString::fromLocal8Bit(process.readAllStandardOutput() +
                                                    process.readAllStandardError());
     const QString lower = output.toLower();
+    const QRegularExpression positiveResponse(
+        QStringLiteral("received\\s+[1-9][0-9]*\\s+response"));
     if (lower.contains(QStringLiteral("reply from")) ||
         lower.contains(QStringLiteral("unicast reply")) ||
-        lower.contains(QStringLiteral("duplicate")))
+        lower.contains(QStringLiteral("duplicate")) ||
+        positiveResponse.match(lower).hasMatch())
         return {IpAddressProbeState::Conflict,
                 QStringLiteral("An ARP response was received for %1 on %2. %3")
                     .arg(target.toString(), interfaceName, output.trimmed())};
