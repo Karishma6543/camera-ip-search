@@ -548,6 +548,71 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     layout->addWidget(reboot); layout->addWidget(refreshDeviceButton_); layout->addWidget(web); layout->addStretch();
     auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), page);
     layout->addWidget(previewNetworkButton);
+    auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), page, true);
+    layout->addWidget(applyNetworkButton);
+    connect(applyNetworkButton, &QPushButton::clicked, this, [this] {
+        const int row = deviceTable_->currentRow();
+        if (row < 0) {
+            QMessageBox::information(this, tr("IP configuration"), tr("Select one camera first."));
+            return;
+        }
+        const auto *ipItem = deviceTable_->item(row, 1);
+        if (!ipItem) return;
+        DeviceRecord device;
+        device.ipAddress = ipItem->data(Qt::UserRole + 8).toString();
+        if (device.ipAddress.isEmpty()) device.ipAddress = ipItem->text();
+        device.networkInterfaceToken = ipItem->data(Qt::UserRole + 7).toString();
+        device.ipv4Address = ipItem->data(Qt::UserRole + 8).toString();
+        device.ipv4SubnetMask = ipItem->data(Qt::UserRole + 9).toString();
+        device.ipv4Gateway = ipItem->data(Qt::UserRole + 10).toString();
+        device.ipv4DnsServer = ipItem->data(Qt::UserRole + 11).toString();
+        device.deviceServiceUrl = ipItem->data(Qt::UserRole + 3).toString();
+        device.macAddress = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
+        device.manufacturer = deviceTable_->item(row, 3) ? deviceTable_->item(row, 3)->text() : QString();
+        device.model = deviceTable_->item(row, 4) ? deviceTable_->item(row, 4)->text() : QString();
+        if (device.networkInterfaceToken.isEmpty() || device.deviceServiceUrl.isEmpty() ||
+            device.ipv4Address.isEmpty() || device.ipv4SubnetMask.isEmpty()) {
+            QMessageBox::warning(this, tr("ONVIF configuration unavailable"),
+                tr("Refresh this camera first. A verified ONVIF interface token, service URL, current IP and subnet mask are required."));
+            return;
+        }
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Apply static IPv4 configuration"));
+        dialog.setMinimumWidth(440);
+        auto *form = new QFormLayout(&dialog);
+        auto *address = new QLineEdit(device.ipv4Address, &dialog);
+        auto *mask = new QLineEdit(device.ipv4SubnetMask, &dialog);
+        auto *gateway = new QLineEdit(device.ipv4Gateway, &dialog);
+        form->addRow(tr("Current camera IP"), new QLabel(device.ipAddress, &dialog));
+        form->addRow(tr("New IPv4 address"), address);
+        form->addRow(tr("Subnet mask"), mask);
+        form->addRow(tr("Gateway (optional)"), gateway);
+        form->addRow(mutedLabel(tr("DNS is not modified by this operation. The app will reconnect to the new IP and verify the reported interface address. A failed reconnect may require manual network recovery or a camera reset."), &dialog));
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Apply | QDialogButtonBox::Cancel, &dialog);
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+            QString error;
+            if (!NetworkConfigValidator::validateStaticIpv4(address->text(), mask->text(),
+                    gateway->text(), QString(), &error)) {
+                QMessageBox::warning(&dialog, tr("Invalid network configuration"), error);
+                return;
+            }
+            if (address->text().trimmed() == device.ipAddress) {
+                QMessageBox::information(&dialog, tr("No IP change"), tr("The new address is the same as the current address."));
+                return;
+            }
+            const auto answer = QMessageBox::warning(&dialog, tr("Confirm camera IP change"),
+                tr("Change camera %1 to %2?\n\nThe camera may disconnect immediately. Ensure your computer can reach the new subnet. This action has no automatic rollback.")
+                    .arg(device.ipAddress, address->text().trimmed()),
+                QMessageBox::Apply | QMessageBox::Cancel, QMessageBox::Cancel);
+            if (answer != QMessageBox::Apply) return;
+            dialog.accept();
+            applyNetworkButton->setEnabled(false);
+            discovery_->applyStaticIpv4(device, address->text(), mask->text(), gateway->text());
+        });
+        dialog.exec();
+    });
     connect(previewNetworkButton, &QPushButton::clicked, this, [this] {
         const int row = deviceTable_->currentRow();
         if (row < 0) {
