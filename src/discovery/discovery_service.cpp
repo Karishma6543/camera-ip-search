@@ -374,10 +374,11 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         const QByteArray gatewayResponse = gatewayReply->readAll();
                         const int gatewayStatus = gatewayReply->attribute(
                             QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                        const bool gatewayOk = gatewayReply->error() == QNetworkReply::NoError &&
-                            gatewayStatus >= 200 && gatewayStatus < 300 &&
-                            !gatewayResponse.isEmpty() && gatewayResponse.size() <= 1024 * 1024 &&
-                            !gatewayResponse.contains("<Fault") && !gatewayResponse.contains(":Fault");
+                        const bool gatewayTransportOk = gatewayReply->error() == QNetworkReply::NoError &&
+                            gatewayStatus >= 200 && gatewayStatus < 300;
+                        const bool gatewayOk = gatewayTransportOk &&
+                            OnvifNetworkConfig::parseSoapOperationResponse(
+                                gatewayResponse, QStringLiteral("SetNetworkDefaultGatewayResponse"));
                         gatewayReply->deleteLater();
                         if (!gatewayOk) {
                             emit networkConfigurationFinished(device, false,
