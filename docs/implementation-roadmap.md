@@ -83,3 +83,5 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 Do not mark a whole brand as supported based on one model. Do not mark a workflow complete because its button exists.
 
 - [x] Extract ONVIF network-interface response parsing into a bounded, testable parser with coverage for interface metadata, manual/DHCP address precedence, gateway and malformed/oversized XML.
+
+- [x] Extract ONVIF GetDNS parsing into a bounded parser with SOAP-fault handling, IPv4 validation and manual-over-DHCP precedence.
