@@ -1,5 +1,6 @@
 #include "onvif_network_interface_parser.h"
 #include <QXmlStreamReader>
+#include <QStringList>
 bool OnvifNetworkInterfaceParser::parse(const QByteArray &payload,
     QVector<OnvifNetworkInterface> *interfaces, QString *error)
 {
