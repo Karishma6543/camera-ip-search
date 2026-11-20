@@ -7,6 +7,7 @@
 #include "adapters/network_config_validator.h"
 #include "app/ip_assignment_preflight.h"
 #include "discovery/ip_conflict_probe.h"
+#include "core/diagnostic_logger.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -20,6 +21,9 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStatusBar>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -371,6 +375,22 @@ void MainWindow::buildUi()
     setCentralWidget(central);
     statusLabel_ = new QLabel(this);
     statusBar()->addWidget(statusLabel_, 1);
+
+    QMenu *helpMenu = menuBar()->addMenu(tr("Help"));
+    QAction *exportDiagnosticsAction = helpMenu->addAction(tr("Export redacted diagnostics..."));
+    connect(exportDiagnosticsAction, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getSaveFileName(
+            this, tr("Export diagnostics"), QStringLiteral("camera-ip-search-diagnostics.txt"),
+            tr("Text files (*.txt);;All files (*)"));
+        if (path.isEmpty()) return;
+        QString error;
+        if (!DiagnosticLogger::exportRedacted(path, &error)) {
+            QMessageBox::warning(this, tr("Diagnostic export failed"), error);
+            return;
+        }
+        QMessageBox::information(this, tr("Diagnostics exported"),
+            tr("A redacted diagnostic log was saved. Review it before sharing."));
+    });
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
         if (reachabilityChecker_->isRunning()) {
