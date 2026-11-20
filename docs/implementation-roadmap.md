@@ -17,7 +17,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
 - [x] Capability-gated batch-operation preflight with per-device outcomes, duplicate stable-ID detection and canonical duplicate-IPv4 endpoint rejection.
 - [x] Sequential batch runner with per-device success/failure results, progress signals and cancellation between targets; concrete protocol handlers remain gated until verified.
-- [ ] Move all potentially blocking network work off the GUI thread.
+- [ ] Move all potentially blocking network work off the GUI thread.\n- [x] Harden cross-platform CI to run on the active development branch, install Linux Qt runtime dependencies and use read-only repository permissions. A green run is still required before claiming build/test verification.
 - [ ] Centralized redacted logging and diagnostic export.
 
 ## Milestone 2 — Discovery and device inventory
