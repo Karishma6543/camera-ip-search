@@ -17,7 +17,8 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
 - [x] Capability-gated batch-operation preflight with per-device outcomes, duplicate stable-ID detection and canonical duplicate-IPv4 endpoint rejection.
 - [x] Sequential batch runner with per-device success/failure results, progress signals and cancellation between targets; concrete protocol handlers remain gated until verified.
-- [ ] Move all potentially blocking network work off the GUI thread.\n- [x] Harden cross-platform CI to run on the active development branch, install Linux Qt runtime dependencies and use read-only repository permissions. A green run is still required before claiming build/test verification.
+- [ ] Move all potentially blocking network work off the GUI thread.
+- [x] Harden cross-platform CI to run on the active development branch, install Linux Qt runtime dependencies and use read-only repository permissions. A green run is still required before claiming build/test verification.
 - [ ] Centralized redacted logging and diagnostic export.
 
 ## Milestone 2 — Discovery and device inventory
@@ -35,7 +36,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Verify the configured address after reconnecting.
 - [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping.
 - [x] Add a collision-aware preflight gate that rejects inventory/local-address conflicts, duplicate targets and inconclusive probe results.
-- [ ] Complete and validate cross-platform live address-conflict probes (ARP/neighbor discovery). Implemented Linux iputils backend with interface/subnet validation, strict output classification, fail-closed handling and asynchronous bulk-preflight integration. Deterministic tests cover clear/conflict/unknown classifications. Windows and macOS native backends, Linux distribution/permission validation and physical-network testing remain pending.
+- [ ] Complete and validate cross-platform live address-conflict probes (ARP/neighbor discovery). Linux iputils backend is implemented with interface/subnet validation and strict classification. Windows SendARP detects positive ARP evidence on the selected interface; no response remains Unknown, so Windows vacancy detection is not complete. macOS native DAD, Linux distribution/permission validation and physical-network testing remain pending.
 - [x] Add bulk IP planning UI with multi-row selection, stable MAC/serial mapping, range/mask inputs, manual reservations, local/interface and inventory reservations, per-device preview and preflight results.
 - [ ] Connect a live probe and verified ONVIF write adapter to an explicit batch apply workflow with confirmation, progress, cancellation policy and per-camera recovery guidance.
 - [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
@@ -98,4 +99,4 @@ Do not mark a whole brand as supported based on one model. Do not mark a workflo
 - A result is Clear only when the process exits normally with code 0 and output explicitly reports zero responses. An ARP reply is Conflict. Missing tools, permission errors, timeouts, crashes, unfamiliar output and all other results are Unknown.
 - This requires an iputils-compatible `arping` implementation and sufficient privileges for raw ARP. Other `arping` variants may be rejected as Unknown by design.
 - The bulk planner now runs this probe asynchronously on the currently selected interface and displays per-target READY/CONFLICT/BLOCKED results. The Apply action remains disabled; a successful ARP check is only a point-in-time observation, not a guarantee that an address cannot be claimed later.
-- Windows and macOS intentionally return Unknown. Do not mark those platforms supported until native interface-scoped DAD backends and tests exist.
+- Windows uses SendARP with a source address from the selected interface and reports Conflict only when a hardware address is resolved; all no-response/error cases remain Unknown. macOS intentionally returns Unknown pending a validated native DAD backend.
