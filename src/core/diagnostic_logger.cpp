@@ -123,6 +123,12 @@ bool DiagnosticLogger::exportRedacted(const QString &destinationPath, QString *e
         return false;
     }
 
+    if (QFileInfo(sourcePath).absoluteFilePath() ==
+        QFileInfo(destinationPath).absoluteFilePath()) {
+        if (error) *error = QStringLiteral("Choose a separate destination; the active diagnostic log cannot be overwritten.");
+        return false;
+    }
+
     QFile source(sourcePath);
     if (!source.open(QIODevice::ReadOnly | QIODevice::Text)) {
         if (error) *error = source.errorString();
@@ -140,8 +146,11 @@ bool DiagnosticLogger::exportRedacted(const QString &destinationPath, QString *e
         if (error) *error = destination.errorString();
         return false;
     }
-    if (destination.write(sanitized.toUtf8()) < 0) {
-        if (error) *error = destination.errorString();
+    const QByteArray exportBytes = sanitized.toUtf8();
+    if (destination.write(exportBytes) != exportBytes.size()) {
+        if (error) *error = destination.errorString().isEmpty()
+            ? QStringLiteral("Could not write the complete diagnostic export.")
+            : destination.errorString();
         return false;
     }
     destination.close();
