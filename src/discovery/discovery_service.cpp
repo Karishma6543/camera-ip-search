@@ -318,6 +318,7 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
         device.discoverySources << QStringLiteral("ONVIF GetCapabilities");
     emit deviceFound(device);
+    requestOnvifDns(device);
 }
 
 void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
