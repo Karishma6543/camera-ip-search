@@ -152,6 +152,9 @@ if(BUILD_TESTING)
     )
     target_include_directories(ip-conflict-probe-tests PRIVATE src)
     target_link_libraries(ip-conflict-probe-tests PRIVATE Qt6::Test Qt6::Network)
+    if(WIN32)
+        target_link_libraries(ip-conflict-probe-tests PRIVATE iphlpapi)
+    endif()
     add_test(NAME ip-conflict-probe-tests COMMAND ip-conflict-probe-tests)
 
     qt_add_executable(batch-operation-preflight-tests
