@@ -28,6 +28,8 @@ qt_add_executable(camera-ip-search
     src/adapters/network_config_validator.h
     src/adapters/network_config_validator.cpp
     src/core/device_record.h
+    src/firmware/firmware_package_validator.h
+    src/firmware/firmware_package_validator.cpp
     src/core/diagnostic_logger.h
     src/core/diagnostic_logger.cpp
     src/discovery/discovery_service.h
@@ -190,6 +192,15 @@ if(BUILD_TESTING)
     target_include_directories(batch-operation-runner-tests PRIVATE src)
     target_link_libraries(batch-operation-runner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME batch-operation-runner-tests COMMAND batch-operation-runner-tests)
+
+    qt_add_executable(firmware-package-validator-tests
+        tests/firmware_package_validator_test.cpp
+        src/firmware/firmware_package_validator.h
+        src/firmware/firmware_package_validator.cpp
+    )
+    target_include_directories(firmware-package-validator-tests PRIVATE src)
+    target_link_libraries(firmware-package-validator-tests PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME firmware-package-validator-tests COMMAND firmware-package-validator-tests)
 
     qt_add_executable(diagnostic-logger-tests
         tests/diagnostic_logger_test.cpp
