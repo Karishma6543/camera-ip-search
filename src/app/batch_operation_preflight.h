@@ -3,6 +3,7 @@
 #include "adapters/device_adapter.h"
 #include "core/device_record.h"
 
+#include <QMetaType>
 #include <QVector>
 
 // This is a preflight report only. A Ready result means that a registered
