@@ -1,27 +1,48 @@
 # Camera IP Search
 
-A cross-platform desktop utility for discovering IP cameras from multiple manufacturers and provisioning only the capabilities verified for each device.
+A cross-platform desktop device manager for discovering, inspecting and safely configuring IP cameras and recorders across multiple manufacturers.
 
-**Status:** Early implementation. The Qt desktop shell now runs active-interface discovery using ONVIF WS-Discovery (UDP 3702) and the project's own Contract B protocol (UDP 9988). Vendor-specific discovery and fallback subnet scanning are next.
+**Development status:** Active development; not feature-complete and not yet at Swatak Device Manager parity. The application currently includes ONVIF discovery and device-information queries, project-firmware discovery, bounded local subnet candidate scanning, a SQLite device inventory, reachability checks, CSV export, manual device entry and guarded ONVIF static IPv4 configuration.
 
-## Compatibility objective
+## Product direction
 
-Target devices include CP Plus, Hikvision, Prama, the project's own camera firmware, generic ONVIF cameras and other manufacturers. Compatibility is model- and firmware-specific: discovery does not guarantee activation, network configuration or firmware-upgrade support.
+The Swatak Device Manager screenshots supplied for this project establish the initial comparison baseline: device inventory, IP assignment (including automatic and range workflows), device details, camera preview, maintenance/password actions, firmware update, bulk camera configuration and NVR channels. The screenshots do not establish the underlying protocols, complete menus or supported models. See [Swatak feature parity specification](docs/swatak-feature-parity.md).
 
-Discovery strategy:
-- ONVIF WS-Discovery (UDP 3702) for standards-based devices.
-- Project firmware discovery (UDP 9988) only for our own firmware.
-- Verified vendor adapters when official protocol/SDK details and licensing permit.
-- Bounded, opt-in local network scanning to find additional candidate endpoints.
-- Manual device entry for devices that cannot be discovered automatically.
+The goal is a multi-vendor device manager with capability-based operations. It must not pretend that a feature is supported merely because a device was discovered or a TCP port is open.
+
+## Current implemented capabilities
+
+- Qt 6 desktop application (C++20) for Windows, macOS and Linux.
+- Active IPv4 interface enumeration and ONVIF WS-Discovery (UDP 3702).
+- Project firmware discovery using its own Contract B UDP 9988 protocol.
+- Bounded, opt-in local IPv4 subnet candidate scanning.
+- ONVIF GetDeviceInformation, GetCapabilities and GetNetworkInterfaces read queries.
+- SQLite inventory for non-sensitive device metadata; credentials are not stored.
+- Manual device entry, device labels, search/filtering, CSV export and open-web-interface action.
+- TCP reachability checks with explicit “no response” semantics.
+- Validated ONVIF static IPv4 configuration with explicit confirmation and post-change verification.
+
+## Not implemented / not hardware-validated yet
+
+- Multi-device automatic and range-based IP assignment.
+- Camera live preview and snapshot capture.
+- Password/activation workflows and reboot.
+- Vendor-specific CP Plus, Hikvision, Prama or Securus management operations.
+- Firmware package compatibility verification and upgrade transports.
+- Bulk image/day-night/IR configuration.
+- NVR channel discovery and management.
+- Exact-model hardware validation and production installers.
+
+These are separate engineering workstreams. They will be enabled only when a protocol or vendor-authorized SDK is verified for the exact model/firmware and has appropriate licensing.
 
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql and Xml modules.
+Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql, Xml and Test modules.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
+ctest --test-dir build --output-on-failure
 ```
 
 ## Developer documentation
@@ -30,23 +51,12 @@ cmake --build build --config Release
 - [Universal compatibility strategy](docs/universal-compatibility.md)
 - [Adapter development guide](docs/adapter-development.md)
 - [Implementation roadmap](docs/implementation-roadmap.md)
+- [Swatak feature parity specification](docs/swatak-feature-parity.md)
 - [Compatibility and hardware test matrix](docs/compatibility-matrix.md)
 - [Firmware communication contracts](docs/protocol-contract.md)
 - [Development setup](docs/development.md)
 - [Contributing](CONTRIBUTING.md)
 
-## Current implementation
+## Safety and release policy
 
-- [x] Qt desktop shell
-- [x] Active IPv4 interface enumeration
-- [x] ONVIF WS-Discovery probe and basic ProbeMatch parsing
-- [x] Project firmware UDP 9988 probe and Contract B response parsing
-- [x] Basic device inventory population
-- [ ] Vendor-specific adapters
-- [ ] Bounded fallback subnet scanning
-- [ ] ONVIF device-information and capability queries
-- [ ] SQLite history, credentials integration and provisioning
-
-## Safety and limitations
-
-The tool will not guess passwords, bypass authentication or send undocumented configuration/activation commands. It shows unknown capabilities honestly. Firmware upgrades require verified model compatibility and integrity checks. Discovery is limited to active local IPv4 interfaces; it does not scan remote routed subnets.
+The application will not guess passwords, bypass authentication or send undocumented configuration/activation commands. Unknown capabilities remain disabled. Network scans are bounded and opt-in. Firmware upgrades require verified model, hardware revision, region and package integrity checks. A feature is not considered hardware-supported until tested against the exact documented device and firmware. See the roadmap for the evidence labels used by this project.
