@@ -98,6 +98,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         authenticator->setPassword(password);
         updateStatus(tr("Credentials supplied for this application session; they are not saved in inventory or to disk."));
     });
+    connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
+            [this](const DeviceRecord &, bool verified, const QString &message) {
+        for (auto *button : findChildren<QPushButton *>()) {
+            if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
+                button->setEnabled(true);
+                break;
+            }
+        }
+        QMessageBox::information(this, verified ? tr("Network configuration verified")
+                                                : tr("Network configuration result"), message);
+        updateStatus(message);
+    });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover devices"));
         scanButton_->setEnabled(true);
