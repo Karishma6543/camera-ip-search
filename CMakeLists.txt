@@ -52,6 +52,19 @@ if(BUILD_TESTING)
     target_include_directories(discovery-parser-tests PRIVATE src)
     target_link_libraries(discovery-parser-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
     add_test(NAME discovery-parser-tests COMMAND discovery-parser-tests)
+
+    qt_add_executable(adapter-registry-tests
+        tests/adapter_registry_test.cpp
+        src/core/device_record.h
+        src/adapters/device_adapter.h
+        src/adapters/onvif_adapter.h
+        src/adapters/onvif_adapter.cpp
+        src/adapters/adapter_registry.h
+        src/adapters/adapter_registry.cpp
+    )
+    target_include_directories(adapter-registry-tests PRIVATE src)
+    target_link_libraries(adapter-registry-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME adapter-registry-tests COMMAND adapter-registry-tests)
 endif()
 
 include(GNUInstallDirs)
