@@ -365,7 +365,10 @@ void MainWindow::buildUi()
     statusBar()->addWidget(statusLabel_, 1);
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
-        if (reachabilityChecker_->isRunning()) return;
+        if (reachabilityChecker_->isRunning()) {
+            reachabilityChecker_->cancel();
+            return;
+        }
         QVector<DeviceRecord> devices;
         const auto selected = deviceTable_->selectionModel()->selectedRows();
         for (const QModelIndex &index : selected) {
@@ -381,8 +384,8 @@ void MainWindow::buildUi()
             }
         }
         if (devices.isEmpty()) { updateStatus(tr("Add or discover devices before checking reachability.")); return; }
-        reachabilityButton_->setEnabled(false);
-        reachabilityButton_->setText(tr("Checking…"));
+        reachabilityButton_->setEnabled(true);
+        reachabilityButton_->setText(tr("Cancel reachability check"));
         updateStatus(tr("Checking TCP reachability. Selected rows only; if none are selected, all devices are checked."));
         reachabilityChecker_->start(devices);
     });
@@ -408,7 +411,7 @@ void MainWindow::buildUi()
     connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
-        updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
+        updateStatus(tr("Reachability check ended — %1 device(s) checked. No response does not prove a device is offline.").arg(checked));
     });
     connect(scanButton_, &QPushButton::clicked, this, [this] {
         if (discovery_->isRunning()) {
