@@ -182,6 +182,7 @@ void MainWindow::buildUi()
         QFrame#topBar { background: #292c31; border: 1px solid #3c4048; border-radius: 10px; }
         QFrame#surface { background: #292c31; border: 1px solid #41454e; border-radius: 10px; }
         QFrame#toolbar { background: #25282d; border: 1px solid #3b3f47; border-radius: 8px; }
+        QFrame#metricCard { background: #292c31; border: 1px solid #41454e; border-radius: 9px; }
         QGroupBox#actionPanel { background: #2b2e34; border: 1px solid #454a54; border-radius: 9px; margin-top: 12px; padding: 13px 10px 10px 10px; color: #f1f1f2; font-weight: 700; }
         QGroupBox#actionPanel::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; color: #f2f2f3; }
         QLineEdit, QComboBox { background: #1f2227; color: #f1f2f4; border: 1px solid #646a75; border-radius: 6px; padding: 8px 9px; selection-background-color: #bd2634; min-height: 18px; }
@@ -267,6 +268,31 @@ void MainWindow::buildUi()
     reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
     tools->addWidget(reachabilityButton_);
     root->addWidget(toolbar);
+
+    // Device health summary uses observed TCP service reachability only.
+    // "No response" is deliberately not labelled Offline because a device may
+    // block every probed TCP port while remaining operational.
+    auto *healthRow = new QHBoxLayout();
+    healthRow->setSpacing(9);
+    const auto addHealthCard = [central, healthRow](const QString &caption, QLabel **valueLabel) {
+        auto *card = new QFrame(central);
+        card->setObjectName(QStringLiteral("metricCard"));
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(12, 8, 12, 8);
+        cardLayout->setSpacing(2);
+        auto *captionLabel = mutedLabel(caption, card);
+        auto *value = new QLabel(QStringLiteral("0"), card);
+        value->setObjectName(QStringLiteral("metric"));
+        cardLayout->addWidget(captionLabel);
+        cardLayout->addWidget(value);
+        healthRow->addWidget(card, 1);
+        *valueLabel = value;
+    };
+    addHealthCard(tr("TCP service reachable"), &onlineMetric_);
+    addHealthCard(tr("No TCP response"), &noResponseMetric_);
+    addHealthCard(tr("Not checked"), &uncheckedMetric_);
+    addHealthCard(tr("Unverified candidates"), &candidateMetric_);
+    root->addLayout(healthRow);
 
     auto *mainRow = new QHBoxLayout();
     mainRow->setSpacing(10);
@@ -422,6 +448,7 @@ void MainWindow::buildUi()
             for (int row = 0; row < deviceTable_->rowCount(); ++row) {
                 if (!deviceTable_->item(row, 1) || deviceTable_->item(row, 1)->text() != ip) continue;
                 deviceTable_->setItem(row, 11, new QTableWidgetItem(status));
+                updateDeviceSummary();
                 const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
                 if (inventoryDb_.isOpen()) {
                     QSqlQuery query(inventoryDb_);
@@ -998,8 +1025,29 @@ void MainWindow::updateStatus(const QString &message)
 void MainWindow::updateDeviceSummary()
 {
     const int count = deviceTable_ ? deviceTable_->rowCount() : 0;
+    int reachable = 0;
+    int noResponse = 0;
+    int unchecked = 0;
+    int candidates = 0;
+    if (deviceTable_) {
+        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+            const auto *reachabilityItem = deviceTable_->item(row, 11);
+            const QString reachability = reachabilityItem
+                ? reachabilityItem->text() : QStringLiteral("Not checked");
+            if (reachability == QStringLiteral("Reachable")) ++reachable;
+            else if (reachability == QStringLiteral("No response")) ++noResponse;
+            else ++unchecked;
+
+            const auto *ipItem = deviceTable_->item(row, 1);
+            if (ipItem && ipItem->data(Qt::UserRole + 13).toBool()) ++candidates;
+        }
+    }
     if (deviceCountValue_) deviceCountValue_->setText(tr("%1 devices").arg(count));
     if (summaryLabel_) summaryLabel_->setText(count == 1 ? tr("1 device found") : tr("%1 devices found").arg(count));
+    if (onlineMetric_) onlineMetric_->setText(QString::number(reachable));
+    if (noResponseMetric_) noResponseMetric_->setText(QString::number(noResponse));
+    if (uncheckedMetric_) uncheckedMetric_->setText(QString::number(unchecked));
+    if (candidateMetric_) candidateMetric_->setText(QString::number(candidates));
 }
 void MainWindow::upsertDevice(const DeviceRecord &device)
 {
@@ -1018,6 +1066,7 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     deviceTable_->setItem(row, 0, check);
     const auto *previousIpItem = deviceTable_->item(row, 1);
     auto *ipItem = new QTableWidgetItem(device.ipAddress);
+    ipItem->setData(Qt::UserRole + 13, device.isCandidate);
     const auto keepExistingWhenEmpty = [previousIpItem, ipItem](int role, const QString &incoming) {
         const QString value = incoming.isEmpty() && previousIpItem
             ? previousIpItem->data(role).toString() : incoming;
