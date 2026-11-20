@@ -34,3 +34,6 @@ public:
         const AdapterRegistry &registry,
         DeviceOperation operation);
 };
+
+Q_DECLARE_METATYPE(BatchTargetResult)
+Q_DECLARE_METATYPE(QVector<BatchTargetResult>)
