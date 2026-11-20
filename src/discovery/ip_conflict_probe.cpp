@@ -51,8 +51,23 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
         if (entry.ip() == target)
             return {IpAddressProbeState::Conflict,
                     QStringLiteral("Target address belongs to this computer's selected interface.")};
-        if (target.isInSubnet(entry.ip(), entry.prefixLength()))
-            inSelectedSubnet = true;
+        const int prefix = entry.prefixLength();
+        if (!target.isInSubnet(entry.ip(), prefix))
+            continue;
+        inSelectedSubnet = true;
+
+        // For ordinary IPv4 subnets, network and directed-broadcast addresses
+        // are not assignable host addresses. Never report either as available.
+        // /31 point-to-point links have two usable endpoints; /32 has no
+        // additional host address to probe.
+        if (prefix >= 1 && prefix <= 30) {
+            const quint32 mask = 0xffffffffU << (32 - prefix);
+            const quint32 candidate = target.toIPv4Address();
+            const quint32 network = entry.ip().toIPv4Address() & mask;
+            const quint32 broadcast = network | ~mask;
+            if (candidate == network || candidate == broadcast)
+                return unknown(QStringLiteral("Target is the network or directed-broadcast address for the selected subnet; no probe was sent."));
+        }
     }
     if (!inSelectedSubnet)
         return unknown(QStringLiteral("Target is not on an IPv4 subnet directly attached to the selected interface; no probe was sent."));
