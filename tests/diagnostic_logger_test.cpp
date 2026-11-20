@@ -46,6 +46,11 @@ void DiagnosticLoggerTest::writesAndExportsSanitizedDiagnostics()
     const QByteArray contents = exported.readAll();
     QVERIFY(contents.contains("[REDACTED]"));
     QVERIFY(!contents.contains("do-not-export"));
+
+    QString overwriteError;
+    QVERIFY(!DiagnosticLogger::exportRedacted(DiagnosticLogger::logFilePath(),
+                                                &overwriteError));
+    QVERIFY(overwriteError.contains(QStringLiteral("separate destination")));
 }
 
 QTEST_MAIN(DiagnosticLoggerTest)
