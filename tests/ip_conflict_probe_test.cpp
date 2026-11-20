@@ -25,9 +25,29 @@ private:
                 continue;
             for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
                 if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                    entry.prefixLength() > 0 && !entry.ip().isLoopback())
+                    entry.prefixLength() >= 1 && entry.prefixLength() <= 30 &&
+                    !entry.ip().isLoopback())
                     return interface.name();
             }
+        }
+        return {};
+    }
+
+    QString targetOnActiveSubnet(const QString &interfaceName) const
+    {
+        const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                entry.prefixLength() < 1 || entry.prefixLength() > 30 ||
+                entry.ip().isLoopback())
+                continue;
+            const quint32 mask = 0xffffffffu << (32 - entry.prefixLength());
+            const quint32 network = entry.ip().toIPv4Address() & mask;
+            const quint32 broadcast = network | ~mask;
+            quint32 candidate = network + 1;
+            if (candidate == entry.ip().toIPv4Address()) ++candidate;
+            if (candidate < broadcast)
+                return QHostAddress(candidate).toString();
         }
         return {};
     }
@@ -50,64 +70,45 @@ private:
 
 void IpConflictProbeTest::rejectsNonIpv4Targets()
 {
-    const auto result = IpConflictProbe::probe(QStringLiteral("2001:db8::1"),
-                                                QStringLiteral("eth0"));
-    QCOMPARE(result.state, IpAddressProbeState::Unknown);
+    QCOMPARE(IpConflictProbe::probe(QStringLiteral("2001:db8::1"),
+                                    QStringLiteral("eth0")).state,
+             IpAddressProbeState::Unknown);
 }
 
 void IpConflictProbeTest::requiresExplicitInterface()
 {
-    const auto result = IpConflictProbe::probe(QStringLiteral("192.168.1.20"), {});
-    QCOMPARE(result.state, IpAddressProbeState::Unknown);
+    QCOMPARE(IpConflictProbe::probe(QStringLiteral("192.168.1.20"), {}).state,
+             IpAddressProbeState::Unknown);
 }
 
 void IpConflictProbeTest::rejectsUnknownInterface()
 {
-    const auto result = IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
-                                                QStringLiteral("oxita-interface-that-does-not-exist"));
-    QCOMPARE(result.state, IpAddressProbeState::Unknown);
+    QCOMPARE(IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
+                                    QStringLiteral("oxita-interface-that-does-not-exist")).state,
+             IpAddressProbeState::Unknown);
 }
 
 void IpConflictProbeTest::rejectsMissingArpingProgram()
 {
-    const auto result = IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
-                                                QStringLiteral("eth0"), {});
-    QCOMPARE(result.state, IpAddressProbeState::Unknown);
+    QCOMPARE(IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
+                                    QStringLiteral("eth0"), {}).state,
+             IpAddressProbeState::Unknown);
 }
 
 void IpConflictProbeTest::classifiesVerifiedZeroResponseAsClear()
 {
 #ifdef Q_OS_LINUX
     const QString interfaceName = usableInterfaceName();
-    if (interfaceName.isEmpty()) QSKIP("No active non-loopback IPv4 interface is available.");
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface with a usable subnet is available.");
+    const QString target = targetOnActiveSubnet(interfaceName);
+    if (target.isEmpty()) QSKIP("No usable host address exists on the selected subnet.");
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString executable = fakeArping(directory,
         "echo 'Received 0 response(s)'\nexit 0\n");
     QVERIFY(!executable.isEmpty());
-    const auto result = IpConflictProbe::probe(QStringLiteral("127.0.0.1"),
-                                                interfaceName, executable);
-    // Loopback is not in the selected interface subnet; use a target derived
-    // from that interface's address and prefix for the actual subprocess path.
-    Q_UNUSED(result)
-    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
-    QString target;
-    for (const auto &entry : interface.addressEntries()) {
-        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-            !entry.ip().isLoopback() && entry.prefixLength() > 0) {
-            const quint32 host = entry.ip().toIPv4Address();
-            const quint32 mask = entry.prefixLength() == 0 ? 0u :
-                (0xffffffffu << (32 - entry.prefixLength()));
-            const quint32 candidate = (host & mask) | ((~mask) & 0x000000feu);
-            target = QHostAddress(candidate).toString();
-            if (target == entry.ip().toString())
-                target = QHostAddress((host & mask) | ((~mask) & 0x000000fdu)).toString();
-            break;
-        }
-    }
-    if (target.isEmpty()) QSKIP("Could not derive an IPv4 target on selected interface.");
-    const auto verified = IpConflictProbe::probe(target, interfaceName, executable);
-    QCOMPARE(verified.state, IpAddressProbeState::Clear);
+    QCOMPARE(IpConflictProbe::probe(target, interfaceName, executable).state,
+             IpAddressProbeState::Clear);
 #else
     QSKIP("The validated arping backend is Linux-only.");
 #endif
@@ -117,28 +118,16 @@ void IpConflictProbeTest::classifiesPositiveResponseAsConflict()
 {
 #ifdef Q_OS_LINUX
     const QString interfaceName = usableInterfaceName();
-    if (interfaceName.isEmpty()) QSKIP("No active non-loopback IPv4 interface is available.");
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface with a usable subnet is available.");
+    const QString target = targetOnActiveSubnet(interfaceName);
+    if (target.isEmpty()) QSKIP("No usable host address exists on the selected subnet.");
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString executable = fakeArping(directory,
         "echo 'Received 1 response(s)'\nexit 1\n");
     QVERIFY(!executable.isEmpty());
-    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
-    QString target;
-    for (const auto &entry : interface.addressEntries()) {
-        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-            !entry.ip().isLoopback() && entry.prefixLength() > 0) {
-            const quint32 host = entry.ip().toIPv4Address();
-            const quint32 mask = 0xffffffffu << (32 - entry.prefixLength());
-            target = QHostAddress((host & mask) | ((~mask) & 0x000000feu)).toString();
-            if (target == entry.ip().toString())
-                target = QHostAddress((host & mask) | ((~mask) & 0x000000fdu)).toString();
-            break;
-        }
-    }
-    if (target.isEmpty()) QSKIP("Could not derive an IPv4 target on selected interface.");
-    const auto result = IpConflictProbe::probe(target, interfaceName, executable);
-    QCOMPARE(result.state, IpAddressProbeState::Conflict);
+    QCOMPARE(IpConflictProbe::probe(target, interfaceName, executable).state,
+             IpAddressProbeState::Conflict);
 #else
     QSKIP("The validated arping backend is Linux-only.");
 #endif
@@ -148,28 +137,16 @@ void IpConflictProbeTest::classifiesAmbiguousOutputAsUnknown()
 {
 #ifdef Q_OS_LINUX
     const QString interfaceName = usableInterfaceName();
-    if (interfaceName.isEmpty()) QSKIP("No active non-loopback IPv4 interface is available.");
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface with a usable subnet is available.");
+    const QString target = targetOnActiveSubnet(interfaceName);
+    if (target.isEmpty()) QSKIP("No usable host address exists on the selected subnet.");
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString executable = fakeArping(directory,
         "echo 'probe completed but no summary available'\nexit 0\n");
     QVERIFY(!executable.isEmpty());
-    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
-    QString target;
-    for (const auto &entry : interface.addressEntries()) {
-        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-            !entry.ip().isLoopback() && entry.prefixLength() > 0) {
-            const quint32 host = entry.ip().toIPv4Address();
-            const quint32 mask = 0xffffffffu << (32 - entry.prefixLength());
-            target = QHostAddress((host & mask) | ((~mask) & 0x000000feu)).toString();
-            if (target == entry.ip().toString())
-                target = QHostAddress((host & mask) | ((~mask) & 0x000000fdu)).toString();
-            break;
-        }
-    }
-    if (target.isEmpty()) QSKIP("Could not derive an IPv4 target on selected interface.");
-    const auto result = IpConflictProbe::probe(target, interfaceName, executable);
-    QCOMPARE(result.state, IpAddressProbeState::Unknown);
+    QCOMPARE(IpConflictProbe::probe(target, interfaceName, executable).state,
+             IpAddressProbeState::Unknown);
 #else
     QSKIP("The validated arping backend is Linux-only.");
 #endif
