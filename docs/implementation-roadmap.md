@@ -35,7 +35,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Verify the configured address after reconnecting.
 - [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping.
 - [x] Add a collision-aware preflight gate that rejects inventory/local-address conflicts, duplicate targets and inconclusive probe results.
-- [ ] Implement and validate concrete cross-platform live address-conflict probes (ARP/neighbor discovery); the preflight API intentionally fails closed until a verified probe is supplied.
+- [ ] Complete and validate cross-platform live address-conflict probes (ARP/neighbor discovery). Initial `IpConflictProbe` now performs interface-scoped IPv4 DAD using an iputils-compatible `arping -D`; unsupported utilities, permissions, timeouts and ambiguous output remain Unknown/fail-closed. Windows/macOS/Linux packaging and hardware validation are still pending.
 - [x] Add bulk IP planning UI with multi-row selection, stable MAC/serial mapping, range/mask inputs, manual reservations, local/interface and inventory reservations, per-device preview and preflight results.
 - [ ] Connect a live probe and verified ONVIF write adapter to an explicit batch apply workflow with confirmation, progress, cancellation policy and per-camera recovery guidance.
 - [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
@@ -89,3 +89,12 @@ Do not mark a whole brand as supported based on one model. Do not mark a workflo
 - [x] Extract ONVIF network-interface response parsing into a bounded, testable parser with coverage for interface metadata, manual/DHCP address precedence, gateway and malformed/oversized XML.
 
 - [x] Extract ONVIF GetDNS parsing into a bounded parser with SOAP-fault handling, IPv4 validation and manual-over-DHCP precedence.
+
+
+## Live ARP conflict probe — current implementation
+
+- `IpConflictProbe` accepts an IPv4 target and an explicit Qt network-interface name; it refuses to send if the interface is down or the target is not in a directly attached IPv4 subnet.
+- It invokes `arping -D -c 2 -w 3 -I <interface> <target>` using `QProcess` arguments (no shell).
+- A result is Clear only when the process exits normally with code 0 and output explicitly reports zero responses. An ARP reply is Conflict. Missing tools, permission errors, timeouts, crashes, unfamiliar output and all other results are Unknown.
+- This requires an iputils-compatible `arping` implementation and sufficient privileges for raw ARP. Other `arping` variants may be rejected as Unknown by design.
+- This probe is not yet connected to the bulk assignment UI. It does not enable IP writes. Validate the exact command/output and privileges on each supported OS before marking platform support complete.
