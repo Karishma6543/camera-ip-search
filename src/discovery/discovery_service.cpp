@@ -442,3 +442,60 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
         device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     emit deviceFound(device);
 }\n
+void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
+{
+    const QUrl url(device.deviceServiceUrl);
+    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
+                           url.scheme() != QStringLiteral("https")) ||
+        url.host() != device.ipAddress)
+        return;
+    const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetDNS/></s:Body>
+</s:Envelope>)";
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(3500);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+        handleOnvifDns(reply, key);
+    });
+}
+
+void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &deviceKey)
+{
+    const QByteArray payload = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    reply->deleteLater();
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+        return;
+
+    QXmlStreamReader xml(payload);
+    QStringList path;
+    QString dnsAddress;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isStartElement()) {
+            path.append(xml.name().toString());
+            const QString joined = path.join(QLatin1Char('/'));
+            if (joined.endsWith(QStringLiteral("/DNSManual/IPv4Address"))) {
+                dnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                path.removeLast();
+            }
+        } else if (xml.isEndElement() && !path.isEmpty()) {
+            path.removeLast();
+        }
+    }
+    if (xml.hasError()) return;
+    if (!dnsAddress.isEmpty()) {
+        DeviceRecord &device = devices_[deviceKey];
+        device.ipv4DnsServer = dnsAddress;
+        if (!device.discoverySources.contains(QStringLiteral("ONVIF GetDNS")))
+            device.discoverySources << QStringLiteral("ONVIF GetDNS");
+        emit deviceFound(device);
+    }
+}
