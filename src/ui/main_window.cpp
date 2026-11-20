@@ -6,6 +6,7 @@
 #include "discovery/reachability_checker.h"
 #include "adapters/network_config_validator.h"
 #include "app/ip_assignment_preflight.h"
+#include "discovery/ip_conflict_probe.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -41,6 +42,8 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QHostAddress>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrentRun>
 #include <QFileDialog>
 #include <QFile>
 #include <QFileInfo>
@@ -610,7 +613,7 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
     layout->addWidget(results, 1);
 
     auto *safetyNote = mutedLabel(
-        tr("Safety gate: live ARP/neighbor probing is not yet implemented. An unknown or unavailable probe is treated as BLOCKED. The Apply action remains disabled until live conflict detection, adapter write capability and per-device recovery handling are verified."),
+        tr("Safety gate: live duplicate-address probing uses iputils arping on Linux and the selected interface. Other platforms, missing permissions/utilities, timeouts and ambiguous results remain BLOCKED. Apply stays disabled until camera write support and recovery are verified."),
         page);
     layout->addWidget(safetyNote);
 
@@ -732,24 +735,58 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
     });
 
     connect(preflightButton, &QPushButton::clicked, this,
-            [summary, results, planState, preflightState,
+            [this, page, summary, results, preflightButton, planState, preflightState,
              inventoryState, localReservedState] {
-        // The plan builder already reserved these addresses. Repeat the
-        // checks at the preflight boundary as defense in depth.
-        *preflightState = IpAssignmentPreflight::evaluate(
-            *planState, *inventoryState, *localReservedState, {});
-        int ready = 0;
-        for (int i = 0; i < preflightState->size(); ++i) {
-            const auto &check = preflightState->at(i);
-            const bool isReady = check.state == IpAssignmentPreflightState::Ready;
-            if (isReady) ++ready;
-            results->item(i, 3)->setText(isReady ? tr("READY") :
-                (check.state == IpAssignmentPreflightState::AddressConflict ? tr("CONFLICT") :
-                 check.state == IpAssignmentPreflightState::InvalidPlan ? tr("INVALID") : tr("BLOCKED")));
-            results->item(i, 4)->setText(check.message);
+        if (planState->isEmpty()) return;
+        const QString interfaceName = interfaceSelector_
+            ? interfaceSelector_->currentData().toString() : QString();
+        if (interfaceName.isEmpty()) {
+            summary->setText(tr("Preflight blocked: select an active IPv4 interface."));
+            return;
         }
-        summary->setText(tr("Safety preflight: %1 / %2 ready. No live probe is configured, so all targets remain blocked from apply.")
-                             .arg(ready).arg(preflightState->size()));
+
+        preflightButton->setEnabled(false);
+        preflightButton->setText(tr("Probing…"));
+        summary->setText(tr("Checking %1 proposed address(es) on interface %2. This runs in the background; inconclusive results are blocked.")
+                             .arg(planState->size()).arg(interfaceName));
+
+        const auto plan = *planState;
+        const auto inventory = *inventoryState;
+        const auto localReserved = *localReservedState;
+        auto *watcher = new QFutureWatcher<QVector<IpAssignmentPreflightResult>>(page);
+        connect(watcher, &QFutureWatcher<QVector<IpAssignmentPreflightResult>>::finished,
+                page, [watcher, summary, results, preflightButton, preflightState] {
+            *preflightState = watcher->result();
+            int ready = 0;
+            int conflicts = 0;
+            int blocked = 0;
+            for (int i = 0; i < preflightState->size(); ++i) {
+                const auto &check = preflightState->at(i);
+                const bool isReady = check.state == IpAssignmentPreflightState::Ready;
+                if (isReady) ++ready;
+                else if (check.state == IpAssignmentPreflightState::AddressConflict) ++conflicts;
+                else ++blocked;
+                if (results->item(i, 3))
+                    results->item(i, 3)->setText(isReady ? QObject::tr("READY") :
+                        (check.state == IpAssignmentPreflightState::AddressConflict ? QObject::tr("CONFLICT") :
+                         check.state == IpAssignmentPreflightState::InvalidPlan ? QObject::tr("INVALID") : QObject::tr("BLOCKED")));
+                if (results->item(i, 4)) results->item(i, 4)->setText(check.message);
+            }
+            summary->setText(QObject::tr("Live preflight complete: %1 clear, %2 conflict(s), %3 unverified. Clear means only that this ARP probe found no response at probe time; it is not a guarantee against later address use. Camera writes remain disabled.")
+                                 .arg(ready).arg(conflicts).arg(blocked));
+            preflightButton->setText(QObject::tr("Run safety preflight"));
+            preflightButton->setEnabled(true);
+            watcher->deleteLater();
+        });
+
+        watcher->setFuture(QtConcurrent::run(
+            [plan, inventory, localReserved, interfaceName] {
+                return IpAssignmentPreflight::evaluate(
+                    plan, inventory, localReserved,
+                    [interfaceName](const QString &address) {
+                        return IpConflictProbe::probe(address, interfaceName);
+                    });
+            }));
     });
 
     return page;
