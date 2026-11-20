@@ -18,6 +18,8 @@ The goal is a multi-vendor device manager with capability-based operations. It m
 - Bounded, opt-in local IPv4 subnet candidate scanning.
 - ONVIF GetDeviceInformation, GetCapabilities and GetNetworkInterfaces read queries.
 - SQLite inventory for non-sensitive device metadata; credentials are not stored.
+- Extensible capability adapter registry with unique adapter IDs; unverified management operations remain unsupported by default.
+- Firmware package candidate checks for exact vendor/series/model/hardware-revision/region metadata and SHA-256 integrity; this does not verify signatures or enable flashing.
 - Bounded application diagnostics with credential redaction and a user-triggered redacted support-log export.
 - Manual device entry, device labels, search/filtering, CSV export and open-web-interface action.
 - TCP reachability checks with explicit “no response” semantics.
