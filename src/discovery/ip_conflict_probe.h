@@ -7,11 +7,11 @@
 class IpConflictProbe final
 {
 public:
-    // Linux-only IPv4 duplicate-address-detection ARP probe on the explicitly
-    // selected interface. Requires iputils arping and raw-socket privileges.
-    // Windows/macOS deliberately return Unknown until native backends are
-    // separately implemented and validated. Only a documented zero-response
-    // DAD result is Clear; every ambiguous result fails closed.
+    // Interface-scoped IPv4 conflict probe. Linux uses iputils arping -D and can
+    // report Clear only from an explicit zero-response DAD result. Windows uses
+    // SendARP only for positive conflict evidence; no reply remains Unknown.
+    // macOS remains Unknown until a native DAD backend is validated. Ambiguous
+    // results always fail closed.
     static IpAddressProbeResult probe(const QString &targetAddress,
                                       const QString &interfaceName,
                                       const QString &arpingProgram = QStringLiteral("arping"));
