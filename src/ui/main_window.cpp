@@ -5,6 +5,7 @@
 #include "discovery/subnet_scanner.h"
 #include "discovery/reachability_checker.h"
 #include "adapters/network_config_validator.h"
+#include "app/ip_assignment_preflight.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -20,6 +21,8 @@
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QAbstractItemModel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QWidget>
@@ -41,8 +44,10 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QStringConverter>
 #include <QTextStream>
+#include <memory>
 
 namespace {
 QLabel *mutedLabel(const QString &text, QWidget *parent)
@@ -547,76 +552,186 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(10, 10, 10, 10);
+    layout->setSpacing(9);
+
     layout->addWidget(mutedLabel(
-        tr("Prepare a device-mapped IP assignment preview. Select camera rows in the inventory, enter a target range and subnet mask, then review the proposed mapping. This tool does not change camera settings."),
+        tr("Bulk IPv4 planner — select camera rows in the inventory, create a device-mapped plan, then run the safety preflight. This release is preview-only: no camera settings are changed."),
         page));
 
+    auto *form = new QFormLayout();
     auto *rangeStart = new QLineEdit(page);
     rangeStart->setPlaceholderText(QStringLiteral("192.168.1.100"));
     auto *rangeEnd = new QLineEdit(page);
     rangeEnd->setPlaceholderText(QStringLiteral("192.168.1.150"));
     auto *mask = new QLineEdit(QStringLiteral("255.255.255.0"), page);
-    auto *form = new QFormLayout();
-    form->addRow(tr("Range start"), rangeStart);
-    form->addRow(tr("Range end"), rangeEnd);
-    form->addRow(tr("Target subnet mask"), mask);
+    auto *reserved = new QLineEdit(page);
+    reserved->setPlaceholderText(tr("Optional comma-separated IPs: gateway, printer, server…"));
+    form->addRow(tr("First assignable IPv4"), rangeStart);
+    form->addRow(tr("Last assignable IPv4"), rangeEnd);
+    form->addRow(tr("Subnet mask"), mask);
+    form->addRow(tr("Additional reserved IPs"), reserved);
     layout->addLayout(form);
 
-    auto *preview = actionButton(tr("Preview range assignment"), page, true);
-    layout->addWidget(preview);
-    auto *selectionInfo = mutedLabel(tr("Select one or more device rows above using Ctrl / Shift-click."), page);
+    auto *selectionInfo = mutedLabel(
+        tr("Select camera rows above using Ctrl / Shift-click. Devices need a MAC address or serial number for stable mapping."),
+        page);
     layout->addWidget(selectionInfo);
-    layout->addStretch();
 
-    connect(preview, &QPushButton::clicked, this,
-            [this, rangeStart, rangeEnd, mask, selectionInfo] {
+    auto *actions = new QHBoxLayout();
+    auto *previewButton = actionButton(tr("Build assignment plan"), page, true);
+    auto *preflightButton = actionButton(tr("Run safety preflight"), page);
+    preflightButton->setEnabled(false);
+    actions->addWidget(previewButton);
+    actions->addWidget(preflightButton);
+    actions->addStretch();
+    layout->addLayout(actions);
+
+    auto *summary = mutedLabel(tr("No plan generated."), page);
+    layout->addWidget(summary);
+
+    auto *results = new QTableWidget(page);
+    results->setColumnCount(5);
+    results->setHorizontalHeaderLabels({
+        tr("DEVICE ID"), tr("CURRENT IP"), tr("PROPOSED IP"),
+        tr("PREFLIGHT"), tr("DETAILS")
+    });
+    results->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    results->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    results->verticalHeader()->setVisible(false);
+    results->setSelectionBehavior(QAbstractItemView::SelectRows);
+    results->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    results->setAlternatingRowColors(true);
+    results->setMinimumHeight(180);
+    layout->addWidget(results, 1);
+
+    auto *safetyNote = mutedLabel(
+        tr("Safety gate: live ARP/neighbor probing is not yet implemented. An unknown or unavailable probe is treated as BLOCKED. The Apply action remains disabled until live conflict detection, adapter write capability and per-device recovery handling are verified."),
+        page);
+    layout->addWidget(safetyNote);
+
+    auto planState = std::make_shared<QList<IpAssignmentTarget>>();
+    auto preflightState = std::make_shared<QVector<IpAssignmentPreflightResult>>();
+
+    connect(previewButton, &QPushButton::clicked, this,
+            [this, rangeStart, rangeEnd, mask, reserved, selectionInfo,
+             summary, results, preflightButton, planState, preflightState] {
+        planState->clear();
+        preflightState->clear();
+        results->setRowCount(0);
+        preflightButton->setEnabled(false);
+
         QList<IpAssignmentTarget> selectedDevices;
-        const auto selectedRows = deviceTable_->selectionModel()->selectedRows();
         QSet<QString> allInventoryAddresses;
+        QSet<QString> localReservedAddresses;
+
         for (int row = 0; row < deviceTable_->rowCount(); ++row) {
             const auto *ip = deviceTable_->item(row, 1);
+            const auto *mac = deviceTable_->item(row, 5);
+            const auto *serial = deviceTable_->item(row, 9);
             if (ip && !ip->text().trimmed().isEmpty())
                 allInventoryAddresses.insert(ip->text().trimmed());
-        }
-        for (const QModelIndex &index : selectedRows) {
-            const int row = index.row();
-            const auto *ip = deviceTable_->item(row, 1);
-            const auto *mac = deviceTable_->item(row, 5);
-            if (!ip || ip->text().trimmed().isEmpty()) continue;
+            if (ip) {
+                const QString gateway = ip->data(Qt::UserRole + 10).toString().trimmed();
+                if (!gateway.isEmpty()) localReservedAddresses.insert(gateway);
+            }
+            if (!deviceTable_->selectionModel()->isRowSelected(row, QModelIndex()))
+                continue;
+
+            if (!ip || ip->text().trimmed().isEmpty()) {
+                QMessageBox::warning(this, tr("Missing device address"),
+                    tr("Every selected row must have a current IPv4 address."));
+                return;
+            }
+            QString stableId = mac ? mac->text().trimmed() : QString();
+            if (stableId.isEmpty() && serial)
+                stableId = serial->text().trimmed();
+            if (stableId.isEmpty()) {
+                QMessageBox::warning(this, tr("Stable identity required"),
+                    tr("A selected camera has neither a MAC address nor a serial number. Add/refresh its identity before bulk planning; an IP address alone is not a safe device identity for a migration."));
+                return;
+            }
             const QString current = ip->data(Qt::UserRole + 8).toString().trimmed().isEmpty()
                 ? ip->text().trimmed() : ip->data(Qt::UserRole + 8).toString().trimmed();
-            QString id = mac ? mac->text().trimmed() : QString();
-            if (id.isEmpty()) id = QStringLiteral("ip:") + ip->text().trimmed();
-            selectedDevices.append({id, current, {}});
+            selectedDevices.append({stableId, current, {}});
         }
+
         if (selectedDevices.isEmpty()) {
             QMessageBox::information(this, tr("No devices selected"),
-                tr("Select one or more camera rows in the inventory before creating a plan."));
+                tr("Select one or more camera rows in the inventory first."));
             return;
         }
 
-        QList<IpAssignmentTarget> plan;
+        for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+            const auto flags = interface.flags();
+            if (!flags.testFlag(QNetworkInterface::IsUp) ||
+                !flags.testFlag(QNetworkInterface::IsRunning) ||
+                flags.testFlag(QNetworkInterface::IsLoopBack))
+                continue;
+            for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+                const QHostAddress address = entry.ip();
+                if (address.protocol() == QAbstractSocket::IPv4Protocol &&
+                    !address.isLoopback() && !address.isNull())
+                    localReservedAddresses.insert(address.toString());
+            }
+        }
+
+        const QStringList extra = reserved->text().split(
+            QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
+        for (const QString &address : extra)
+            localReservedAddresses.insert(address.trimmed());
+
         QString error;
         if (!IpAssignmentPlanner::buildDevicePlan(
                 rangeStart->text(), rangeEnd->text(), mask->text(),
-                selectedDevices, allInventoryAddresses, &plan, &error)) {
+                selectedDevices, allInventoryAddresses, planState.get(), &error)) {
+            summary->setText(tr("Plan rejected: %1").arg(error));
             QMessageBox::warning(this, tr("Cannot create IP plan"), error);
             return;
         }
 
-        QString report = tr("Dry-run assignment preview — %1 device(s)\n\n")
-                             .arg(plan.size());
-        for (const auto &target : plan) {
-            report += tr("%1\n%2  →  %3\n\n")
-                          .arg(target.deviceId, target.currentAddress, target.proposedAddress);
+        for (const IpAssignmentTarget &target : *planState) {
+            const int row = results->rowCount();
+            results->insertRow(row);
+            results->setItem(row, 0, new QTableWidgetItem(target.deviceId));
+            results->setItem(row, 1, new QTableWidgetItem(target.currentAddress));
+            results->setItem(row, 2, new QTableWidgetItem(target.proposedAddress));
+            results->setItem(row, 3, new QTableWidgetItem(tr("Not checked")));
+            results->setItem(row, 4, new QTableWidgetItem(tr("Plan generated; no network probe or write performed.")));
         }
-        report += tr("No camera was contacted or reconfigured. Inventory addresses are excluded, but live ARP/network conflict detection has not been performed. Confirm device reachability, subnet, gateway and adapter write support before any future apply step.");
-        QMessageBox::information(this, tr("IP assignment preview"), report);
-        selectionInfo->setText(tr("%1 device(s) mapped. Preview only; no settings changed.")
-                                   .arg(plan.size()));
+        selectionInfo->setText(tr("%1 device(s) selected and mapped in inventory order.")
+                                   .arg(planState->size()));
+        summary->setText(tr("Plan ready: %1 target(s). Inventory IPs, known camera gateways and active local IPv4 addresses are reserved.").arg(planState->size()));
+        preflightButton->setEnabled(true);
     });
+
+    connect(preflightButton, &QPushButton::clicked, this,
+            [reserved, summary, results, planState, preflightState] {
+        Q_UNUSED(reserved);
+        QSet<QString> inventoryAddresses;
+        QSet<QString> localReservedAddresses;
+        // The plan builder already excluded all inventory addresses. This
+        // second gate is intentionally run without a live probe until a
+        // platform-verified ARP/neighbor provider is available.
+        *preflightState = IpAssignmentPreflight::evaluate(
+            *planState, inventoryAddresses, localReservedAddresses, {});
+        int ready = 0;
+        for (int i = 0; i < preflightState->size(); ++i) {
+            const auto &check = preflightState->at(i);
+            const bool isReady = check.state == IpAssignmentPreflightState::Ready;
+            if (isReady) ++ready;
+            results->item(i, 3)->setText(isReady ? tr("READY") :
+                (check.state == IpAssignmentPreflightState::AddressConflict ? tr("CONFLICT") :
+                 check.state == IpAssignmentPreflightState::InvalidPlan ? tr("INVALID") : tr("BLOCKED")));
+            results->item(i, 4)->setText(check.message);
+        }
+        summary->setText(tr("Safety preflight: %1 / %2 ready. No live probe is configured, so all targets remain blocked from apply.")
+                             .arg(ready).arg(preflightState->size()));
+    });
+
     return page;
 }
+
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
