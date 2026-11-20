@@ -1,5 +1,6 @@
 #include "discovery_service.h"
 #include "discovery_parser.h"
+#include "adapters/network_config_validator.h"
 
 #include <QNetworkAddressEntry>
 #include <QJsonDocument>
@@ -7,6 +8,7 @@
 #include <QNetworkDatagram>
 #include <QNetworkRequest>
 #include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 #include <QUrl>
 #include <QUuid>
 #include <algorithm>
@@ -206,6 +208,165 @@ void DiscoveryService::mergeAndEmit(DeviceRecord device)
 }
 
 
+
+void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString &address,
+                                             const QString &subnetMask, const QString &gateway)
+{
+    QString validationError;
+    if (!NetworkConfigValidator::validateStaticIpv4(address, subnetMask, gateway, QString(), &validationError)) {
+        emit networkConfigurationFinished(device, false, validationError);
+        return;
+    }
+    if (device.networkInterfaceToken.isEmpty() || device.deviceServiceUrl.isEmpty() ||
+        device.ipAddress.isEmpty()) {
+        emit networkConfigurationFinished(device, false,
+            tr("The camera has no verified ONVIF interface token or device-service URL."));
+        return;
+    }
+
+    const QUrl oldUrl(device.deviceServiceUrl);
+    if (!oldUrl.isValid() || (oldUrl.scheme() != QStringLiteral("http") &&
+        oldUrl.scheme() != QStringLiteral("https")) || oldUrl.host() != device.ipAddress) {
+        emit networkConfigurationFinished(device, false,
+            tr("The ONVIF service URL does not match the camera's current IP address."));
+        return;
+    }
+
+    QHostAddress maskAddress;
+    maskAddress.setAddress(subnetMask.trimmed());
+    const quint32 mask = maskAddress.toIPv4Address();
+    int prefix = 0;
+    bool zeroSeen = false;
+    for (int bit = 31; bit >= 0; --bit) {
+        const bool set = (mask & (1U << bit)) != 0;
+        if (set && zeroSeen) {
+            emit networkConfigurationFinished(device, false, tr("Subnet mask is not contiguous."));
+            return;
+        }
+        if (set) ++prefix; else zeroSeen = true;
+    }
+
+    QByteArray soap;
+    QXmlStreamWriter writer(&soap);
+    writer.writeStartDocument();
+    writer.writeStartElement(QStringLiteral("s:Envelope"));
+    writer.writeNamespace(QStringLiteral("http://www.w3.org/2003/05/soap-envelope"), QStringLiteral("s"));
+    writer.writeNamespace(QStringLiteral("http://www.onvif.org/ver10/device/wsdl"), QStringLiteral("tds"));
+    writer.writeNamespace(QStringLiteral("http://www.onvif.org/ver10/schema"), QStringLiteral("tt"));
+    writer.writeStartElement(QStringLiteral("s:Body"));
+    writer.writeStartElement(QStringLiteral("tds:SetNetworkInterfaces"));
+    writer.writeStartElement(QStringLiteral("tds:InterfaceToken"));
+    writer.writeCharacters(device.networkInterfaceToken);
+    writer.writeEndElement();
+    writer.writeStartElement(QStringLiteral("tds:NetworkInterface"));
+    writer.writeStartElement(QStringLiteral("tt:IPv4"));
+    writer.writeTextElement(QStringLiteral("tt:Enabled"), QStringLiteral("true"));
+    writer.writeStartElement(QStringLiteral("tt:Config"));
+    writer.writeTextElement(QStringLiteral("tt:DHCP"), QStringLiteral("false"));
+    writer.writeStartElement(QStringLiteral("tt:Manual"));
+    writer.writeTextElement(QStringLiteral("tt:Address"), address.trimmed());
+    writer.writeTextElement(QStringLiteral("tt:PrefixLength"), QString::number(prefix));
+    writer.writeEndElement();
+    if (!gateway.trimmed().isEmpty())
+        writer.writeTextElement(QStringLiteral("tt:Gateway"), gateway.trimmed());
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndDocument();
+
+    QNetworkRequest request(oldUrl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,
+                      QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(5000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *setReply = networkManager_.post(request, soap);
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, key] {
+        const QByteArray response = setReply->readAll();
+        const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool accepted = setReply->error() == QNetworkReply::NoError &&
+                              status >= 200 && status < 300 && !response.isEmpty() &&
+                              response.size() <= 1024 * 1024 &&
+                              !response.contains("<Fault") && !response.contains(":Fault");
+        const QString errorText = setReply->errorString();
+        setReply->deleteLater();
+        if (!accepted) {
+            emit networkConfigurationFinished(device, false,
+                tr("Camera did not confirm the network change (%1).").arg(errorText));
+            return;
+        }
+
+        QUrl verifyUrl = oldUrl;
+        verifyUrl.setHost(address.trimmed());
+        QByteArray verifySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetNetworkInterfaces/></s:Body>
+</s:Envelope>)";
+        QNetworkRequest verifyRequest(verifyUrl);
+        verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader,
+                                QStringLiteral("application/soap+xml; charset=utf-8"));
+        verifyRequest.setTransferTimeout(5000);
+        verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        QNetworkReply *verifyReply = networkManager_.post(verifyRequest, verifySoap);
+        connect(verifyReply, &QNetworkReply::finished, this,
+            [this, verifyReply, device, address, key, verifyUrl] {
+                const QByteArray payload = verifyReply->readAll();
+                const int verifyStatus = verifyReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                const bool transportOk = verifyReply->error() == QNetworkReply::NoError &&
+                                         verifyStatus >= 200 && verifyStatus < 300 &&
+                                         !payload.isEmpty() && payload.size() <= 1024 * 1024;
+                verifyReply->deleteLater();
+                if (!transportOk) {
+                    emit networkConfigurationFinished(device, false,
+                        tr("The camera accepted the request, but verification at the new IP failed. Check the new address and reconnect manually if needed."));
+                    return;
+                }
+                QXmlStreamReader xml(payload);
+                bool tokenSeen = false;
+                bool addressSeen = false;
+                QString currentToken;
+                while (!xml.atEnd()) {
+                    xml.readNext();
+                    if (xml.isStartElement()) {
+                        const QString name = xml.name().toString();
+                        if (name == QStringLiteral("NetworkInterface"))
+                            currentToken = xml.attributes().value(QStringLiteral("token")).toString();
+                        else if (name == QStringLiteral("IPv4Address")) {
+                            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                            if (currentToken == device.networkInterfaceToken && value == address)
+                                addressSeen = true;
+                        } else if (name == QStringLiteral("Address")) {
+                            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                            if (currentToken == device.networkInterfaceToken && value == address)
+                                addressSeen = true;
+                        }
+                    }
+                    if (xml.isEndElement() && xml.name() == QStringLiteral("NetworkInterface"))
+                        currentToken.clear();
+                }
+                if (xml.hasError() || !addressSeen) {
+                    emit networkConfigurationFinished(device, false,
+                        tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
+                    return;
+                }
+                DeviceRecord updated = device;
+                updated.ipAddress = address;
+                updated.ipv4Address = address;
+                updated.ipv4SubnetMask = QString();
+                updated.ipv4Gateway = QString();
+                updated.ipv4DhcpEnabled = false;
+                updated.ipv4ConfigurationKnown = true;
+                updated.deviceServiceUrl = verifyUrl.toString();
+                if (devices_.contains(key)) devices_[key] = updated;
+                emit deviceFound(updated);
+                emit networkConfigurationFinished(updated, true,
+                    tr("Static IPv4 configuration was applied and verified at %1. Refresh the device to retrieve its reported subnet and gateway.").arg(address));
+            });
+    });
+}
 
 void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
 {
