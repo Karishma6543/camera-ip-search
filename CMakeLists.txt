@@ -26,6 +26,8 @@ qt_add_executable(camera-ip-search
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
     src/discovery/discovery_service.cpp
+    src/discovery/onvif_network_config.h
+    src/discovery/onvif_network_config.cpp
     src/discovery/subnet_scanner.h
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
@@ -67,6 +69,15 @@ if(BUILD_TESTING)
     target_include_directories(adapter-registry-tests PRIVATE src)
     target_link_libraries(adapter-registry-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME adapter-registry-tests COMMAND adapter-registry-tests)
+
+    qt_add_executable(onvif-network-config-tests
+        tests/onvif_network_config_test.cpp
+        src/discovery/onvif_network_config.h
+        src/discovery/onvif_network_config.cpp
+    )
+    target_include_directories(onvif-network-config-tests PRIVATE src)
+    target_link_libraries(onvif-network-config-tests PRIVATE Qt6::Test Qt6::Xml)
+    add_test(NAME onvif-network-config-tests COMMAND onvif-network-config-tests)
 
     qt_add_executable(network-config-validator-tests
         tests/network_config_validator_test.cpp
