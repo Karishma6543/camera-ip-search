@@ -55,7 +55,7 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
         if (entry.ip() == target)
             return {IpAddressProbeState::Conflict,
                     QStringLiteral("Target address belongs to this computer's selected interface.")};
-        if (entry.ip().isInSubnet(target, entry.prefixLength()))
+        if (target.isInSubnet(entry.ip(), entry.prefixLength()))
             inSelectedSubnet = true;
     }
     if (!inSelectedSubnet)
