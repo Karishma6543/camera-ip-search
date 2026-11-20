@@ -16,6 +16,7 @@ private slots:
     void rejectsUnknownInterface();
     void rejectsMissingArpingProgram();
     void rejectsTargetOutsideSelectedSubnet();
+    void rejectsNetworkAndBroadcastAddresses();
     void detectsSelectedInterfaceAddressAsConflict();
     void classifiesVerifiedZeroResponseAsClear();
     void classifiesPositiveResponseAsConflict();
@@ -143,9 +144,31 @@ void IpConflictProbeTest::rejectsTargetOutsideSelectedSubnet()
 #endif
 }
 
+void IpConflictProbeTest::rejectsNetworkAndBroadcastAddresses()
+{
+    const QString interfaceName = usableInterfaceName();
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface is available.");
+    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
+    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+        const int prefix = entry.prefixLength();
+        if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+            prefix < 1 || prefix > 30 || entry.ip().isLoopback())
+            continue;
+        const quint32 mask = 0xffffffffU << (32 - prefix);
+        const quint32 network = entry.ip().toIPv4Address() & mask;
+        const quint32 broadcast = network | ~mask;
+        QCOMPARE(IpConflictProbe::probe(QHostAddress(network).toString(), interfaceName).state,
+                 IpAddressProbeState::Unknown);
+        QCOMPARE(IpConflictProbe::probe(QHostAddress(broadcast).toString(), interfaceName).state,
+                 IpAddressProbeState::Unknown);
+        return;
+    }
+    QSKIP("No ordinary IPv4 subnet is available for endpoint validation.");
+}
+
 void IpConflictProbeTest::detectsSelectedInterfaceAddressAsConflict()
 {
-const QString interfaceName = usableInterfaceName();
+    const QString interfaceName = usableInterfaceName();
     if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface is available.");
     const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
     for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
