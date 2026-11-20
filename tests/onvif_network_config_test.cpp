@@ -13,6 +13,7 @@ private slots:
     void verifiesOnlyRequestedInterface();
     void rejectsWrongAddressAndToken();
     void buildsEscapedGatewayRequest();
+    void validatesGatewayOperationResponse();
 };
 
 void OnvifNetworkConfigTest::parsesSuccessfulSetResponse()
@@ -67,6 +68,17 @@ void OnvifNetworkConfigTest::buildsEscapedGatewayRequest()
     QXmlStreamReader reader(xml);
     while (!reader.atEnd()) reader.readNext();
     QVERIFY(!reader.hasError());
+}
+
+void OnvifNetworkConfigTest::validatesGatewayOperationResponse()
+{
+    QVERIFY(OnvifNetworkConfig::parseSoapOperationResponse(
+        R"(<Envelope><SetNetworkDefaultGatewayResponse/></Envelope>)",
+        "SetNetworkDefaultGatewayResponse"));
+    QVERIFY(!OnvifNetworkConfig::parseSoapOperationResponse(
+        R"(<Envelope><Fault/></Envelope>)", "SetNetworkDefaultGatewayResponse"));
+    QVERIFY(!OnvifNetworkConfig::parseSoapOperationResponse(
+        R"(<Envelope><OtherResponse/></Envelope>)", "SetNetworkDefaultGatewayResponse"));
 }
 
 QTEST_GUILESS_MAIN(OnvifNetworkConfigTest)
