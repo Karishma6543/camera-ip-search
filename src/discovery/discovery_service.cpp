@@ -442,7 +442,8 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces")))
         device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     emit deviceFound(device);
-}\n
+}
+
 void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
 {
     const QUrl url(device.deviceServiceUrl);
