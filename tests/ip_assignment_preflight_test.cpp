@@ -35,12 +35,14 @@ void IpAssignmentPreflightTest::blocksInventoryConflicts()
     const QList<IpAssignmentTarget> plan{
         {QStringLiteral("cam-a"), {}, QStringLiteral("192.168.1.20")}
     };
+    bool probeCalled = false;
     const auto results = IpAssignmentPreflight::evaluate(
-        plan, {QStringLiteral("192.168.1.20")}, {}, [](const QString &) {
-            QFAIL("Probe must not run for an inventory conflict");
-            return IpAddressProbeResult{};
+        plan, {QStringLiteral("192.168.1.20")}, {}, [&probeCalled](const QString &) {
+            probeCalled = true;
+            return IpAddressProbeResult{IpAddressProbeState::Clear, {}};
         });
     QCOMPARE(results.first().state, IpAssignmentPreflightState::AddressConflict);
+    QVERIFY(!probeCalled);
 }
 
 void IpAssignmentPreflightTest::blocksLocalInfrastructureAddresses()
@@ -93,12 +95,14 @@ void IpAssignmentPreflightTest::rejectsDuplicateTargets()
         {QStringLiteral("cam-a"), {}, QStringLiteral("192.168.1.20")},
         {QStringLiteral("cam-b"), {}, QStringLiteral("192.168.1.20")}
     };
+    bool probeCalled = false;
     const auto results = IpAssignmentPreflight::evaluate(
-        plan, {}, {}, [](const QString &) {
-            QFAIL("Probe must not run for an invalid plan");
-            return IpAddressProbeResult{};
+        plan, {}, {}, [&probeCalled](const QString &) {
+            probeCalled = true;
+            return IpAddressProbeResult{IpAddressProbeState::Clear, {}};
         });
     QCOMPARE(results.size(), 2);
+    QVERIFY(!probeCalled);
     for (const auto &result : results)
         QCOMPARE(result.state, IpAssignmentPreflightState::InvalidPlan);
 }
