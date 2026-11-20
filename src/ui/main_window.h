@@ -29,6 +29,7 @@ private:
     QWidget *makeNvrTab(QWidget *parent);
     void updateStatus(const QString &message);
     void updateDeviceSummary();
+    void refreshDeviceDetails();
     void upsertDevice(const DeviceRecord &device);
     void initializeInventory();
     void persistDevice(const DeviceRecord &device);
