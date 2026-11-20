@@ -42,6 +42,8 @@ qt_add_executable(camera-ip-search
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
     src/discovery/reachability_checker.cpp
+    src/discovery/ip_conflict_probe.h
+    src/discovery/ip_conflict_probe.cpp
     src/discovery/ip_assignment_planner.h
     src/discovery/ip_assignment_planner.cpp
     src/ui/main_window.cpp
@@ -136,6 +138,17 @@ if(BUILD_TESTING)
     target_include_directories(ip-assignment-preflight-tests PRIVATE src)
     target_link_libraries(ip-assignment-preflight-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME ip-assignment-preflight-tests COMMAND ip-assignment-preflight-tests)
+
+    qt_add_executable(ip-conflict-probe-tests
+        tests/ip_conflict_probe_test.cpp
+        src/app/ip_assignment_preflight.h
+        src/discovery/ip_assignment_planner.h
+        src/discovery/ip_conflict_probe.h
+        src/discovery/ip_conflict_probe.cpp
+    )
+    target_include_directories(ip-conflict-probe-tests PRIVATE src)
+    target_link_libraries(ip-conflict-probe-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME ip-conflict-probe-tests COMMAND ip-conflict-probe-tests)
 
     qt_add_executable(batch-operation-preflight-tests
         tests/batch_operation_preflight_test.cpp
