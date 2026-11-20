@@ -124,9 +124,17 @@ void IpConflictProbeTest::rejectsUnknownInterface()
 
 void IpConflictProbeTest::rejectsMissingArpingProgram()
 {
-    QCOMPARE(IpConflictProbe::probe(QStringLiteral("192.168.1.20"),
-                                    QStringLiteral("eth0"), {}).state,
+#ifdef Q_OS_LINUX
+    const QString interfaceName = usableInterfaceName();
+    if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface with a usable subnet is available.");
+    const QString target = targetOnActiveSubnet(interfaceName);
+    if (target.isEmpty()) QSKIP("No usable host address exists on the selected subnet.");
+    QCOMPARE(IpConflictProbe::probe(target, interfaceName,
+                                    QStringLiteral("/definitely-not-an-arping-executable")).state,
              IpAddressProbeState::Unknown);
+#else
+    QSKIP("The arping executable backend is Linux-only.");
+#endif
 }
 
 
