@@ -81,39 +81,35 @@ QString DiagnosticLogger::redact(const QString &text)
 {
     QString safe = text;
 
-    // Treat an entire authorization header as secret (including multi-word
-    // schemes such as "Bearer <token>").
+    // Redact the entire authorization value, including multi-word schemes.
     static const QRegularExpression authorization(
-        QStringLiteral(R"(((?:proxy-)?authorization\\s*:\\s*)[^\\r\\n,;]+)"),
+        QStringLiteral(R"(((?:proxy-)?authorization\s*:\s*)[^\r\n,;]+)"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(authorization, QStringLiteral("\\1[REDACTED]"));
 
-    // JSON string properties: "password": "value".
+    // JSON properties and XML elements often carry ONVIF credentials.
     static const QRegularExpression jsonSecrets(
-        QStringLiteral(R"(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)"\\s*:\\s*)"[^"]*")"),
+        QStringLiteral(R"(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)"\s*:\s*)"[^"]*")"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(jsonSecrets, QStringLiteral("\\1\"[REDACTED]\""));
 
-    // XML element text commonly found in SOAP diagnostics.
     static const QRegularExpression xmlSecrets(
-        QStringLiteral(R"(<(Password|Username|Token|AccessToken|Secret)>[^<]*</\\1>)"),
+        QStringLiteral(R"(<(Password|Username|Token|AccessToken|Secret)>[^<]*</\1>)"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(xmlSecrets, QStringLiteral("<\\1>[REDACTED]</\\1>"));
 
-    // Common key/value and HTTP header forms. Replace values, not key names.
     static const QRegularExpression secrets(
-        QStringLiteral(R"((password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)(\\s*[:=]\\s*|\\s+)(\"[^\"]*\"|'[^']*'|[^\\s&,;]+))"),
+        QStringLiteral(R"((password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)(\s*[:=]\s*|\s+)("[^"]*"|'[^']*'|[^\s&,;]+))"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(secrets, QStringLiteral("\\1\\2[REDACTED]"));
 
-    // Remove URL user-info and redact sensitive query parameters.
     static const QRegularExpression urlCredentials(
-        QStringLiteral(R"((https?://)[^/@\\s]+:[^/@\\s]+@)"),
+        QStringLiteral(R"((https?://)[^/@\s]+:[^/@\s]+@)"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(urlCredentials, QStringLiteral("\\1[REDACTED]@"));
 
     static const QRegularExpression querySecrets(
-        QStringLiteral(R"(([?&](?:password|passwd|token|access_token|api_key|secret)=)[^&#\\s]*)"),
+        QStringLiteral(R"(([?&](?:password|passwd|token|access_token|api_key|secret)=)[^&#\s]*)"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(querySecrets, QStringLiteral("\\1[REDACTED]"));
     return safe;
