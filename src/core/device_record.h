@@ -16,6 +16,13 @@ struct DeviceRecord
     QString serialNumber;
     QString deviceServiceUrl;
     QString networkSummary;
+    QString networkInterfaceToken;
+    QString ipv4Address;
+    QString ipv4SubnetMask;
+    QString ipv4Gateway;
+    QString ipv4DnsServer;
+    bool ipv4DhcpEnabled{false};
+    bool ipv4ConfigurationKnown{false};
     QString activationState{QStringLiteral("Unknown")};
     QStringList capabilities;
     QStringList discoverySources;
