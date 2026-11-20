@@ -27,7 +27,7 @@ void DiagnosticLoggerTest::redactsCommonCredentialForms()
     QVERIFY(!output.contains(QStringLiteral("secret@")));
     QVERIFY(!output.contains(QStringLiteral("abc123")));
     QVERIFY(!output.contains(QStringLiteral("bearer-secret")));
-        R"({"password":"json-secret"})" " "
+    QVERIFY(!output.contains(QStringLiteral("json-secret")));
     QVERIFY(!output.contains(QStringLiteral("soap-secret")));
     QVERIFY(output.contains(QStringLiteral("[REDACTED]")));
 }
