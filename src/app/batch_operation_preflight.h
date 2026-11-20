@@ -12,7 +12,10 @@ enum class BatchTargetState {
     MissingIdentity,
     DuplicateTarget,
     NoCompatibleAdapter,
-    UnsupportedOperation
+    UnsupportedOperation,
+    Succeeded,
+    ExecutionFailed,
+    Cancelled
 };
 
 struct BatchTargetResult
