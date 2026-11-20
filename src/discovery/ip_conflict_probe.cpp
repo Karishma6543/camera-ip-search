@@ -5,6 +5,7 @@
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QtGlobal>
 
 namespace {
 bool isIpv4(const QString &text, QHostAddress *parsed = nullptr)
@@ -27,6 +28,12 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
                                             const QString &interfaceName,
                                             const QString &arpingProgram)
 {
+#ifndef Q_OS_LINUX
+    Q_UNUSED(targetAddress)
+    Q_UNUSED(interfaceName)
+    Q_UNUSED(arpingProgram)
+    return unknown(QStringLiteral("This build currently supports verified iputils ARP probing on Linux only. Windows and macOS require a separately validated native backend."));
+#else
     QHostAddress target;
     if (!isIpv4(targetAddress, &target))
         return unknown(QStringLiteral("ARP probe requires a valid IPv4 target."));
@@ -102,4 +109,5 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
                        .arg(process.exitStatus() == QProcess::NormalExit
                                 ? QStringLiteral("normal") : QStringLiteral("crashed"),
                             output.trimmed()));
+#endif
 }
