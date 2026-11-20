@@ -369,18 +369,57 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
                     return;
                 }
-                DeviceRecord updated = device;
-                updated.ipAddress = address;
-                updated.ipv4Address = address;
-                updated.ipv4SubnetMask = subnetMask;
-                updated.ipv4Gateway = gateway;
-                updated.ipv4DhcpEnabled = false;
-                updated.ipv4ConfigurationKnown = true;
-                updated.deviceServiceUrl = verifyUrl.toString();
-                if (devices_.contains(key)) devices_[key] = updated;
-                emit deviceFound(updated);
-                emit networkConfigurationFinished(updated, true,
-                    tr("Static IPv4 configuration was applied and verified at %1. Refresh the device to retrieve its reported subnet and gateway.").arg(address));
+                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl] {
+                    DeviceRecord updated = device;
+                    updated.ipAddress = address;
+                    updated.ipv4Address = address;
+                    updated.ipv4SubnetMask = subnetMask;
+                    if (!gateway.trimmed().isEmpty()) updated.ipv4Gateway = gateway.trimmed();
+                    updated.ipv4DhcpEnabled = false;
+                    updated.ipv4ConfigurationKnown = true;
+                    updated.deviceServiceUrl = verifyUrl.toString();
+                    if (devices_.contains(key)) devices_[key] = updated;
+                    emit deviceFound(updated);
+                    emit networkConfigurationFinished(updated, true,
+                        tr("Static IPv4 address was verified at %1%2.")
+                            .arg(address, gateway.trimmed().isEmpty()
+                                ? QString() : tr("; gateway was also applied")));
+                };
+                if (gateway.trimmed().isEmpty()) {
+                    finishVerified();
+                    return;
+                }
+                const QByteArray gatewaySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:SetNetworkDefaultGateway><tds:IPv4Address>)" +
+                    gateway.trimmed().toUtf8() +
+                    R"(</tds:IPv4Address></tds:SetNetworkDefaultGateway></s:Body>
+</s:Envelope>)";
+                QNetworkRequest gatewayRequest(verifyUrl);
+                gatewayRequest.setHeader(QNetworkRequest::ContentTypeHeader,
+                                         QStringLiteral("application/soap+xml; charset=utf-8"));
+                gatewayRequest.setTransferTimeout(5000);
+                gatewayRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                            QNetworkRequest::ManualRedirectPolicy);
+                QNetworkReply *gatewayReply = networkManager_.post(gatewayRequest, gatewaySoap);
+                connect(gatewayReply, &QNetworkReply::finished, this,
+                    [this, gatewayReply, device, address, gateway, finishVerified] {
+                        const QByteArray gatewayResponse = gatewayReply->readAll();
+                        const int gatewayStatus = gatewayReply->attribute(
+                            QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                        const bool gatewayOk = gatewayReply->error() == QNetworkReply::NoError &&
+                            gatewayStatus >= 200 && gatewayStatus < 300 &&
+                            !gatewayResponse.isEmpty() && gatewayResponse.size() <= 1024 * 1024 &&
+                            !gatewayResponse.contains("<Fault") && !gatewayResponse.contains(":Fault");
+                        gatewayReply->deleteLater();
+                        if (!gatewayOk) {
+                            emit networkConfigurationFinished(device, false,
+                                tr("The new IP was verified, but the gateway change was not confirmed. The camera may now have the new IP with its previous gateway."));
+                            return;
+                        }
+                        finishVerified();
+                    });
             });
     });
 }
