@@ -312,7 +312,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
         QNetworkReply *verifyReply = networkManager_.post(verifyRequest, verifySoap);
         connect(verifyReply, &QNetworkReply::finished, this,
-            [this, verifyReply, device, address, key, verifyUrl] {
+            [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl] {
                 const QByteArray payload = verifyReply->readAll();
                 const int verifyStatus = verifyReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                 const bool transportOk = verifyReply->error() == QNetworkReply::NoError &&
@@ -325,7 +325,6 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                     return;
                 }
                 QXmlStreamReader xml(payload);
-                bool tokenSeen = false;
                 bool addressSeen = false;
                 QString currentToken;
                 while (!xml.atEnd()) {
@@ -355,8 +354,8 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                 DeviceRecord updated = device;
                 updated.ipAddress = address;
                 updated.ipv4Address = address;
-                updated.ipv4SubnetMask = QString();
-                updated.ipv4Gateway = QString();
+                updated.ipv4SubnetMask = subnetMask;
+                updated.ipv4Gateway = gateway;
                 updated.ipv4DhcpEnabled = false;
                 updated.ipv4ConfigurationKnown = true;
                 updated.deviceServiceUrl = verifyUrl.toString();
