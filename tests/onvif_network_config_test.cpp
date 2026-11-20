@@ -1,6 +1,7 @@
 #include "discovery/onvif_network_config.h"
 
 #include <QtTest>
+#include <QXmlStreamReader>
 
 class OnvifNetworkConfigTest final : public QObject
 {
