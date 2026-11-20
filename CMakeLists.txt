@@ -15,6 +15,8 @@ qt_standard_project_setup()
 qt_add_executable(camera-ip-search
     src/main.cpp
     src/adapters/device_adapter.h
+    src/app/batch_operation_preflight.h
+    src/app/batch_operation_preflight.cpp
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
     src/adapters/adapter_registry.h
@@ -98,6 +100,21 @@ if(BUILD_TESTING)
     target_include_directories(ip-assignment-planner-tests PRIVATE src)
     target_link_libraries(ip-assignment-planner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME ip-assignment-planner-tests COMMAND ip-assignment-planner-tests)
+
+    qt_add_executable(batch-operation-preflight-tests
+        tests/batch_operation_preflight_test.cpp
+        src/core/device_record.h
+        src/adapters/device_adapter.h
+        src/adapters/onvif_adapter.h
+        src/adapters/onvif_adapter.cpp
+        src/adapters/adapter_registry.h
+        src/adapters/adapter_registry.cpp
+        src/app/batch_operation_preflight.h
+        src/app/batch_operation_preflight.cpp
+    )
+    target_include_directories(batch-operation-preflight-tests PRIVATE src)
+    target_link_libraries(batch-operation-preflight-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME batch-operation-preflight-tests COMMAND batch-operation-preflight-tests)
 endif()
 
 include(GNUInstallDirs)
