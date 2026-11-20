@@ -7,6 +7,11 @@
 #include <QRegularExpression>
 #include <QtGlobal>
 
+#ifdef Q_OS_WIN
+#  include <winsock2.h>
+#  include <iphlpapi.h>
+#endif
+
 namespace {
 bool isIpv4(const QString &text, QHostAddress *parsed = nullptr)
 {
@@ -28,20 +33,11 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
                                             const QString &interfaceName,
                                             const QString &arpingProgram)
 {
-#ifndef Q_OS_LINUX
-    Q_UNUSED(targetAddress)
-    Q_UNUSED(interfaceName)
-    Q_UNUSED(arpingProgram)
-    return unknown(QStringLiteral("This build currently supports verified iputils ARP probing on Linux only. Windows and macOS require a separately validated native backend."));
-#else
     QHostAddress target;
     if (!isIpv4(targetAddress, &target))
         return unknown(QStringLiteral("ARP probe requires a valid IPv4 target."));
     if (interfaceName.trimmed().isEmpty())
         return unknown(QStringLiteral("Select a network interface before probing."));
-    if (arpingProgram.trimmed().isEmpty())
-        return unknown(QStringLiteral("The arping executable is not configured."));
-
     const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName.trimmed());
     if (!interface.isValid() || !(interface.flags() & QNetworkInterface::IsUp) ||
         !(interface.flags() & QNetworkInterface::IsRunning))
@@ -60,6 +56,35 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
     }
     if (!inSelectedSubnet)
         return unknown(QStringLiteral("Target is not on an IPv4 subnet directly attached to the selected interface; no probe was sent."));
+
+#ifdef Q_OS_WIN
+    // Select a source address from the requested interface. SendARP proves
+    // occupancy when it resolves a MAC; absence of a reply is inconclusive.
+    const QNetworkAddressEntry *sourceEntry = nullptr;
+    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+            !entry.netmask().isNull() && target.isInSubnet(entry.ip(), entry.prefixLength())) {
+            sourceEntry = &entry;
+            break;
+        }
+    }
+    if (!sourceEntry)
+        return unknown(QStringLiteral("No usable source IPv4 address exists on the selected interface."));
+    const ULONG destination = target.toIPv4Address();
+    const ULONG source = sourceEntry->ip().toIPv4Address();
+    ULONG hardwareAddress[2] = {};
+    ULONG hardwareAddressLength = sizeof(hardwareAddress);
+    const DWORD result = SendARP(destination, source, hardwareAddress, &hardwareAddressLength);
+    if (result == NO_ERROR && hardwareAddressLength > 0) {
+        return {IpAddressProbeState::Conflict,
+                QStringLiteral("Windows resolved an ARP hardware address for %1 on the selected interface; treat the address as occupied.")
+                    .arg(target.toString())};
+    }
+    return unknown(QStringLiteral("Windows SendARP did not obtain a hardware address (error %1). No vacancy conclusion is possible.")
+                       .arg(static_cast<qulonglong>(result)));
+#elif defined(Q_OS_LINUX)
+    if (arpingProgram.trimmed().isEmpty())
+        return unknown(QStringLiteral("The arping executable is not configured."));
 
     // No shell is used. The target and interface are passed as separate,
     // validated process arguments to avoid command injection.
@@ -109,5 +134,8 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
                        .arg(process.exitStatus() == QProcess::NormalExit
                                 ? QStringLiteral("normal") : QStringLiteral("crashed"),
                             output.trimmed()));
+#else
+    Q_UNUSED(arpingProgram)
+    return unknown(QStringLiteral("A validated interface-scoped ARP duplicate-address backend is not available on this platform."));
 #endif
 }
