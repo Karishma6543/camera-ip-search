@@ -9,10 +9,17 @@ class BatchOperationRunnerTest final : public QObject
 {
     Q_OBJECT
 private slots:
+    void initTestCase();
+    void recordsHandlerFailure();
     void rejectsEmptyOrMissingHandler();
     void executesOnlyPreflightApprovedTargets();
     void cancellationSkipsRemainingTargets();
 };
+
+void BatchOperationRunnerTest::initTestCase()
+{
+    qRegisterMetaType<QVector<BatchTargetResult>>();
+}
 
 static DeviceRecord validOnvif(const QString &id, const QString &ip)
 {
@@ -75,6 +82,24 @@ void BatchOperationRunnerTest::cancellationSkipsRemainingTargets()
     const auto results = qvariant_cast<QVector<BatchTargetResult>>(finished.takeFirst().at(0));
     QCOMPARE(results.at(0).state, BatchTargetState::Succeeded);
     QCOMPARE(results.at(1).state, BatchTargetState::Cancelled);
+}
+
+void BatchOperationRunnerTest::recordsHandlerFailure()
+{
+    AdapterRegistry registry;
+    BatchOperationRunner runner(registry);
+    QSignalSpy finished(&runner, &BatchOperationRunner::finished);
+    QVERIFY(runner.start(
+        {validOnvif(QStringLiteral("cam-1"), QStringLiteral("192.168.1.2"))},
+        DeviceOperation::ReadDeviceInformation,
+        [](const DeviceRecord &, DeviceOperation, QString &detail) {
+            detail = QStringLiteral("Authentication rejected");
+            return false;
+        }));
+    QTRY_COMPARE(finished.size(), 1);
+    const auto results = qvariant_cast<QVector<BatchTargetResult>>(finished.takeFirst().at(0));
+    QCOMPARE(results.first().state, BatchTargetState::ExecutionFailed);
+    QCOMPARE(results.first().message, QStringLiteral("Authentication rejected"));
 }
 
 QTEST_MAIN(BatchOperationRunnerTest)
