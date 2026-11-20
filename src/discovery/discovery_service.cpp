@@ -261,14 +261,10 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     writer.writeStartElement(QStringLiteral("tds:NetworkInterface"));
     writer.writeStartElement(QStringLiteral("tt:IPv4"));
     writer.writeTextElement(QStringLiteral("tt:Enabled"), QStringLiteral("true"));
-    writer.writeStartElement(QStringLiteral("tt:Config"));
     writer.writeTextElement(QStringLiteral("tt:DHCP"), QStringLiteral("false"));
     writer.writeStartElement(QStringLiteral("tt:Manual"));
     writer.writeTextElement(QStringLiteral("tt:Address"), address.trimmed());
     writer.writeTextElement(QStringLiteral("tt:PrefixLength"), QString::number(prefix));
-    writer.writeEndElement();
-    if (!gateway.trimmed().isEmpty())
-        writer.writeTextElement(QStringLiteral("tt:Gateway"), gateway.trimmed());
     writer.writeEndElement();
     writer.writeEndElement();
     writer.writeEndElement();
@@ -291,10 +287,32 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                               response.size() <= 1024 * 1024 &&
                               !response.contains("<Fault") && !response.contains(":Fault");
         const QString errorText = setReply->errorString();
+        bool rebootNeeded = false;
+        if (accepted) {
+            QXmlStreamReader responseXml(response);
+            while (!responseXml.atEnd()) {
+                responseXml.readNext();
+                if (responseXml.isStartElement() && responseXml.name() == QStringLiteral("RebootNeeded"))
+                    rebootNeeded = responseXml.readElementText(QXmlStreamReader::SkipChildElements)
+                                       .trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0;
+            }
+            if (responseXml.hasError()) {
+                emit networkConfigurationFinished(device, false,
+                    tr("The camera response could not be parsed safely; the network change was not verified."));
+                setReply->deleteLater();
+                return;
+            }
+        }
         setReply->deleteLater();
         if (!accepted) {
             emit networkConfigurationFinished(device, false,
                 tr("Camera did not confirm the network change (%1).").arg(errorText));
+            return;
+        }
+
+        if (rebootNeeded) {
+            emit networkConfigurationFinished(device, false,
+                tr("The camera reports that a reboot is required before the new IP becomes active. The app will not reboot it automatically; inventory remains unchanged."));
             return;
         }
 
