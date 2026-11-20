@@ -99,6 +99,33 @@ bool OnvifNetworkConfig::verifyInterfaceIpv4Address(const QByteArray &payload,
     return true;
 }
 
+bool OnvifNetworkConfig::parseSoapOperationResponse(const QByteArray &payload,
+                                                           const QString &expectedResponse,
+                                                           QString *error)
+{
+    if (payload.isEmpty() || payload.size() > 1024 * 1024 || expectedResponse.isEmpty()) {
+        setError(error, QStringLiteral("Empty, oversized, or invalid ONVIF operation response."));
+        return false;
+    }
+    QXmlStreamReader xml(payload);
+    bool responseSeen = false;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement()) continue;
+        const QString name = xml.name().toString();
+        if (name == QStringLiteral("Fault")) {
+            setError(error, QStringLiteral("Camera returned a SOAP fault."));
+            return false;
+        }
+        if (name == expectedResponse) responseSeen = true;
+    }
+    if (xml.hasError() || !responseSeen) {
+        setError(error, QStringLiteral("Malformed or unexpected ONVIF operation response."));
+        return false;
+    }
+    return true;
+}
+
 QByteArray OnvifNetworkConfig::buildSetNetworkDefaultGatewayRequest(const QString &gateway)
 {
     QByteArray payload;
