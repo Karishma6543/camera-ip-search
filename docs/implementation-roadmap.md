@@ -19,7 +19,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Sequential batch runner with per-device success/failure results, progress signals and cancellation between targets; concrete protocol handlers remain gated until verified.
 - [ ] Move all potentially blocking network work off the GUI thread.
 - [x] Harden cross-platform CI to run on the active development branch, install Linux Qt runtime dependencies and use read-only repository permissions. A green run is still required before claiming build/test verification.
-- [ ] Centralized redacted logging and diagnostic export.
+- [x] Centralized Qt diagnostic logging with common credential redaction, 5 MB active-log rotation, 10 MB export limit and user-triggered redacted export; review exported logs before sharing.
 
 ## Milestone 2 — Discovery and device inventory
 - [x] ONVIF WS-Discovery and ProbeMatch parsing.
