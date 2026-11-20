@@ -28,6 +28,8 @@ qt_add_executable(camera-ip-search
     src/adapters/network_config_validator.h
     src/adapters/network_config_validator.cpp
     src/core/device_record.h
+    src/core/diagnostic_logger.h
+    src/core/diagnostic_logger.cpp
     src/discovery/discovery_service.h
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
@@ -188,6 +190,15 @@ if(BUILD_TESTING)
     target_include_directories(batch-operation-runner-tests PRIVATE src)
     target_link_libraries(batch-operation-runner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME batch-operation-runner-tests COMMAND batch-operation-runner-tests)
+
+    qt_add_executable(diagnostic-logger-tests
+        tests/diagnostic_logger_test.cpp
+        src/core/diagnostic_logger.h
+        src/core/diagnostic_logger.cpp
+    )
+    target_include_directories(diagnostic-logger-tests PRIVATE src)
+    target_link_libraries(diagnostic-logger-tests PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME diagnostic-logger-tests COMMAND diagnostic-logger-tests)
 endif()
 
 include(GNUInstallDirs)
