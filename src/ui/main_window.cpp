@@ -512,7 +512,7 @@ void MainWindow::buildUi()
             addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
             addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
         }
-        deviceDetailsLabel_->setText(details.join(QLatin1Char('\\n')));
+        deviceDetailsLabel_->setText(details.join(QLatin1Char('\n')));
     });
     updateDeviceSummary();
 }
