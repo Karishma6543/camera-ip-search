@@ -10,10 +10,6 @@ bool parseUnicastIpv4(const QString &text, quint32 *value)
         address.protocol() != QAbstractSocket::IPv4Protocol ||
         address.isNull() || address.isLoopback() || address.isMulticast())
         return false;
-    bool ok = false;
-    const quint32 parsed = text.trimmed().toUInt(&ok);
-    Q_UNUSED(parsed);
-    Q_UNUSED(ok);
     if (value) *value = address.toIPv4Address();
     return true;
 }
