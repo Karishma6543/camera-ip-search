@@ -70,8 +70,8 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
     }
     if (!sourceEntry)
         return unknown(QStringLiteral("No usable source IPv4 address exists on the selected interface."));
-    const ULONG destination = target.toIPv4Address();
-    const ULONG source = sourceEntry->ip().toIPv4Address();
+    const ULONG destination = htonl(target.toIPv4Address());
+    const ULONG source = htonl(sourceEntry->ip().toIPv4Address());
     ULONG hardwareAddress[2] = {};
     ULONG hardwareAddressLength = sizeof(hardwareAddress);
     const DWORD result = SendARP(destination, source, hardwareAddress, &hardwareAddressLength);
