@@ -735,7 +735,7 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
     });
 
     connect(preflightButton, &QPushButton::clicked, this,
-            [this, page, summary, results, preflightButton, planState, preflightState,
+            [this, page, summary, results, previewButton, preflightButton, planState, preflightState,
              inventoryState, localReservedState] {
         if (planState->isEmpty()) return;
         const QString interfaceName = interfaceSelector_
@@ -745,6 +745,7 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
             return;
         }
 
+        previewButton->setEnabled(false);
         preflightButton->setEnabled(false);
         preflightButton->setText(tr("Probing…"));
         summary->setText(tr("Checking %1 proposed address(es) on interface %2. This runs in the background; inconclusive results are blocked.")
@@ -755,7 +756,7 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
         const auto localReserved = *localReservedState;
         auto *watcher = new QFutureWatcher<QVector<IpAssignmentPreflightResult>>(page);
         connect(watcher, &QFutureWatcher<QVector<IpAssignmentPreflightResult>>::finished,
-                page, [watcher, summary, results, preflightButton, preflightState] {
+                page, [watcher, summary, results, previewButton, preflightButton, preflightState] {
             *preflightState = watcher->result();
             int ready = 0;
             int conflicts = 0;
@@ -776,6 +777,7 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
                                  .arg(ready).arg(conflicts).arg(blocked));
             preflightButton->setText(QObject::tr("Run safety preflight"));
             preflightButton->setEnabled(true);
+            previewButton->setEnabled(true);
             watcher->deleteLater();
         });
 
