@@ -8,5 +8,5 @@ bool parseSetNetworkInterfacesResponse(const QByteArray &xml, bool *rebootNeeded
                                        QString *error = nullptr);
 bool verifyInterfaceIpv4Address(const QByteArray &xml, const QString &interfaceToken,
                                 const QString &address, QString *error = nullptr);
-QByteArray buildSetNetworkDefaultGatewayRequest(const QString &gateway);
+bool parseSoapOperationResponse(const QByteArray &xml, const QString &expectedResponse,\n                               QString *error = nullptr);\nQByteArray buildSetNetworkDefaultGatewayRequest(const QString &gateway);
 }
