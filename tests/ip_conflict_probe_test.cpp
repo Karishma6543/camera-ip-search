@@ -37,6 +37,35 @@ private:
         return {};
     }
 
+    QString addressOutsideActiveSubnets() const
+    {
+        const QStringList candidates{QStringLiteral("192.0.2.1"),
+                                     QStringLiteral("198.51.100.1"),
+                                     QStringLiteral("203.0.113.254"),
+                                     QStringLiteral("198.18.0.1"),
+                                     QStringLiteral("9.9.9.9")};
+        for (const QString &candidateText : candidates) {
+            const QHostAddress candidate(candidateText);
+            bool directlyAttached = false;
+            for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+                if (!(interface.flags() & QNetworkInterface::IsUp) ||
+                    !(interface.flags() & QNetworkInterface::IsRunning))
+                    continue;
+                for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+                    if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                        entry.prefixLength() >= 0 &&
+                        candidate.isInSubnet(entry.ip(), entry.prefixLength())) {
+                        directlyAttached = true;
+                        break;
+                    }
+                }
+                if (directlyAttached) break;
+            }
+            if (!directlyAttached) return candidateText;
+        }
+        return {};
+    }
+
     QString targetOnActiveSubnet(const QString &interfaceName) const
     {
         const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
@@ -105,8 +134,9 @@ void IpConflictProbeTest::rejectsTargetOutsideSelectedSubnet()
 #ifdef Q_OS_LINUX
     const QString interfaceName = usableInterfaceName();
     if (interfaceName.isEmpty()) QSKIP("No active IPv4 interface is available.");
-    QCOMPARE(IpConflictProbe::probe(QStringLiteral("203.0.113.254"),
-                                    interfaceName).state,
+    const QString outside = addressOutsideActiveSubnets();
+    if (outside.isEmpty()) QSKIP("Could not find a test address outside all attached subnets.");
+    QCOMPARE(IpConflictProbe::probe(outside, interfaceName).state,
              IpAddressProbeState::Unknown);
 #else
     QSKIP("The validated arping backend is Linux-only.");
