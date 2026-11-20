@@ -54,9 +54,9 @@ void BatchOperationRunner::processNext()
                 if (results_[i].state == BatchTargetState::Ready) {
                     results_[i].state = BatchTargetState::Cancelled;
                     results_[i].message = QStringLiteral("Cancelled before execution");
-                    ++completedCount_;
-                    emit targetFinished(results_[i]);
                 }
+                ++completedCount_;
+                emit targetFinished(results_[i]);
             }
         }
         running_ = false;
