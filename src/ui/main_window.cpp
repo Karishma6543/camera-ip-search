@@ -92,7 +92,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         }
         authenticator->setUser(username);
         authenticator->setPassword(password);
-        updateStatus(tr("Credentials supplied for this network request only; they are not saved in inventory."));
+        updateStatus(tr("Credentials supplied for this application session; they are not saved in inventory or to disk."));
     });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover devices"));
@@ -501,6 +501,12 @@ void MainWindow::buildUi()
             addDetail(Qt::UserRole + 4, tr("Network interfaces"));
             addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
             addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
+            addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
+            addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
+            addDetail(Qt::UserRole + 9, tr("Camera subnet mask"));
+            addDetail(Qt::UserRole + 10, tr("Camera gateway"));
+            addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
+            addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
         }
         deviceDetailsLabel_->setText(details.join(QLatin1Char('\\n')));
     });
@@ -549,6 +555,13 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         device.networkSummary = ip->data(Qt::UserRole + 4).toString();
         device.capabilities = ip->data(Qt::UserRole + 5).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         device.openPorts = ip->data(Qt::UserRole + 6).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.networkInterfaceToken = ip->data(Qt::UserRole + 7).toString();
+        device.ipv4Address = ip->data(Qt::UserRole + 8).toString();
+        device.ipv4SubnetMask = ip->data(Qt::UserRole + 9).toString();
+        device.ipv4Gateway = ip->data(Qt::UserRole + 10).toString();
+        device.ipv4DnsServer = ip->data(Qt::UserRole + 11).toString();
+        device.ipv4DhcpEnabled = ip->data(Qt::UserRole + 12).toString() == QStringLiteral("true");
+        device.ipv4ConfigurationKnown = !device.networkInterfaceToken.isEmpty();
         device.userLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
         device.manufacturer = deviceTable_->item(row, 3) ? deviceTable_->item(row, 3)->text() : QString();
         device.model = deviceTable_->item(row, 4) ? deviceTable_->item(row, 4)->text() : QString();
@@ -610,6 +623,14 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     keepExistingWhenEmpty(Qt::UserRole + 4, device.networkSummary);
     keepExistingWhenEmpty(Qt::UserRole + 5, device.capabilities.join(QStringLiteral(", ")));
     keepExistingWhenEmpty(Qt::UserRole + 6, device.openPorts.join(QStringLiteral(", ")));
+    keepExistingWhenEmpty(Qt::UserRole + 7, device.networkInterfaceToken);
+    keepExistingWhenEmpty(Qt::UserRole + 8, device.ipv4Address);
+    keepExistingWhenEmpty(Qt::UserRole + 9, device.ipv4SubnetMask);
+    keepExistingWhenEmpty(Qt::UserRole + 10, device.ipv4Gateway);
+    keepExistingWhenEmpty(Qt::UserRole + 11, device.ipv4DnsServer);
+    ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
+        ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
+        : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
@@ -653,6 +674,13 @@ void MainWindow::initializeInventory()
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN network_summary TEXT DEFAULT ''"));
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN capabilities TEXT DEFAULT ''"));
     query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN open_ports TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN network_interface_token TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_address TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_subnet_mask TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_gateway TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_dns_server TEXT DEFAULT ''"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_dhcp_enabled INTEGER DEFAULT 0"));
+    query.exec(QStringLiteral("ALTER TABLE devices ADD COLUMN ipv4_config_known INTEGER DEFAULT 0"));
 }
 
 void MainWindow::persistDevice(const DeviceRecord &device)
@@ -660,7 +688,7 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
     const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
     QSqlQuery query(inventoryDb_);
-    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,:interface,:endpoint,:service,:network,:capabilities,:ports,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,interface_name=CASE WHEN excluded.interface_name='' THEN devices.interface_name ELSE excluded.interface_name END,onvif_endpoint=CASE WHEN excluded.onvif_endpoint='' THEN devices.onvif_endpoint ELSE excluded.onvif_endpoint END,device_service_url=CASE WHEN excluded.device_service_url='' THEN devices.device_service_url ELSE excluded.device_service_url END,network_summary=CASE WHEN excluded.network_summary='' THEN devices.network_summary ELSE excluded.network_summary END,capabilities=CASE WHEN excluded.capabilities='' THEN devices.capabilities ELSE excluded.capabilities END,open_ports=CASE WHEN excluded.open_ports='' THEN devices.open_ports ELSE excluded.open_ports END,last_seen=CURRENT_TIMESTAMP"));
+    query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,network_interface_token,ipv4_address,ipv4_subnet_mask,ipv4_gateway,ipv4_dns_server,ipv4_dhcp_enabled,ipv4_config_known,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,:interface,:endpoint,:service,:network,:capabilities,:ports,:if_token,:ipv4,:mask,:gateway,:dns,:dhcp,:config_known,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,interface_name=CASE WHEN excluded.interface_name='' THEN devices.interface_name ELSE excluded.interface_name END,onvif_endpoint=CASE WHEN excluded.onvif_endpoint='' THEN devices.onvif_endpoint ELSE excluded.onvif_endpoint END,device_service_url=CASE WHEN excluded.device_service_url='' THEN devices.device_service_url ELSE excluded.device_service_url END,network_summary=CASE WHEN excluded.network_summary='' THEN devices.network_summary ELSE excluded.network_summary END,capabilities=CASE WHEN excluded.capabilities='' THEN devices.capabilities ELSE excluded.capabilities END,open_ports=CASE WHEN excluded.open_ports='' THEN devices.open_ports ELSE excluded.open_ports END,network_interface_token=CASE WHEN excluded.network_interface_token='' THEN devices.network_interface_token ELSE excluded.network_interface_token END,ipv4_address=CASE WHEN excluded.ipv4_address='' THEN devices.ipv4_address ELSE excluded.ipv4_address END,ipv4_subnet_mask=CASE WHEN excluded.ipv4_subnet_mask='' THEN devices.ipv4_subnet_mask ELSE excluded.ipv4_subnet_mask END,ipv4_gateway=CASE WHEN excluded.ipv4_gateway='' THEN devices.ipv4_gateway ELSE excluded.ipv4_gateway END,ipv4_dns_server=CASE WHEN excluded.ipv4_dns_server='' THEN devices.ipv4_dns_server ELSE excluded.ipv4_dns_server END,ipv4_dhcp_enabled=CASE WHEN excluded.ipv4_config_known=0 THEN devices.ipv4_dhcp_enabled ELSE excluded.ipv4_dhcp_enabled END,ipv4_config_known=MAX(devices.ipv4_config_known,excluded.ipv4_config_known),last_seen=CURRENT_TIMESTAMP"));
     query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
     query.bindValue(":manufacturer", device.manufacturer); query.bindValue(":model", device.model);
     query.bindValue(":firmware", device.firmwareVersion); query.bindValue(":serial", device.serialNumber);
@@ -677,6 +705,13 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     query.bindValue(":network", device.networkSummary);
     query.bindValue(":capabilities", device.capabilities.join(QStringLiteral(", ")));
     query.bindValue(":ports", device.openPorts.join(QStringLiteral(", ")));
+    query.bindValue(":if_token", device.networkInterfaceToken);
+    query.bindValue(":ipv4", device.ipv4Address);
+    query.bindValue(":mask", device.ipv4SubnetMask);
+    query.bindValue(":gateway", device.ipv4Gateway);
+    query.bindValue(":dns", device.ipv4DnsServer);
+    query.bindValue(":dhcp", device.ipv4DhcpEnabled ? 1 : 0);
+    query.bindValue(":config_known", device.ipv4ConfigurationKnown ? 1 : 0);
     if (!query.exec()) updateStatus(tr("Inventory save failed: %1").arg(query.lastError().text()));
 }
 
@@ -684,7 +719,7 @@ void MainWindow::loadInventory()
 {
     if (!inventoryDb_.isOpen()) return;
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports FROM devices ORDER BY last_seen DESC"))) return;
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,network_interface_token,ipv4_address,ipv4_subnet_mask,ipv4_gateway,ipv4_dns_server,ipv4_dhcp_enabled,ipv4_config_known FROM devices ORDER BY last_seen DESC"))) return;
     loadingInventory_ = true;
     while (query.next()) {
         DeviceRecord device;
@@ -705,6 +740,13 @@ void MainWindow::loadInventory()
         device.networkSummary=query.value(17).toString();
         device.capabilities=query.value(18).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         device.openPorts=query.value(19).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.networkInterfaceToken=query.value(20).toString();
+        device.ipv4Address=query.value(21).toString();
+        device.ipv4SubnetMask=query.value(22).toString();
+        device.ipv4Gateway=query.value(23).toString();
+        device.ipv4DnsServer=query.value(24).toString();
+        device.ipv4DhcpEnabled=query.value(25).toInt()!=0;
+        device.ipv4ConfigurationKnown=query.value(26).toInt()!=0;
         upsertDevice(device);
     }
     loadingInventory_ = false;
