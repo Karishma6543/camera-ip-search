@@ -8,6 +8,7 @@
 #include <QHostAddress>
 #include <QNetworkInterface>
 #include <QNetworkAccessManager>
+#include <QAuthenticator>
 #include <QNetworkReply>
 #include <QPointer>
 #include <QTimer>
@@ -28,6 +29,7 @@ signals:
     void deviceFound(const DeviceRecord &device);
     void statusChanged(const QString &message);
     void finished(int deviceCount);
+    void authenticationRequested(QAuthenticator *authenticator);
 
 private:
     struct InterfaceSocket {
