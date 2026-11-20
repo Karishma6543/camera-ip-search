@@ -3,6 +3,23 @@
 
 #include <QtTest>
 
+namespace {
+class TestVendorAdapter final : public DeviceAdapter
+{
+public:
+    QString id() const override { return QStringLiteral("test-vendor"); }
+    QString displayName() const override { return QStringLiteral("Test vendor"); }
+    bool canHandle(const DeviceRecord &device) const override
+    {
+        return device.manufacturer.compare(QStringLiteral("Acme"), Qt::CaseInsensitive) == 0;
+    }
+    QStringList verifiedReadOperations() const override
+    {
+        return {QStringLiteral("GetDeviceInformation")};
+    }
+};
+}
+
 class AdapterRegistryTest final : public QObject
 {
     Q_OBJECT
@@ -11,6 +28,8 @@ private slots:
     void rejectsEndpointForDifferentHost();
     void exposesOnlyImplementedReadOperations();
     void doesNotInferManagementSupportFromDiscovery();
+    void registersAdditionalVendorAdapters();
+    void rejectsNullAndDuplicateAdapterIds();
 };
 
 void AdapterRegistryTest::recognizesOnvifDeviceService()
@@ -70,6 +89,29 @@ void AdapterRegistryTest::doesNotInferManagementSupportFromDiscovery()
     QVERIFY(!adapter->supports(DeviceOperation::UpdateFirmware));
     QVERIFY(!adapter->supports(DeviceOperation::ConfigureImageSettings));
     QVERIFY(!adapter->supports(DeviceOperation::ManageNvrChannels));
+}
+
+void AdapterRegistryTest::registersAdditionalVendorAdapters()
+{
+    AdapterRegistry registry;
+    QVERIFY(registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
+
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("192.168.1.40");
+    device.manufacturer = QStringLiteral("ACME");
+    const DeviceAdapter *adapter = registry.adapterFor(device);
+    QVERIFY(adapter);
+    QCOMPARE(adapter->id(), QStringLiteral("test-vendor"));
+    QVERIFY(adapter->supports(DeviceOperation::ReadDeviceInformation));
+    QVERIFY(!adapter->supports(DeviceOperation::Reboot));
+}
+
+void AdapterRegistryTest::rejectsNullAndDuplicateAdapterIds()
+{
+    AdapterRegistry registry;
+    QVERIFY(!registry.registerAdapter(nullptr));
+    QVERIFY(!registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
+    QVERIFY(!registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
 }
 
 QTEST_MAIN(AdapterRegistryTest)
