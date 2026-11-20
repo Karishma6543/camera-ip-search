@@ -20,11 +20,12 @@ The goal is a multi-vendor device manager with capability-based operations. It m
 - SQLite inventory for non-sensitive device metadata; credentials are not stored.
 - Manual device entry, device labels, search/filtering, CSV export and open-web-interface action.
 - TCP reachability checks with explicit “no response” semantics.
+- Linux-only, interface-scoped IPv4 duplicate-address detection using iputils `arping -D`, integrated into the bulk IP preflight and executed off the UI thread. Unknown/inconclusive results block the preflight.
 - Validated ONVIF static IPv4 configuration with explicit confirmation and post-change verification.
 
 ## Not implemented / not hardware-validated yet
 
-- Multi-device automatic and range-based IP assignment.
+- Multi-device automatic and range-based IP writes (the planner and live preflight are implemented; camera write orchestration remains disabled).
 - Camera live preview and snapshot capture.
 - Password/activation workflows and reboot.
 - Vendor-specific CP Plus, Hikvision, Prama or Securus management operations.
@@ -37,7 +38,7 @@ These are separate engineering workstreams. They will be enabled only when a pro
 
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql, Xml and Test modules.
+Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql, Xml, Test and Concurrent modules. On Linux, install an iputils-compatible `arping` utility (for Debian/Ubuntu: `sudo apt install iputils-arping`) and grant the application the raw-socket privileges required by your distribution. Windows and macOS currently report live ARP probing as Unknown; they do not mark addresses Clear.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
