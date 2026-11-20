@@ -32,6 +32,8 @@ qt_add_executable(camera-ip-search
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
     src/discovery/reachability_checker.cpp
+    src/discovery/ip_assignment_planner.h
+    src/discovery/ip_assignment_planner.cpp
     src/ui/main_window.cpp
     src/ui/main_window.h
 )
@@ -87,6 +89,15 @@ if(BUILD_TESTING)
     target_include_directories(network-config-validator-tests PRIVATE src)
     target_link_libraries(network-config-validator-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME network-config-validator-tests COMMAND network-config-validator-tests)
+
+    qt_add_executable(ip-assignment-planner-tests
+        tests/ip_assignment_planner_test.cpp
+        src/discovery/ip_assignment_planner.h
+        src/discovery/ip_assignment_planner.cpp
+    )
+    target_include_directories(ip-assignment-planner-tests PRIVATE src)
+    target_link_libraries(ip-assignment-planner-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME ip-assignment-planner-tests COMMAND ip-assignment-planner-tests)
 endif()
 
 include(GNUInstallDirs)
