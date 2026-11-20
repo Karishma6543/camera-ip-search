@@ -2,6 +2,8 @@
 
 #include "adapters/onvif_adapter.h"
 
+#include <utility>
+
 AdapterRegistry::AdapterRegistry()
 {
     registerAdapter(std::make_unique<OnvifAdapter>());
@@ -9,11 +11,15 @@ AdapterRegistry::AdapterRegistry()
 
 bool AdapterRegistry::registerAdapter(std::unique_ptr<DeviceAdapter> adapter)
 {
-    if (!adapter || adapter->id().trimmed().isEmpty())
+    if (!adapter)
+        return false;
+
+    const QString adapterId = adapter->id().trimmed();
+    if (adapterId.isEmpty())
         return false;
 
     for (const auto &registered : adapters_) {
-        if (registered->id().compare(adapter->id(), Qt::CaseInsensitive) == 0)
+        if (registered->id().trimmed().compare(adapterId, Qt::CaseInsensitive) == 0)
             return false;
     }
 
