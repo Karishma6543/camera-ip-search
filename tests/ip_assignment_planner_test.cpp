@@ -12,6 +12,9 @@ private slots:
     void rejectsNetworkAndBroadcastAddresses();
     void rejectsInsufficientFreeAddresses();
     void rejectsInvalidMask();
+    void mapsAddressesToSelectedDevices();
+    void rejectsDuplicateDeviceIds();
+    void reservesCurrentInventoryAddresses();
 };
 
 void IpAssignmentPlannerTest::createsSequentialPlan()
@@ -73,6 +76,52 @@ void IpAssignmentPlannerTest::rejectsInvalidMask()
     QVERIFY(!IpAssignmentPlanner::buildRangePlan(
         QStringLiteral("10.0.0.10"), QStringLiteral("10.0.0.20"),
         QStringLiteral("255.0.255.0"), 1, {}, &plan));
+}
+
+
+void IpAssignmentPlannerTest::mapsAddressesToSelectedDevices()
+{
+    const QList<IpAssignmentTarget> devices{
+        {QStringLiteral("cam-2"), QStringLiteral("192.168.1.10"), {}},
+        {QStringLiteral("cam-1"), QStringLiteral("192.168.1.11"), {}}
+    };
+    QList<IpAssignmentTarget> plan;
+    QString error;
+    QVERIFY2(IpAssignmentPlanner::buildDevicePlan(
+        QStringLiteral("192.168.1.10"), QStringLiteral("192.168.1.20"),
+        QStringLiteral("255.255.255.0"), devices, {}, &plan, &error), qPrintable(error));
+    QCOMPARE(plan.size(), 2);
+    QCOMPARE(plan.at(0).deviceId, QStringLiteral("cam-2"));
+    QCOMPARE(plan.at(0).proposedAddress, QStringLiteral("192.168.1.12"));
+    QCOMPARE(plan.at(1).deviceId, QStringLiteral("cam-1"));
+    QCOMPARE(plan.at(1).proposedAddress, QStringLiteral("192.168.1.13"));
+}
+
+void IpAssignmentPlannerTest::rejectsDuplicateDeviceIds()
+{
+    const QList<IpAssignmentTarget> devices{
+        {QStringLiteral("same"), QStringLiteral("192.168.1.10"), {}},
+        {QStringLiteral("same"), QStringLiteral("192.168.1.11"), {}}
+    };
+    QList<IpAssignmentTarget> plan;
+    QVERIFY(!IpAssignmentPlanner::buildDevicePlan(
+        QStringLiteral("192.168.1.20"), QStringLiteral("192.168.1.30"),
+        QStringLiteral("255.255.255.0"), devices, {}, &plan));
+    QVERIFY(plan.isEmpty());
+}
+
+void IpAssignmentPlannerTest::reservesCurrentInventoryAddresses()
+{
+    const QList<IpAssignmentTarget> devices{
+        {QStringLiteral("cam-a"), QStringLiteral("192.168.1.10"), {}}
+    };
+    QList<IpAssignmentTarget> plan;
+    QVERIFY(IpAssignmentPlanner::buildDevicePlan(
+        QStringLiteral("192.168.1.10"), QStringLiteral("192.168.1.12"),
+        QStringLiteral("255.255.255.0"), devices,
+        QSet<QString>{QStringLiteral("192.168.1.11")}, &plan));
+    QCOMPARE(plan.size(), 1);
+    QCOMPARE(plan.first().proposedAddress, QStringLiteral("192.168.1.12"));
 }
 
 QTEST_MAIN(IpAssignmentPlannerTest)
