@@ -28,6 +28,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QInputDialog>
+#include <QAuthenticator>
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QUrl>
@@ -72,6 +73,27 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
+    connect(discovery_, &DiscoveryService::authenticationRequested, this,
+            [this](QAuthenticator *authenticator) {
+        if (!authenticator) return;
+        bool accepted = false;
+        const QString username = QInputDialog::getText(this, tr("Camera authentication"),
+            tr("Username for %1:").arg(authenticator->realm()), QLineEdit::Normal,
+            QString(), &accepted);
+        if (!accepted) {
+            updateStatus(tr("Camera authentication cancelled; no credentials were stored."));
+            return;
+        }
+        const QString password = QInputDialog::getText(this, tr("Camera authentication"),
+            tr("Password:"), QLineEdit::Password, QString(), &accepted);
+        if (!accepted) {
+            updateStatus(tr("Camera authentication cancelled; no credentials were stored."));
+            return;
+        }
+        authenticator->setUser(username);
+        authenticator->setPassword(password);
+        updateStatus(tr("Credentials supplied for this network request only; they are not saved in inventory."));
+    });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover devices"));
         scanButton_->setEnabled(true);
