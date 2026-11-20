@@ -55,5 +55,6 @@ private:
     QLabel *deviceDetailsLabel_{nullptr};
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
+    QPushButton *refreshDeviceButton_{nullptr};
     QSqlDatabase inventoryDb_;
 };
