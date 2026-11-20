@@ -638,11 +638,16 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
             const auto *ip = deviceTable_->item(row, 1);
             const auto *mac = deviceTable_->item(row, 5);
             const auto *serial = deviceTable_->item(row, 9);
-            if (ip && !ip->text().trimmed().isEmpty())
-                allInventoryAddresses.insert(ip->text().trimmed());
             if (ip) {
+                QHostAddress inventoryIp;
+                if (inventoryIp.setAddress(ip->text().trimmed()) &&
+                    inventoryIp.protocol() == QAbstractSocket::IPv4Protocol)
+                    allInventoryAddresses.insert(inventoryIp.toString());
+                QHostAddress gatewayIp;
                 const QString gateway = ip->data(Qt::UserRole + 10).toString().trimmed();
-                if (!gateway.isEmpty()) localReservedAddresses.insert(gateway);
+                if (gatewayIp.setAddress(gateway) &&
+                    gatewayIp.protocol() == QAbstractSocket::IPv4Protocol)
+                    localReservedAddresses.insert(gatewayIp.toString());
             }
             if (!deviceTable_->selectionModel()->isRowSelected(row, QModelIndex()))
                 continue;
@@ -662,7 +667,14 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
             }
             const QString current = ip->data(Qt::UserRole + 8).toString().trimmed().isEmpty()
                 ? ip->text().trimmed() : ip->data(Qt::UserRole + 8).toString().trimmed();
-            selectedDevices.append({stableId, current, {}});
+            QHostAddress currentAddress;
+            if (!currentAddress.setAddress(current) ||
+                currentAddress.protocol() != QAbstractSocket::IPv4Protocol) {
+                QMessageBox::warning(this, tr("IPv4 address required"),
+                    tr("Selected device %1 does not have a valid current IPv4 address.").arg(stableId));
+                return;
+            }
+            selectedDevices.append({stableId, currentAddress.toString(), {}});
         }
 
         if (selectedDevices.isEmpty()) {
