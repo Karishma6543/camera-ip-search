@@ -93,3 +93,48 @@ bool IpAssignmentPlanner::buildRangePlan(const QString &startAddress,
     if (error) error->clear();
     return true;
 }
+
+
+bool IpAssignmentPlanner::buildDevicePlan(
+    const QString &startAddress, const QString &endAddress,
+    const QString &subnetMask,
+    const QList<IpAssignmentTarget> &selectedDevices,
+    const QSet<QString> &additionalReservedAddresses,
+    QList<IpAssignmentTarget> *plan, QString *error)
+{
+    if (plan) plan->clear();
+    if (!plan || selectedDevices.isEmpty() || selectedDevices.size() > 256) {
+        setError(error, QStringLiteral("Select between 1 and 256 devices and provide an output plan."));
+        return false;
+    }
+
+    QSet<QString> ids;
+    QSet<QString> reserved = additionalReservedAddresses;
+    for (const auto &device : selectedDevices) {
+        const QString id = device.deviceId.trimmed();
+        if (id.isEmpty() || ids.contains(id)) {
+            setError(error, QStringLiteral("Every selected device must have a non-empty, unique inventory ID."));
+            return false;
+        }
+        ids.insert(id);
+        if (!device.currentAddress.trimmed().isEmpty())
+            reserved.insert(device.currentAddress.trimmed());
+    }
+
+    QStringList addresses;
+    if (!buildRangePlan(startAddress, endAddress, subnetMask,
+                        selectedDevices.size(), reserved, &addresses, error))
+        return false;
+
+    QList<IpAssignmentTarget> result;
+    for (qsizetype i = 0; i < selectedDevices.size(); ++i) {
+        IpAssignmentTarget target = selectedDevices.at(i);
+        target.deviceId = target.deviceId.trimmed();
+        target.currentAddress = target.currentAddress.trimmed();
+        target.proposedAddress = addresses.at(i);
+        result.append(target);
+    }
+    *plan = result;
+    if (error) error->clear();
+    return true;
+}
