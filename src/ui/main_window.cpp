@@ -1036,7 +1036,7 @@ void MainWindow::updateDeviceSummary()
                 ? reachabilityItem->text() : QStringLiteral("Not checked");
             if (reachability == QStringLiteral("Reachable")) ++reachable;
             else if (reachability == QStringLiteral("No response")) ++noResponse;
-            else ++unchecked;
+            else if (reachability == QStringLiteral("Not checked")) ++unchecked;
 
             const auto *ipItem = deviceTable_->item(row, 1);
             if (ipItem && ipItem->data(Qt::UserRole + 13).toBool()) ++candidates;
