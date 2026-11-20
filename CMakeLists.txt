@@ -214,3 +214,15 @@ endif()
 
 include(GNUInstallDirs)
 install(TARGETS camera-ip-search RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} BUNDLE DESTINATION .)
+
+# Portable staging archives for CI/release review. These are not yet
+# self-contained installers: Qt runtime deployment, signing and notarization
+# remain platform-specific release gates.
+set(CPACK_PACKAGE_NAME "CameraIpSearch")
+set(CPACK_PACKAGE_VENDOR "Oxita")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cross-platform IP camera discovery and device inventory")
+set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Camera IP Search")
+set(CPACK_GENERATOR "ZIP;TGZ")
+include(CPack)
