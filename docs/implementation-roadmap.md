@@ -12,7 +12,8 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Qt desktop shell and CMake/CTest build.
 - [x] SQLite persistence for non-sensitive inventory.
 - [x] Active IPv4 interface enumeration.
-- [ ] Normalized device, observation, capability and structured error models.
+- [ ] Normalized device, observation and structured error models.
+- [x] Explicit typed device-operation capability contract with conservative unsupported defaults.
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
 - [ ] Unified operation coordinator with cancellation, progress and structured per-device outcomes.
 - [ ] Move all potentially blocking network work off the GUI thread.
