@@ -1,5 +1,6 @@
 #include "reachability_checker.h"
 #include <QDateTime>
+#include <QHostAddress>
 #include <QSet>
 
 namespace {
@@ -74,7 +75,14 @@ void ReachabilityChecker::checkNextDevice()
             ports_.append(normalized);
         }
     }
-    if (devices_.at(deviceIndex_).ipAddress.trimmed().isEmpty() || ports_.isEmpty()) {
+    const QString addressText = devices_.at(deviceIndex_).ipAddress.trimmed();
+    QHostAddress address;
+    if (addressText.isEmpty() || !address.setAddress(addressText) ||
+        address.protocol() != QAbstractSocket::IPv4Protocol) {
+        completeCurrent(QStringLiteral("Invalid address"));
+        return;
+    }
+    if (ports_.isEmpty()) {
         completeCurrent(QStringLiteral("Not checked"));
         return;
     }
