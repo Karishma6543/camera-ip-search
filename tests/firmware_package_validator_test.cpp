@@ -48,7 +48,7 @@ void FirmwarePackageValidatorTest::rejectsDifferentHardwareRevision()
     manifest.hardwareRevision = QStringLiteral("Rev A");
     const auto result = FirmwarePackageValidator::validateCandidate(
         manifest, target(), bytes);
-    QCOMPARE(result.state, FirmwareValidationState::TargetMismatch);
+    QVERIFY(result.state == FirmwareValidationState::TargetMismatch);
 }
 
 void FirmwarePackageValidatorTest::rejectsDigestMismatch()
@@ -58,7 +58,7 @@ void FirmwarePackageValidatorTest::rejectsDigestMismatch()
     manifest.sha256 = QString(64, QLatin1Char('0'));
     const auto result = FirmwarePackageValidator::validateCandidate(
         manifest, target(), bytes);
-    QCOMPARE(result.state, FirmwareValidationState::PackageHashMismatch);
+    QVERIFY(result.state == FirmwareValidationState::PackageHashMismatch);
 }
 
 void FirmwarePackageValidatorTest::rejectsMalformedDigest()
@@ -68,7 +68,7 @@ void FirmwarePackageValidatorTest::rejectsMalformedDigest()
     manifest.sha256 = QStringLiteral("not-a-sha256");
     const auto result = FirmwarePackageValidator::validateCandidate(
         manifest, target(), bytes);
-    QCOMPARE(result.state, FirmwareValidationState::InvalidPackageHash);
+    QVERIFY(result.state == FirmwareValidationState::InvalidPackageHash);
 }
 
 void FirmwarePackageValidatorTest::rejectsMissingTargetMetadata()
@@ -78,7 +78,7 @@ void FirmwarePackageValidatorTest::rejectsMissingTargetMetadata()
     incompleteTarget.region.clear();
     const auto result = FirmwarePackageValidator::validateCandidate(
         manifestFor(bytes), incompleteTarget, bytes);
-    QCOMPARE(result.state, FirmwareValidationState::MissingMetadata);
+    QVERIFY(result.state == FirmwareValidationState::MissingMetadata);
 }
 
 void FirmwarePackageValidatorTest::rejectsEmptyPackage()
@@ -89,7 +89,7 @@ void FirmwarePackageValidatorTest::rejectsEmptyPackage()
         QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
     const auto result = FirmwarePackageValidator::validateCandidate(
         manifest, target(), bytes);
-    QCOMPARE(result.state, FirmwareValidationState::EmptyPackage);
+    QVERIFY(result.state == FirmwareValidationState::EmptyPackage);
 }
 
 QTEST_MAIN(FirmwarePackageValidatorTest)
