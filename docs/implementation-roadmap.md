@@ -15,7 +15,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [ ] Normalized device, observation and structured error models.
 - [x] Explicit typed device-operation capability contract with conservative unsupported defaults.
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
-- [ ] Unified operation coordinator with cancellation, progress and structured per-device outcomes.
+- [x] Capability-gated batch-operation preflight with per-device outcomes; execution, cancellation and progress remain future work.
 - [ ] Move all potentially blocking network work off the GUI thread.
 - [ ] Centralized redacted logging and diagnostic export.
 
