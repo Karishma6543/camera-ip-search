@@ -1,6 +1,7 @@
 #include "discovery_service.h"
 #include "onvif_network_config.h"
 #include "discovery_parser.h"
+#include "onvif_network_interface_parser.h"
 #include "adapters/network_config_validator.h"
 
 #include <QNetworkAddressEntry>
@@ -534,66 +535,18 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
         return;
 
-    struct InterfaceData {
-        QString token;
-        QString name;
-        QString mac;
-        QString address;
-        QString prefix;
-        QString dhcp;
-        QString gateway;
-    };
-    QVector<InterfaceData> parsed;
-    QXmlStreamReader xml(payload);
-    QStringList path;
-    InterfaceData current;
-    bool inInterface = false;
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (xml.isStartElement()) {
-            const QString name = xml.name().toString();
-            path.append(name);
-            if (name == QStringLiteral("NetworkInterface")) {
-                inInterface = true;
-                current = InterfaceData{};
-                current.token = xml.attributes().value(QStringLiteral("token")).toString();
-                continue;
-            }
-            if (!inInterface) continue;
-            const QString joined = path.join(QLatin1Char('/'));
-            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-            if (joined.endsWith(QStringLiteral("/NetworkInterface/Name"))) current.name = value;
-            else if (joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress"))) current.mac = value;
-            else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP"))) current.dhcp = value;
-            else if (joined.endsWith(QStringLiteral("/IPv4/Config/Manual/IPv4Address")) ||
-                     joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/IPv4Address")) ||
-                     joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/IPv4Address"))) {
-                if (current.address.isEmpty()) current.address = value;
-            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/Manual/PrefixLength")) ||
-                       joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/PrefixLength")) ||
-                       joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/PrefixLength"))) {
-                if (current.prefix.isEmpty()) current.prefix = value;
-            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/Gateway/IPv4Address"))) {
-                current.gateway = value;
-            }
-            path.removeLast();
-        } else if (xml.isEndElement()) {
-            if (xml.name() == QStringLiteral("NetworkInterface") && inInterface) {
-                parsed.append(current);
-                inInterface = false;
-            }
-            if (!path.isEmpty()) path.removeLast();
-        }
-    }
-    if (xml.hasError()) return;
+    QVector<OnvifNetworkInterface> parsed;
+    QString parseError;
+    if (!OnvifNetworkInterfaceParser::parse(payload, &parsed, &parseError))
+        return;
 
     QStringList summaries;
-    const InterfaceData *selected = nullptr;
+    const OnvifNetworkInterface *selected = nullptr;
     for (const auto &entry : parsed) {
         QStringList fields;
         if (!entry.name.isEmpty()) fields << entry.name;
-        if (!entry.address.isEmpty()) fields << entry.address;
-        if (!entry.mac.isEmpty()) fields << entry.mac;
+        if (!entry.ipv4Address.isEmpty()) fields << entry.ipv4Address;
+        if (!entry.macAddress.isEmpty()) fields << entry.macAddress;
         if (!fields.isEmpty()) summaries << fields.join(QStringLiteral(" | "));
         if (!selected && !entry.token.isEmpty()) selected = &entry;
     }
@@ -602,9 +555,9 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     device.networkSummary = summaries.join(QStringLiteral("; "));
     if (selected) {
         device.networkInterfaceToken = selected->token;
-        if (!selected->address.isEmpty()) device.ipv4Address = selected->address;
+        if (!selected->ipv4Address.isEmpty()) device.ipv4Address = selected->ipv4Address;
         bool prefixOk = false;
-        const int prefix = selected->prefix.toInt(&prefixOk);
+        const int prefix = selected->prefixLength.toInt(&prefixOk);
         if (prefixOk && prefix >= 1 && prefix <= 32) {
             const quint32 mask = 0xffffffffU << (32 - prefix);
             device.ipv4SubnetMask = QHostAddress(mask).toString();
