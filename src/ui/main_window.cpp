@@ -1,5 +1,6 @@
 #include "main_window.h"
 
+#include "discovery/ip_assignment_planner.h"
 #include "discovery/discovery_service.h"
 #include "discovery/subnet_scanner.h"
 #include "discovery/reachability_checker.h"
@@ -543,8 +544,74 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
-    layout->addWidget(mutedLabel(tr("Select multiple devices to apply model-supported settings together. Day/Night, ICR, Easy Mode and Image / IR controls will be enabled only for verified adapters."), page));
+    layout->addWidget(mutedLabel(
+        tr("Prepare a device-mapped IP assignment preview. Select camera rows in the inventory, enter a target range and subnet mask, then review the proposed mapping. This tool does not change camera settings."),
+        page));
+
+    auto *rangeStart = new QLineEdit(page);
+    rangeStart->setPlaceholderText(QStringLiteral("192.168.1.100"));
+    auto *rangeEnd = new QLineEdit(page);
+    rangeEnd->setPlaceholderText(QStringLiteral("192.168.1.150"));
+    auto *mask = new QLineEdit(QStringLiteral("255.255.255.0"), page);
+    auto *form = new QFormLayout();
+    form->addRow(tr("Range start"), rangeStart);
+    form->addRow(tr("Range end"), rangeEnd);
+    form->addRow(tr("Target subnet mask"), mask);
+    layout->addLayout(form);
+
+    auto *preview = actionButton(tr("Preview range assignment"), page, true);
+    layout->addWidget(preview);
+    auto *selectionInfo = mutedLabel(tr("Select one or more device rows above using Ctrl / Shift-click."), page);
+    layout->addWidget(selectionInfo);
     layout->addStretch();
+
+    connect(preview, &QPushButton::clicked, this,
+            [this, rangeStart, rangeEnd, mask, selectionInfo] {
+        QList<IpAssignmentTarget> selectedDevices;
+        const auto selectedRows = deviceTable_->selectionModel()->selectedRows();
+        QSet<QString> allInventoryAddresses;
+        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+            const auto *ip = deviceTable_->item(row, 1);
+            if (ip && !ip->text().trimmed().isEmpty())
+                allInventoryAddresses.insert(ip->text().trimmed());
+        }
+        for (const QModelIndex &index : selectedRows) {
+            const int row = index.row();
+            const auto *ip = deviceTable_->item(row, 1);
+            const auto *mac = deviceTable_->item(row, 5);
+            if (!ip || ip->text().trimmed().isEmpty()) continue;
+            const QString current = ip->data(Qt::UserRole + 8).toString().trimmed().isEmpty()
+                ? ip->text().trimmed() : ip->data(Qt::UserRole + 8).toString().trimmed();
+            QString id = mac ? mac->text().trimmed() : QString();
+            if (id.isEmpty()) id = QStringLiteral("ip:") + ip->text().trimmed();
+            selectedDevices.append({id, current, {}});
+        }
+        if (selectedDevices.isEmpty()) {
+            QMessageBox::information(this, tr("No devices selected"),
+                tr("Select one or more camera rows in the inventory before creating a plan."));
+            return;
+        }
+
+        QList<IpAssignmentTarget> plan;
+        QString error;
+        if (!IpAssignmentPlanner::buildDevicePlan(
+                rangeStart->text(), rangeEnd->text(), mask->text(),
+                selectedDevices, allInventoryAddresses, &plan, &error)) {
+            QMessageBox::warning(this, tr("Cannot create IP plan"), error);
+            return;
+        }
+
+        QString report = tr("Dry-run assignment preview — %1 device(s)\n\n")
+                             .arg(plan.size());
+        for (const auto &target : plan) {
+            report += tr("%1\n%2  →  %3\n\n")
+                          .arg(target.deviceId, target.currentAddress, target.proposedAddress);
+        }
+        report += tr("No camera was contacted or reconfigured. Inventory addresses are excluded, but live ARP/network conflict detection has not been performed. Confirm device reachability, subnet, gateway and adapter write support before any future apply step.");
+        QMessageBox::information(this, tr("IP assignment preview"), report);
+        selectionInfo->setText(tr("%1 device(s) mapped. Preview only; no settings changed.")
+                                   .arg(plan.size()));
+    });
     return page;
 }
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
