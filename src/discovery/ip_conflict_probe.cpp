@@ -85,7 +85,7 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
         QStringLiteral("received\\s+[1-9][0-9]*\\s+response"));
     if (lower.contains(QStringLiteral("reply from")) ||
         lower.contains(QStringLiteral("unicast reply")) ||
-        lower.contains(QStringLiteral("duplicate")) ||
+        lower.contains(QStringLiteral("duplicate address detected")) ||
         positiveResponse.match(lower).hasMatch())
         return {IpAddressProbeState::Conflict,
                 QStringLiteral("An ARP response was received for %1 on %2. %3")
