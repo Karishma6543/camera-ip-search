@@ -33,7 +33,9 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Validate static IPv4 address, subnet mask, gateway and DNS input.
 - [x] ONVIF static IPv4 interface configuration with explicit confirmation.
 - [x] Verify the configured address after reconnecting.
-- [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping (live collision checks remain pending).
+- [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping.
+- [x] Add a collision-aware preflight gate that rejects inventory/local-address conflicts, duplicate targets and inconclusive probe results.
+- [ ] Implement and validate concrete cross-platform live address-conflict probes (ARP/neighbor discovery); the preflight API intentionally fails closed until a verified probe is supplied.
 - [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
 - [ ] Add batch preview, confirmation, cancellation policy, per-device result and recovery guidance.
 - [ ] Implement DHCP, DNS and gateway writes only when supported by the exact adapter.
