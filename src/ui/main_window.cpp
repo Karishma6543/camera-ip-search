@@ -451,7 +451,9 @@ void MainWindow::buildUi()
     });
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
     connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
-        openWebButton_->setEnabled(deviceTable_->currentRow() >= 0);
+        const bool hasSelection = deviceTable_->currentRow() >= 0;
+        openWebButton_->setEnabled(hasSelection);
+        refreshDeviceButton_->setEnabled(hasSelection);
     });
     connect(help, &QPushButton::clicked, this, [this] { updateStatus(tr("See the project documentation for supported discovery protocols and current feature status.")); });
     connect(settings, &QPushButton::clicked, this, [this] { updateStatus(tr("Application preferences are planned; no settings have been changed.")); });
@@ -506,11 +508,37 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *page = new QWidget(parent);
     auto *layout = new QHBoxLayout(page);
     auto *reboot = actionButton(tr("Reboot selected"), page); reboot->setEnabled(false);
-    auto *refresh = actionButton(tr("Refresh device info"), page); refresh->setEnabled(false);
+    refreshDeviceButton_ = actionButton(tr("Refresh device info"), page);
+    refreshDeviceButton_->setEnabled(false);
     openWebButton_ = actionButton(tr("Open web interface"), page);
     openWebButton_->setEnabled(false);
     auto *web = openWebButton_;
-    layout->addWidget(reboot); layout->addWidget(refresh); layout->addWidget(web); layout->addStretch();
+    layout->addWidget(reboot); layout->addWidget(refreshDeviceButton_); layout->addWidget(web); layout->addStretch();
+    connect(refreshDeviceButton_, &QPushButton::clicked, this, [this] {
+        const int row = deviceTable_->currentRow();
+        if (row < 0) return;
+        const auto *ip = deviceTable_->item(row, 1);
+        if (!ip) return;
+        DeviceRecord device;
+        device.ipAddress = ip->text();
+        device.interfaceName = ip->data(Qt::UserRole + 1).toString();
+        device.onvifEndpoint = ip->data(Qt::UserRole + 2).toString();
+        device.deviceServiceUrl = ip->data(Qt::UserRole + 3).toString();
+        device.networkSummary = ip->data(Qt::UserRole + 4).toString();
+        device.capabilities = ip->data(Qt::UserRole + 5).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.openPorts = ip->data(Qt::UserRole + 6).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        device.userLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+        device.manufacturer = deviceTable_->item(row, 3) ? deviceTable_->item(row, 3)->text() : QString();
+        device.model = deviceTable_->item(row, 4) ? deviceTable_->item(row, 4)->text() : QString();
+        device.macAddress = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
+        device.firmwareVersion = deviceTable_->item(row, 6) ? deviceTable_->item(row, 6)->text() : QString();
+        device.activationState = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QStringLiteral("Unknown");
+        device.discoverySources = deviceTable_->item(row, 8)
+            ? deviceTable_->item(row, 8)->text().split(QStringLiteral(", "), Qt::SkipEmptyParts) : QStringList{};
+        device.serialNumber = deviceTable_->item(row, 9) ? deviceTable_->item(row, 9)->text() : QString();
+        device.hardwareId = deviceTable_->item(row, 10) ? deviceTable_->item(row, 10)->text() : QString();
+        discovery_->refreshDeviceInfo(device);
+    });
     return page;
 }
 QWidget *MainWindow::makeNvrTab(QWidget *parent)
