@@ -354,23 +354,28 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
 
     QXmlStreamReader xml(payload);
     QStringList interfaces;
-    QString currentName;
-    QString currentMac;
-    QString currentAddress;
+    QString token, currentName, currentMac, currentAddress, currentPrefix, currentDhcp;
+    QString selectedToken, selectedAddress, selectedPrefix, selectedDhcp, gateway;
     while (!xml.atEnd()) {
         xml.readNext();
         if (xml.isStartElement()) {
             const QString name = xml.name().toString();
             if (name == QStringLiteral("NetworkInterface")) {
-                currentName.clear();
-                currentMac.clear();
-                currentAddress.clear();
+                token = xml.attributes().value(QStringLiteral("token")).toString();
+                currentName.clear(); currentMac.clear(); currentAddress.clear();
+                currentPrefix.clear(); currentDhcp.clear();
             } else if (name == QStringLiteral("Name")) {
                 currentName = xml.readElementText().trimmed();
             } else if (name == QStringLiteral("HwAddress")) {
                 currentMac = xml.readElementText().trimmed();
             } else if (name == QStringLiteral("Address")) {
                 currentAddress = xml.readElementText().trimmed();
+            } else if (name == QStringLiteral("PrefixLength")) {
+                currentPrefix = xml.readElementText().trimmed();
+            } else if (name == QStringLiteral("DHCP")) {
+                currentDhcp = xml.readElementText().trimmed();
+            } else if (name == QStringLiteral("IPv4Address")) {
+                gateway = xml.readElementText().trimmed();
             }
         } else if (xml.isEndElement() && xml.name() == QStringLiteral("NetworkInterface")) {
             QStringList parts;
@@ -378,11 +383,36 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
             if (!currentAddress.isEmpty()) parts << currentAddress;
             if (!currentMac.isEmpty()) parts << currentMac;
             if (!parts.isEmpty()) interfaces << parts.join(QStringLiteral(" | "));
+            if (selectedToken.isEmpty() && !token.isEmpty()) {
+                selectedToken = token;
+                selectedAddress = currentAddress;
+                selectedPrefix = currentPrefix;
+                selectedDhcp = currentDhcp;
+            }
         }
     }
     if (xml.hasError()) return;
+
     DeviceRecord &device = devices_[deviceKey];
     device.networkSummary = interfaces.join(QStringLiteral("; "));
+    if (!selectedToken.isEmpty()) device.networkInterfaceToken = selectedToken;
+    if (!selectedAddress.isEmpty()) device.ipv4Address = selectedAddress;
+    bool prefixOk = false;
+    const int prefix = selectedPrefix.toInt(&prefixOk);
+    if (prefixOk && prefix >= 1 && prefix <= 32) {
+        const quint32 mask = prefix == 0 ? 0U : (0xffffffffU << (32 - prefix));
+        device.ipv4SubnetMask = QHostAddress(mask).toString();
+    }
+    if (selectedDhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
+        selectedDhcp == QStringLiteral("1")) {
+        device.ipv4DhcpEnabled = true;
+        device.ipv4ConfigurationKnown = true;
+    } else if (selectedDhcp.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0 ||
+               selectedDhcp == QStringLiteral("0")) {
+        device.ipv4DhcpEnabled = false;
+        device.ipv4ConfigurationKnown = !device.ipv4Address.isEmpty();
+    }
+    if (!gateway.isEmpty()) device.ipv4Gateway = gateway;
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces")))
         device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     emit deviceFound(device);
