@@ -51,6 +51,10 @@ qt_add_executable(camera-ip-search
 )
 
 target_link_libraries(camera-ip-search PRIVATE Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent)
+
+if(WIN32)
+    target_link_libraries(camera-ip-search PRIVATE iphlpapi)
+endif()
 target_include_directories(camera-ip-search PRIVATE src)
 
 if(MSVC)
