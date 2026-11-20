@@ -20,7 +20,7 @@ The goal is a multi-vendor device manager with capability-based operations. It m
 - SQLite inventory for non-sensitive device metadata; credentials are not stored.
 - Manual device entry, device labels, search/filtering, CSV export and open-web-interface action.
 - TCP reachability checks with explicit “no response” semantics.
-- Linux-only, interface-scoped IPv4 duplicate-address detection using iputils `arping -D`, integrated into the bulk IP preflight and executed off the UI thread. Unknown/inconclusive results block the preflight.
+- Interface-scoped IPv4 conflict checks integrated into bulk IP preflight and executed off the UI thread. Linux uses iputils `arping -D` and can classify explicit zero-response results as Clear; Windows uses native `SendARP` for positive conflict evidence only (no reply remains Unknown). macOS remains fail-closed as Unknown.
 - Validated ONVIF static IPv4 configuration with explicit confirmation and post-change verification.
 
 ## Not implemented / not hardware-validated yet
@@ -38,7 +38,7 @@ These are separate engineering workstreams. They will be enabled only when a pro
 
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql, Xml, Test and Concurrent modules. On Linux, install an iputils-compatible `arping` utility (for Debian/Ubuntu: `sudo apt install iputils-arping`) and grant the application the raw-socket privileges required by your distribution. Windows and macOS currently report live ARP probing as Unknown; they do not mark addresses Clear.
+Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql, Xml, Test and Concurrent modules. On Linux, install an iputils-compatible `arping` utility (for Debian/Ubuntu: `sudo apt install iputils-arping`) and grant the application the raw-socket privileges required by your distribution. Windows can flag a target as occupied when `SendARP` resolves it, but no-response results remain Unknown and block assignment. macOS currently reports Unknown pending a native DAD implementation.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
