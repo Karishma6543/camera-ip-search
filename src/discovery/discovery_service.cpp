@@ -478,14 +478,18 @@ void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &devic
 
     QXmlStreamReader xml(payload);
     QStringList path;
-    QString dnsAddress;
+    QString manualDnsAddress;
+    QString dhcpDnsAddress;
     while (!xml.atEnd()) {
         xml.readNext();
         if (xml.isStartElement()) {
             path.append(xml.name().toString());
             const QString joined = path.join(QLatin1Char('/'));
             if (joined.endsWith(QStringLiteral("/DNSManual/IPv4Address"))) {
-                dnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                manualDnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                path.removeLast();
+            } else if (joined.endsWith(QStringLiteral("/DNSFromDHCP/IPv4Address"))) {
+                dhcpDnsAddress = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
                 path.removeLast();
             }
         } else if (xml.isEndElement() && !path.isEmpty()) {
@@ -493,6 +497,7 @@ void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &devic
         }
     }
     if (xml.hasError()) return;
+    const QString dnsAddress = !manualDnsAddress.isEmpty() ? manualDnsAddress : dhcpDnsAddress;
     if (!dnsAddress.isEmpty()) {
         DeviceRecord &device = devices_[deviceKey];
         device.ipv4DnsServer = dnsAddress;
