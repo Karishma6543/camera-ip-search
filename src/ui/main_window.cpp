@@ -556,35 +556,8 @@ void MainWindow::buildUi()
     connect(settings, &QPushButton::clicked, this, [this] { updateStatus(tr("Application preferences are planned; no settings have been changed.")); });
     connect(selectAll, &QPushButton::clicked, this, [this] { updateStatus(tr("Bulk selection actions will be enabled with the bulk configuration implementation.")); });
     connect(clearSelection, &QPushButton::clicked, this, [this] { deviceTable_->clearSelection(); });
-    connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
-        if (row < 0 || !deviceDetailsLabel_) return;
-        QStringList details;
-        for (int col = 1; col < deviceTable_->columnCount(); ++col) {
-            const auto *item = deviceTable_->item(row, col);
-            if (item && !item->text().isEmpty())
-                details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + item->text();
-        }
-        const auto *ipItem = deviceTable_->item(row, 1);
-        if (ipItem) {
-            const auto addDetail = [&details, ipItem](int role, const QString &title) {
-                const QString value = ipItem->data(role).toString();
-                if (!value.isEmpty()) details << title + QStringLiteral(": ") + value;
-            };
-            addDetail(Qt::UserRole + 1, tr("Network interface"));
-            addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
-            addDetail(Qt::UserRole + 3, tr("Device service URL"));
-            addDetail(Qt::UserRole + 4, tr("Network interfaces"));
-            addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
-            addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
-            addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
-            addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
-            addDetail(Qt::UserRole + 9, tr("Camera subnet mask"));
-            addDetail(Qt::UserRole + 10, tr("Camera gateway"));
-            addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
-            addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
-        }
-        deviceDetailsLabel_->setText(details.join(QLatin1Char('\n')));
-    });
+    connect(deviceTable_, &QTableWidget::currentCellChanged, this,
+            [this](int, int, int, int) { refreshDeviceDetails(); });
     updateDeviceSummary();
 }
 
@@ -1018,6 +991,52 @@ QWidget *MainWindow::makeNvrTab(QWidget *parent)
     return page;
 }
 
+void MainWindow::refreshDeviceDetails()
+{
+    if (!deviceDetailsLabel_) return;
+    const int row = deviceTable_ ? deviceTable_->currentRow() : -1;
+    if (row < 0) {
+        deviceDetailsLabel_->setText(tr("Select a discovered device to view its details."));
+        return;
+    }
+
+    QStringList details;
+    for (int col = 1; col < deviceTable_->columnCount(); ++col) {
+        const auto *item = deviceTable_->item(row, col);
+        if (item && !item->text().isEmpty())
+            details << deviceTable_->horizontalHeaderItem(col)->text() +
+                           QStringLiteral(": ") + item->text();
+    }
+
+    const auto *ipItem = deviceTable_->item(row, 1);
+    if (ipItem) {
+        const auto addDetail = [&details, ipItem](int role, const QString &title) {
+            const QString value = ipItem->data(role).toString();
+            if (!value.isEmpty())
+                details << title + QStringLiteral(": ") + value;
+        };
+        addDetail(Qt::UserRole + 1, tr("Network interface"));
+        addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
+        addDetail(Qt::UserRole + 3, tr("Device service URL"));
+        addDetail(Qt::UserRole + 4, tr("Network interfaces"));
+        addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
+        addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
+        addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
+        addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
+        addDetail(Qt::UserRole + 9, tr("Camera subnet mask"));
+        addDetail(Qt::UserRole + 10, tr("Camera gateway"));
+        addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
+        addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
+        addDetail(Qt::UserRole + 14, tr("Last reachability check"));
+        addDetail(Qt::UserRole + 15, tr("Last successful response"));
+        details << tr("Inventory classification: %1")
+                       .arg(ipItem->data(Qt::UserRole + 13).toBool()
+                                ? tr("Unverified subnet candidate")
+                                : tr("Discovered or manually added"));
+    }
+    deviceDetailsLabel_->setText(details.join(QLatin1Char('\n')));
+}
+
 void MainWindow::updateStatus(const QString &message)
 {
     if (statusLabel_) statusLabel_->setText(message);
@@ -1083,6 +1102,8 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     keepExistingWhenEmpty(Qt::UserRole + 9, device.ipv4SubnetMask);
     keepExistingWhenEmpty(Qt::UserRole + 10, device.ipv4Gateway);
     keepExistingWhenEmpty(Qt::UserRole + 11, device.ipv4DnsServer);
+    keepExistingWhenEmpty(Qt::UserRole + 14, device.reachabilityCheckedAt);
+    keepExistingWhenEmpty(Qt::UserRole + 15, device.lastSuccessfulResponseAt);
     ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
         ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
         : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
@@ -1097,6 +1118,7 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, col == 0 ? ipItem : new QTableWidgetItem(values.at(col)));
     updateDeviceSummary();
+    if (deviceTable_->currentRow() == row) refreshDeviceDetails();
     applyFilters();
     if (!loadingInventory_) persistDevice(device);
 }
