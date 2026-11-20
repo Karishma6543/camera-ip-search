@@ -43,6 +43,10 @@ private:
     QLabel *statusLabel_{nullptr};
     QLabel *summaryLabel_{nullptr};
     QLabel *deviceCountValue_{nullptr};
+    QLabel *onlineMetric_{nullptr};
+    QLabel *noResponseMetric_{nullptr};
+    QLabel *uncheckedMetric_{nullptr};
+    QLabel *candidateMetric_{nullptr};
     QPushButton *scanButton_{nullptr};
     QPushButton *subnetScanButton_{nullptr};
     QPushButton *reachabilityButton_{nullptr};
