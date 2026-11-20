@@ -582,8 +582,12 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
     auto *previewButton = actionButton(tr("Build assignment plan"), page, true);
     auto *preflightButton = actionButton(tr("Run safety preflight"), page);
     preflightButton->setEnabled(false);
+    auto *applyButton = actionButton(tr("Apply to cameras"), page, true);
+    applyButton->setEnabled(false);
+    applyButton->setToolTip(tr("Disabled until verified live conflict probing, adapter write support and recovery handling are available."));
     actions->addWidget(previewButton);
     actions->addWidget(preflightButton);
+    actions->addWidget(applyButton);
     actions->addStretch();
     layout->addLayout(actions);
 
@@ -683,9 +687,6 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 
         const QStringList extra = reserved->text().split(
             QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
-        for (const QString &address : extra)
-            localReservedAddresses.insert(address.trimmed());
-
         for (const QString &address : extra)
             localReservedAddresses.insert(address.trimmed());
 
