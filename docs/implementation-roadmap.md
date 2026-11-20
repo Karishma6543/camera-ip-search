@@ -15,7 +15,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [ ] Normalized device, observation and structured error models.
 - [x] Explicit typed device-operation capability contract with conservative unsupported defaults.
 - [ ] Explicit interface selection throughout discovery (not just subnet scanning).
-- [x] Capability-gated batch-operation preflight with per-device outcomes.
+- [x] Capability-gated batch-operation preflight with per-device outcomes, duplicate stable-ID detection and canonical duplicate-IPv4 endpoint rejection.
 - [x] Sequential batch runner with per-device success/failure results, progress signals and cancellation between targets; concrete protocol handlers remain gated until verified.
 - [ ] Move all potentially blocking network work off the GUI thread.
 - [ ] Centralized redacted logging and diagnostic export.
