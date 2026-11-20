@@ -12,6 +12,7 @@ enum class BatchTargetState {
     Ready,
     MissingIdentity,
     DuplicateTarget,
+    DuplicateAddress,
     NoCompatibleAdapter,
     UnsupportedOperation,
     Succeeded,
