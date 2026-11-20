@@ -27,6 +27,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Bounded opt-in IPv4 subnet candidate scanning.
 - [x] ONVIF GetDeviceInformation, GetCapabilities and GetNetworkInterfaces read operations.
 - [x] Manual entry, inventory, search/filter, labels, CSV export and reachability checks.
+- [x] Live inventory health summary for TCP-reachable devices, no TCP response, unchecked devices and unverified subnet candidates; metrics are observational and do not mislabel no-response devices as offline.
 - [ ] Add verified vendor discovery adapters where official protocol/SDK and license permit.
 - [ ] Hardware-test discovery on exact CP Plus, Hikvision, Prama, Securus and generic ONVIF models.
 
