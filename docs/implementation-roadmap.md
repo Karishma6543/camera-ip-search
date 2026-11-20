@@ -76,6 +76,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 
 ## Milestone 8 — Release readiness
 - [ ] Complete Windows, macOS and Linux packaging/signing.
+  - CPack ZIP/TGZ staging archives are configured; self-contained Qt deployment, installers, signing/notarization and clean-machine validation remain outstanding.
 - [ ] Complete automated tests and hardware validation matrix.
 - [ ] Security, privacy, licensing and dependency review.
 - [ ] Publish supported model/firmware combinations, limitations and recovery instructions.
