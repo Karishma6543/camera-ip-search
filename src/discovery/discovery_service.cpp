@@ -35,6 +35,23 @@ DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
 
 bool DiscoveryService::isRunning() const { return running_; }
 
+void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
+{
+    const DeviceAdapter *adapter = adapterRegistry_.adapterFor(device);
+    if (!adapter) {
+        emit statusChanged(tr("No verified protocol adapter is available for this device. Refresh requires a valid ONVIF device-service endpoint."));
+        return;
+    }
+    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    if (key.isEmpty()) {
+        emit statusChanged(tr("Cannot refresh device information without a stable device address."));
+        return;
+    }
+    devices_.insert(key, device);
+    emit statusChanged(tr("Refreshing device information using %1…").arg(adapter->displayName()));
+    requestOnvifDeviceInformation(device);
+}
+
 void DiscoveryService::start()
 {
     if (running_) return;
