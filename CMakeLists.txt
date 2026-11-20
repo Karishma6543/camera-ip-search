@@ -19,6 +19,8 @@ qt_add_executable(camera-ip-search
     src/adapters/onvif_adapter.cpp
     src/adapters/adapter_registry.h
     src/adapters/adapter_registry.cpp
+    src/adapters/network_config_validator.h
+    src/adapters/network_config_validator.cpp
     src/core/device_record.h
     src/discovery/discovery_service.h
     src/discovery/discovery_parser.h
@@ -65,6 +67,15 @@ if(BUILD_TESTING)
     target_include_directories(adapter-registry-tests PRIVATE src)
     target_link_libraries(adapter-registry-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME adapter-registry-tests COMMAND adapter-registry-tests)
+
+    qt_add_executable(network-config-validator-tests
+        tests/network_config_validator_test.cpp
+        src/adapters/network_config_validator.h
+        src/adapters/network_config_validator.cpp
+    )
+    target_include_directories(network-config-validator-tests PRIVATE src)
+    target_link_libraries(network-config-validator-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME network-config-validator-tests COMMAND network-config-validator-tests)
 endif()
 
 include(GNUInstallDirs)
