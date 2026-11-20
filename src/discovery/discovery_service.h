@@ -24,12 +24,16 @@ public:
     void cancel();
     bool isRunning() const;
     void refreshDeviceInfo(const DeviceRecord &device);
+    void applyStaticIpv4(const DeviceRecord &device, const QString &address,
+                         const QString &subnetMask, const QString &gateway);
 
 signals:
     void deviceFound(const DeviceRecord &device);
     void statusChanged(const QString &message);
     void finished(int deviceCount);
     void authenticationRequested(QAuthenticator *authenticator);
+    void networkConfigurationFinished(const DeviceRecord &device, bool verified,
+                                      const QString &message);
 
 private:
     struct InterfaceSocket {
