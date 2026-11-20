@@ -612,12 +612,17 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 
     auto planState = std::make_shared<QList<IpAssignmentTarget>>();
     auto preflightState = std::make_shared<QVector<IpAssignmentPreflightResult>>();
+    auto inventoryState = std::make_shared<QSet<QString>>();
+    auto localReservedState = std::make_shared<QSet<QString>>();
 
     connect(previewButton, &QPushButton::clicked, this,
             [this, rangeStart, rangeEnd, mask, reserved, selectionInfo,
-             summary, results, preflightButton, planState, preflightState] {
+             summary, results, preflightButton, planState, preflightState,
+             inventoryState, localReservedState] {
         planState->clear();
         preflightState->clear();
+        inventoryState->clear();
+        localReservedState->clear();
         results->setRowCount(0);
         preflightButton->setEnabled(false);
 
@@ -681,10 +686,18 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
         for (const QString &address : extra)
             localReservedAddresses.insert(address.trimmed());
 
+        for (const QString &address : extra)
+            localReservedAddresses.insert(address.trimmed());
+
+        *inventoryState = allInventoryAddresses;
+        *localReservedState = localReservedAddresses;
+        QSet<QString> allReserved = allInventoryAddresses;
+        allReserved.unite(localReservedAddresses);
+
         QString error;
         if (!IpAssignmentPlanner::buildDevicePlan(
                 rangeStart->text(), rangeEnd->text(), mask->text(),
-                selectedDevices, allInventoryAddresses, planState.get(), &error)) {
+                selectedDevices, allReserved, planState.get(), &error)) {
             summary->setText(tr("Plan rejected: %1").arg(error));
             QMessageBox::warning(this, tr("Cannot create IP plan"), error);
             return;
@@ -706,15 +719,12 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
     });
 
     connect(preflightButton, &QPushButton::clicked, this,
-            [reserved, summary, results, planState, preflightState] {
-        Q_UNUSED(reserved);
-        QSet<QString> inventoryAddresses;
-        QSet<QString> localReservedAddresses;
-        // The plan builder already excluded all inventory addresses. This
-        // second gate is intentionally run without a live probe until a
-        // platform-verified ARP/neighbor provider is available.
+            [summary, results, planState, preflightState,
+             inventoryState, localReservedState] {
+        // The plan builder already reserved these addresses. Repeat the
+        // checks at the preflight boundary as defense in depth.
         *preflightState = IpAssignmentPreflight::evaluate(
-            *planState, inventoryAddresses, localReservedAddresses, {});
+            *planState, *inventoryState, *localReservedState, {});
         int ready = 0;
         for (int i = 0; i < preflightState->size(); ++i) {
             const auto &check = preflightState->at(i);
