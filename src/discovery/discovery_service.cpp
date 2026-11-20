@@ -283,7 +283,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *setReply = networkManager_.post(request, soap);
     const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
-    connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, key] {
+    connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const bool accepted = setReply->error() == QNetworkReply::NoError &&
