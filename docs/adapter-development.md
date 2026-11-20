@@ -7,15 +7,19 @@
 
 An adapter translates one discovery or management protocol into the application's normalized device and capability model. It must not own UI widgets or directly write presentation state.
 
-Expected conceptual boundaries:
+Current C++ boundary:
+- `DeviceAdapter` defines adapter identity, display name, device matching, verified read operations and typed operation support.
+- `AdapterRegistry::registerAdapter()` accepts owned adapters at application composition time. IDs must be non-empty and unique (case-insensitive); null and duplicate registrations are rejected.
+- `AdapterRegistry::adapterFor()` returns the first registered adapter that claims the device. Register narrow, model-specific adapters before broad fallback adapters when precedence matters.
+- The built-in ONVIF adapter only matches an HTTP(S) device-service endpoint whose host matches the discovered device IP and whose discovery evidence identifies ONVIF.
 
+Expected wider boundaries:
 - **Discovery provider:** performs a bounded probe and emits device observations.
-- **Device adapter:** enriches a known device and exposes verified capabilities/actions.
 - **Transport:** handles UDP/TCP/HTTP with deadlines, cancellation and bounded payload sizes.
 - **Normalizer:** converts protocol-specific fields into common types while retaining source/provenance.
 - **Coordinator:** runs enabled providers, merges observations and publishes results.
 
-The exact C++ interfaces will be introduced incrementally; this guide defines behavior, not a claim that all interfaces already exist.
+The registry is an extension point, not a plugin loader. Dynamic third-party loading, SDK isolation and vendor-specific transports are not implemented by this change.
 
 ## 2. Required behavior
 
@@ -30,6 +34,8 @@ Every adapter must:
 - Avoid sending state-changing commands during discovery.
 - Include unit tests with valid, malformed, truncated, oversized and unexpected responses.
 - Document hardware/models and firmware versions actually tested.
+
+The default `DeviceAdapter::supports()` implementation is conservative: unlisted management operations return false. An adapter must not advertise a write action merely because a protocol standard defines that action; its implementation and model/firmware applicability must be verified first.
 
 ## 3. Vendor integration process
 
@@ -63,7 +69,7 @@ A timeout is not evidence that a device is unsupported. Preserve the distinction
 
 ## 5. Test strategy
 
-- Unit tests: codecs, normalization, identity merging, capability calculation.
+- Unit tests: codecs, normalization, identity merging, capability calculation and registry precedence.
 - Protocol tests: deterministic local UDP/TCP fixtures and malformed input cases.
 - Integration tests: ONVIF simulator and project firmware simulator.
 - Hardware tests: physical cameras across the supported vendor/model matrix.
