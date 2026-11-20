@@ -32,7 +32,7 @@ This roadmap tracks repository work and evidence. A UI control is not a complete
 - [x] Validate static IPv4 address, subnet mask, gateway and DNS input.
 - [x] ONVIF static IPv4 interface configuration with explicit confirmation.
 - [x] Verify the configured address after reconnecting.
-- [x] Implement a dry-run IP range planner with reserved-address exclusions (collision checks against live devices remain to be added).
+- [x] Implement a dry-run IP range planner with reserved-address exclusions and stable selected-device mapping (live collision checks remain pending).
 - [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
 - [ ] Add batch preview, confirmation, cancellation policy, per-device result and recovery guidance.
 - [ ] Implement DHCP, DNS and gateway writes only when supported by the exact adapter.
