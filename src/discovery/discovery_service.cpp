@@ -19,6 +19,10 @@ const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
 
 DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
 {
+    connect(&networkManager_, &QNetworkAccessManager::authenticationRequired,
+            this, [this](QNetworkReply *, QAuthenticator *authenticator) {
+        emit authenticationRequested(authenticator);
+    });
     timeout_.setSingleShot(true);
     timeout_.setInterval(5000);
     connect(&timeout_, &QTimer::timeout, this, [this] {
