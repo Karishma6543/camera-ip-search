@@ -1,67 +1,81 @@
 # Implementation roadmap
 
-This roadmap is the working sequence for contributors. Checkboxes represent repository work, not promises that a vendor or device has passed hardware validation.
+This roadmap tracks repository work and evidence. A UI control is not a completed feature unless it performs a supported operation, reports per-device results and has tests.
 
-## Milestone 0 — Documentation and architecture baseline
-- [x] Define universal, capability-based compatibility strategy.
-- [x] Separate ONVIF, vendor-specific, project firmware and fallback discovery paths.
-- [x] Define contributor requirements for adapters and hardware validation.
-- [x] Record security boundaries and unsupported/unknown states.
+## Milestone 0 — Product baseline
+- [x] Define capability-based, multi-vendor compatibility strategy.
+- [x] Document security boundaries and unknown/unsupported states.
+- [x] Capture Swatak screenshot-based feature parity baseline.
+- [ ] Obtain official Swatak manual/installer or additional screenshots to verify hidden workflows and exact terminology.
 
 ## Milestone 1 — Application foundations
-- [ ] Introduce normalized device, observation, capability and structured error models.
-- [ ] Add network-interface enumeration and explicit interface selection.
-- [ ] Add a discovery coordinator with cancellation and progress reporting.
-- [ ] Add deterministic unit-test fixtures and logging redaction.
-- [ ] Keep UI responsive by running network work outside the GUI thread.
+- [x] Qt desktop shell and CMake/CTest build.
+- [x] SQLite persistence for non-sensitive inventory.
+- [x] Active IPv4 interface enumeration.
+- [ ] Normalized device, observation, capability and structured error models.
+- [ ] Explicit interface selection throughout discovery (not just subnet scanning).
+- [ ] Unified operation coordinator with cancellation, progress and structured per-device outcomes.
+- [ ] Move all potentially blocking network work off the GUI thread.
+- [ ] Centralized redacted logging and diagnostic export.
 
-## Milestone 2 — Universal discovery
-- [x] Implement ONVIF WS-Discovery Probe/ProbeMatch parsing and endpoint extraction.
-- [x] Implement the project's UDP 9988 Contract B probe/response codec.
-- [x] Add bounded opt-in IPv4 subnet candidate scanning.
-- [x] Merge duplicate observations and preserve discovery provenance.
-- [x] Add unknown-device and false-positive handling.
-- [ ] Validate Windows, macOS and Linux behavior with hardware.
+## Milestone 2 — Discovery and device inventory
+- [x] ONVIF WS-Discovery and ProbeMatch parsing.
+- [x] Project UDP 9988 Contract B discovery.
+- [x] Bounded opt-in IPv4 subnet candidate scanning.
+- [x] ONVIF GetDeviceInformation, GetCapabilities and GetNetworkInterfaces read operations.
+- [x] Manual entry, inventory, search/filter, labels, CSV export and reachability checks.
+- [ ] Add verified vendor discovery adapters where official protocol/SDK and license permit.
+- [ ] Hardware-test discovery on exact CP Plus, Hikvision, Prama, Securus and generic ONVIF models.
 
-## Milestone 3 — Device information and inventory
-- [x] Query ONVIF GetDeviceInformation when a same-device HTTP(S) endpoint is advertised.
-- [x] Populate manufacturer, model, firmware, serial and hardware ID where returned.
-- [x] Add a selectable device-details view from the inventory.
-- [x] Query ONVIF capabilities and network interfaces (read-only; device/model hardware validation remains outstanding).
-- [x] Persist non-sensitive device inventory and last-seen metadata in local SQLite (no credentials stored).
-- [x] Add manual device entry and open-web-interface action.
+## Milestone 3 — Network configuration
+- [x] Validate static IPv4 address, subnet mask, gateway and DNS input.
+- [x] ONVIF static IPv4 interface configuration with explicit confirmation.
+- [x] Verify the configured address after reconnecting.
+- [ ] Implement a dry-run IP range planner with collision checks and reserved-address exclusions.
+- [ ] Add safe automatic/range assignment only for adapters that advertise verified write support.
+- [ ] Add batch preview, confirmation, cancellation policy, per-device result and recovery guidance.
+- [ ] Implement DHCP, DNS and gateway writes only when supported by the exact adapter.
+- [ ] Hardware-test each write operation and document loss-of-connectivity recovery.
 
-## Milestone 4 — Vendor integrations
-- [ ] Research and document official SDK/protocol options for CP Plus.
-- [ ] Research and document official SDK/protocol options for Hikvision.
-- [ ] Research and document official SDK/protocol options for Prama.
-- [ ] Add vendor adapters only after exact models, licenses and wire behavior are verified.
-- [ ] Add hardware results to the compatibility matrix.
+## Milestone 4 — Device maintenance and preview
+- [ ] Camera preview using a supported RTSP/HTTP stream path; never assume credentials or codecs.
+- [ ] Snapshot capture with explicit destination and user action.
+- [ ] Reboot only through a verified authenticated operation with confirmation.
+- [ ] Password/activation workflows only through official supported mechanisms; never log or persist plaintext secrets.
+- [ ] Add device time, service/port diagnostics and operation history where supported.
 
-## Milestone 5 — Safe provisioning
-- [ ] Implement ONVIF network configuration only for devices advertising support.
-- [ ] Implement project-camera activation and network configuration after firmware command contracts are frozen.
-- [ ] Implement verified vendor-specific activation/configuration where authorized.
-- [ ] Add batch preview, explicit confirmation, per-device result and rollback/recovery guidance.
+## Milestone 5 — Bulk camera configuration
+- [ ] Define normalized image/day-night/IR settings and capability mapping.
+- [ ] Implement read-before-write and preview of current versus proposed values.
+- [ ] Apply only settings supported by every selected target or clearly partition results by adapter.
+- [ ] Provide per-device success/failure, cancellation and audit history.
+- [ ] Add protocol fixtures and exact-model hardware tests.
 
 ## Milestone 6 — Firmware management
-- [ ] Define per-vendor firmware package metadata and compatibility rules.
-- [ ] Verify package integrity and model/hardware/region compatibility.
-- [ ] Implement only vendor-authorized upgrade transports and recovery behavior.
-- [ ] Add progress, cancellation policy and per-device results.
+- [ ] Define firmware package metadata (vendor, product series, model, hardware revision, region, version).
+- [ ] Verify package hash/signature and compatibility before enabling an update.
+- [ ] Implement vendor-authorized update transport only.
+- [ ] Show progress and device-specific outcomes; handle power-loss and recovery warnings.
+- [ ] Never offer a generic firmware flash operation for unknown devices.
 
-## Milestone 7 — Release readiness
-- [ ] Complete Windows, macOS and Linux packaging.
+## Milestone 7 — NVR channel management
+- [ ] Discover recorder/channel inventory through a verified ONVIF or vendor interface.
+- [ ] Display channel, source, status and model information.
+- [ ] Add supported channel add/edit/remove workflows with preview and confirmation.
+- [ ] Hardware-test recorder models and channel limits.
+
+## Milestone 8 — Release readiness
+- [ ] Complete Windows, macOS and Linux packaging/signing.
 - [ ] Complete automated tests and hardware validation matrix.
-- [ ] Publish known limitations and supported model/firmware combinations.
-- [ ] Review security, privacy, licensing and support documentation.
+- [ ] Security, privacy, licensing and dependency review.
+- [ ] Publish supported model/firmware combinations, limitations and recovery instructions.
+- [ ] User acceptance test against the supplied Swatak workflows.
 
-## Release policy
+## Evidence labels
 
-A feature is not “supported” merely because it compiles or passes a mock test. Use these labels:
 - **Implemented:** code exists and automated tests pass.
 - **Protocol-tested:** validated against a simulator or protocol fixture.
 - **Hardware-tested:** validated against the exact documented physical model/firmware.
-- **Vendor-certified:** only if the vendor has explicitly certified it.
+- **Vendor-certified:** only if the vendor explicitly certifies it.
 
-Do not mark a whole brand as supported based on one model.
+Do not mark a whole brand as supported based on one model. Do not mark a workflow complete because its button exists.
