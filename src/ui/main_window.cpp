@@ -694,13 +694,38 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
-    deviceDetailsLabel_ = new QLabel(tr("Select a discovered device to view its details. ONVIF information is queried automatically when the device exposes a reachable device service."), page);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(10);
+
+    auto *heading = new QLabel(tr("Device information"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    auto *description = mutedLabel(
+        tr("Review discovery identity, ONVIF service details, network interfaces and reported capabilities for the selected camera."),
+        page);
+    layout->addWidget(heading);
+    layout->addWidget(description);
+
+    auto *identityPanel = new QFrame(page);
+    identityPanel->setObjectName(QStringLiteral("metricCard"));
+    auto *identityLayout = new QVBoxLayout(identityPanel);
+    identityLayout->setContentsMargins(12, 10, 12, 10);
+    auto *identityTitle = new QLabel(tr("DEVICE PROFILE"), identityPanel);
+    identityTitle->setObjectName(QStringLiteral("eyebrow"));
+    deviceDetailsLabel_ = new QLabel(
+        tr("No device selected. Select a camera in the inventory above to inspect its reported information."),
+        identityPanel);
     deviceDetailsLabel_->setWordWrap(true);
     deviceDetailsLabel_->setTextFormat(Qt::RichText);
     deviceDetailsLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     deviceDetailsLabel_->setObjectName(QStringLiteral("deviceDetails"));
-    layout->addWidget(deviceDetailsLabel_);
-    layout->addStretch();
+    identityLayout->addWidget(identityTitle);
+    identityLayout->addWidget(deviceDetailsLabel_);
+    layout->addWidget(identityPanel, 1);
+
+    auto *note = mutedLabel(
+        tr("Information is device-reported and may be incomplete. An empty field means the camera did not provide that value during the latest query; it does not necessarily indicate a fault."),
+        page);
+    layout->addWidget(note);
     return page;
 }
 QWidget *MainWindow::makeBulkTab(QWidget *parent)
@@ -759,20 +784,59 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
-    auto *layout = new QHBoxLayout(page);
-    auto *reboot = actionButton(tr("Reboot selected"), page);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(12);
+
+    auto *heading = new QLabel(tr("Device actions"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(
+        tr("Actions are performed against the selected camera. Review the target address before opening its web interface or changing network settings."),
+        page));
+
+    auto *devicePanel = panel(tr("Device access & diagnostics"), page);
+    auto *deviceLayout = new QVBoxLayout(devicePanel);
+    deviceLayout->setSpacing(8);
+    auto *deviceDescription = mutedLabel(
+        tr("Refresh retrieves available ONVIF device information. Open web interface launches the camera's HTTP page in your default browser."),
+        devicePanel);
+    deviceLayout->addWidget(deviceDescription);
+    auto *deviceActions = new QHBoxLayout();
+    refreshDeviceButton_ = actionButton(tr("Refresh device info"), devicePanel);
+    refreshDeviceButton_->setEnabled(false);
+    openWebButton_ = actionButton(tr("Open web interface"), devicePanel);
+    openWebButton_->setEnabled(false);
+    auto *reboot = actionButton(tr("Reboot selected"), devicePanel);
     reboot->setEnabled(false);
     reboot->setToolTip(tr("Reboot is unavailable until a verified device adapter exposes a supported reboot operation."));
-    refreshDeviceButton_ = actionButton(tr("Refresh device info"), page);
-    refreshDeviceButton_->setEnabled(false);
-    openWebButton_ = actionButton(tr("Open web interface"), page);
-    openWebButton_->setEnabled(false);
-    auto *web = openWebButton_;
-    layout->addWidget(reboot); layout->addWidget(refreshDeviceButton_); layout->addWidget(web); layout->addStretch();
-    auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), page);
-    layout->addWidget(previewNetworkButton);
-    auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), page, true);
-    layout->addWidget(applyNetworkButton);
+    deviceActions->addWidget(refreshDeviceButton_);
+    deviceActions->addWidget(openWebButton_);
+    deviceActions->addWidget(reboot);
+    deviceLayout->addLayout(deviceActions);
+    layout->addWidget(devicePanel);
+
+    auto *networkPanel = panel(tr("IPv4 network configuration"), page);
+    auto *networkLayout = new QVBoxLayout(networkPanel);
+    networkLayout->setSpacing(8);
+    networkLayout->addWidget(mutedLabel(
+        tr("Preview validates proposed values locally and does not contact the camera. Apply sends an ONVIF static IPv4 request only when the camera exposes the required verified interface details."),
+        networkPanel));
+    auto *networkActions = new QHBoxLayout();
+    auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), networkPanel);
+    auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), networkPanel, true);
+    networkActions->addWidget(previewNetworkButton);
+    networkActions->addWidget(applyNetworkButton);
+    networkLayout->addLayout(networkActions);
+    layout->addWidget(networkPanel);
+
+    auto *safetyNote = new QLabel(
+        tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
+        page);
+    safetyNote->setWordWrap(true);
+    safetyNote->setStyleSheet(QStringLiteral("color:#8A5B13;background:#FBF3E4;border:1px solid #F0E1BE;border-radius:7px;padding:9px;"));
+    layout->addWidget(safetyNote);
+    layout->addStretch();
     connect(applyNetworkButton, &QPushButton::clicked, this, [this, applyNetworkButton] {
         const int row = deviceTable_->currentRow();
         if (row < 0) {
