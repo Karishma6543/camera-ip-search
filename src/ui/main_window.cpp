@@ -40,6 +40,8 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QHostAddress>
+#include <QClipboard>
+#include <QApplication>
 #include <QFileDialog>
 #include <QFile>
 #include <QFileInfo>
@@ -123,6 +125,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     initializeInventory();
     loadInventory();
     populateInterfaces();
+    updateLocalNetworkSummary();
     updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
@@ -405,15 +408,16 @@ void MainWindow::buildUi()
     auto *networkLayout = new QVBoxLayout(networkPanel);
     networkLayout->setSpacing(8);
     networkLayout->addWidget(mutedLabel(
-        tr("Network details are read from the selected camera when its ONVIF device service is available."),
+        tr("Live details for the selected computer interface. Confirm which network discovery and subnet scanning are using."),
         networkPanel));
-    auto *networkHint = new QLabel(
-        tr("To preview or apply a static IPv4 address, open the Device Info tab below the inventory. "
-           "The apply action requires a verified interface token and current address information."),
-        networkPanel);
-    networkHint->setWordWrap(true);
-    networkHint->setObjectName(QStringLiteral("muted"));
-    networkLayout->addWidget(networkHint);
+    localNetworkSummary_ = new QLabel(tr("Select an active IPv4 interface to inspect its address and link details."), networkPanel);
+    localNetworkSummary_->setWordWrap(true);
+    localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    localNetworkSummary_->setObjectName(QStringLiteral("deviceDetails"));
+    networkLayout->addWidget(localNetworkSummary_);
+    networkLayout->addWidget(mutedLabel(
+        tr("Camera-side IPv4 settings are shown in the Selected device panel and can be previewed or applied from the Maintenance tab."),
+        networkPanel));
     rightLayout->addWidget(networkPanel);
 
     auto *capabilityPanel = panel(tr("Feature availability"), rightContent);
@@ -567,6 +571,9 @@ void MainWindow::buildUi()
     });
     connect(deviceTable_, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
         if (item && item->column() == 0) updateDeviceSummary();
+    });
+    connect(interfaceSelector_, &QComboBox::currentIndexChanged, this, [this](int) {
+        updateLocalNetworkSummary();
     });
     connect(searchEdit_, &QLineEdit::textChanged, this, &MainWindow::applyFilters);
     connect(vendorFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
@@ -1084,8 +1091,45 @@ void MainWindow::updateSelectedDevicePanel()
         details << tr("Subnet: %1").arg(mask.isEmpty() ? tr("Not reported") : mask);
         details << tr("Gateway: %1").arg(gateway.isEmpty() ? tr("Not reported") : gateway);
         details << tr("DNS: %1").arg(dns.isEmpty() ? tr("Not reported") : dns);
+        const QString ports = ipItem->data(Qt::UserRole + 6).toString();
+        details << tr("Detected TCP ports: %1").arg(ports.isEmpty() ? tr("Not scanned") : ports);
+        const QString endpoint = ipItem->data(Qt::UserRole + 2).toString();
+        if (!endpoint.isEmpty()) details << tr("ONVIF endpoint: %1").arg(endpoint);
+        const QString service = ipItem->data(Qt::UserRole + 3).toString();
+        if (!service.isEmpty()) details << tr("Device service: %1").arg(service);
     }
     selectedNetworkSummary_->setText(details.join(QLatin1Char('\n')));
+}
+
+void MainWindow::updateLocalNetworkSummary()
+{
+    if (!localNetworkSummary_ || !interfaceSelector_) return;
+    const QString interfaceName = interfaceSelector_->currentData().toString();
+    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
+    if (!interface.isValid()) {
+        localNetworkSummary_->setText(tr("No active network interface is selected."));
+        return;
+    }
+
+    QStringList details;
+    details << tr("Interface: %1").arg(interface.humanReadableName());
+    details << tr("System name: %1").arg(interface.name());
+    details << tr("Hardware address: %1").arg(
+        interface.hardwareAddress().isEmpty() ? tr("Not reported") : interface.hardwareAddress());
+    details << tr("MTU: %1").arg(interface.mtu() > 0 ? QString::number(interface.mtu()) : tr("Not reported"));
+    bool foundIpv4 = false;
+    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+        if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol || entry.ip().isLoopback()) continue;
+        foundIpv4 = true;
+        details << tr("IPv4 address: %1").arg(entry.ip().toString());
+        details << tr("Subnet prefix: /%1").arg(entry.prefixLength());
+        if (!entry.broadcast().isNull())
+            details << tr("Broadcast: %1").arg(entry.broadcast().toString());
+    }
+    if (!foundIpv4) details << tr("IPv4 address: Not available");
+    details << tr("Link state: %1").arg(
+        interface.flags().testFlag(QNetworkInterface::IsRunning) ? tr("Running") : tr("Not running"));
+    localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
 }
 
 void MainWindow::updateStatus(const QString &message)
