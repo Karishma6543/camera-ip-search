@@ -6,6 +6,8 @@
 #include "adapters/network_config_validator.h"
 
 #include <QAbstractItemView>
+#include <QColor>
+#include <QFont>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
