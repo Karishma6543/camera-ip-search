@@ -55,6 +55,12 @@ inline QString styleSheet()
             font-weight: 850;
             letter-spacing: 1.1px;
         }
+        QLabel#deviceDetails {
+            background: #FBFCFD;
+            border: 1px solid #E9ECF0;
+            border-radius: 8px;
+            padding: 12px;
+        }
         QFrame#topBar, QFrame#surface, QFrame#toolbar, QFrame#metricCard {
             background: #FFFFFF;
             border: 1px solid #E5E8ED;
