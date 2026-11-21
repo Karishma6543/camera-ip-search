@@ -736,13 +736,13 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
         auto *name = new QLabel(features.at(i), page);
         auto *state = new QLabel(tr("Adapter required"), page);
         state->setObjectName(QStringLiteral("muted"));
-        capabilities->addWidget(name, i, 0);
-        capabilities->addWidget(state, i, 1, Qt::AlignRight);
+        capabilities->addWidget(name, i * 2, 0);
+        capabilities->addWidget(state, i * 2, 1, Qt::AlignRight);
         if (i + 1 < features.size()) {
             auto *line = new QFrame(page);
             line->setFrameShape(QFrame::HLine);
             line->setStyleSheet(QStringLiteral("color:#ECEEF2;"));
-            capabilities->addWidget(line, i, 0, 1, 2);
+            capabilities->addWidget(line, i * 2 + 1, 0, 1, 2);
         }
     }
     layout->addLayout(capabilities);
