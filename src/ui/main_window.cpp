@@ -461,6 +461,7 @@ void MainWindow::buildUi()
                 }
                 break;
             }
+            updateDeviceSummary();
             applyFilters();
         });
     connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
