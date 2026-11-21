@@ -326,9 +326,15 @@ void MainWindow::buildUi()
     auto *listTitle = new QLabel(tr("Discovered devices"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
     summaryLabel_ = mutedLabel(tr("Ready to scan your local network"), left);
+    auto *selectAllChecks = actionButton(tr("Select all"), left);
+    auto *clearChecks = actionButton(tr("Clear"), left);
+    selectAllChecks->setToolTip(tr("Check every device for the next reachability operation."));
+    clearChecks->setToolTip(tr("Clear all device checkboxes."));
     listHeading->addWidget(listTitle);
     listHeading->addStretch();
     listHeading->addWidget(summaryLabel_);
+    listHeading->addWidget(selectAllChecks);
+    listHeading->addWidget(clearChecks);
     leftLayout->addLayout(listHeading);
 
     deviceTable_ = new QTableWidget(0, 12, left);
@@ -548,6 +554,19 @@ void MainWindow::buildUi()
             }
         }
         updateStatus(tr("Could not start subnet scan. Select an active IPv4 interface."));
+    });
+    connect(selectAllChecks, &QPushButton::clicked, this, [this] {
+        for (int row = 0; row < deviceTable_->rowCount(); ++row)
+            if (auto *item = deviceTable_->item(row, 0)) item->setCheckState(Qt::Checked);
+        updateStatus(tr("All %1 device(s) checked for the next reachability operation.").arg(deviceTable_->rowCount()));
+    });
+    connect(clearChecks, &QPushButton::clicked, this, [this] {
+        for (int row = 0; row < deviceTable_->rowCount(); ++row)
+            if (auto *item = deviceTable_->item(row, 0)) item->setCheckState(Qt::Unchecked);
+        updateStatus(tr("Device checkboxes cleared."));
+    });
+    connect(deviceTable_, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
+        if (item && item->column() == 0) updateDeviceSummary();
     });
     connect(searchEdit_, &QLineEdit::textChanged, this, &MainWindow::applyFilters);
     connect(vendorFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
@@ -1094,8 +1113,14 @@ void MainWindow::updateDeviceSummary()
     if (reachableMetric_) reachableMetric_->setText(QString::number(reachable));
     if (verifiedMetric_) verifiedMetric_->setText(QString::number(verified));
     if (unverifiedMetric_) unverifiedMetric_->setText(QString::number(count - verified));
-    if (summaryLabel_)
-        summaryLabel_->setText(count == 1 ? tr("1 device in inventory") : tr("%1 devices in inventory").arg(count));
+    if (summaryLabel_) {
+        int checked = 0;
+        for (int row = 0; row < count; ++row) {
+            const auto *item = deviceTable_->item(row, 0);
+            if (item && item->checkState() == Qt::Checked) ++checked;
+        }
+        summaryLabel_->setText(tr("%1 devices · %2 checked").arg(count).arg(checked));
+    }
 }
 void MainWindow::upsertDevice(const DeviceRecord &device)
 {
