@@ -430,7 +430,7 @@ void MainWindow::buildUi()
     addCapability(tr("ONVIF discovery"), tr("Available"), true);
     addCapability(tr("Device information"), tr("Available"), true);
     addCapability(tr("TCP reachability"), tr("Available"), true);
-    addCapability(tr("Static IPv4"), tr("Adapter / device dependent"), true);
+    addCapability(tr("Static IPv4"), tr("Conditional"), false);
     addCapability(tr("Bulk image settings"), tr("Planned"), false);
     addCapability(tr("Firmware update"), tr("Planned"), false);
     addCapability(tr("NVR channels"), tr("Planned"), false);
@@ -1099,6 +1099,8 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     }
     updateDeviceSummary();
     applyFilters();
+    if (row == deviceTable_->currentRow())
+        updateSelectedDevicePanel();
     if (!loadingInventory_) persistDevice(device);
 }
 
