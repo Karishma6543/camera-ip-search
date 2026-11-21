@@ -57,6 +57,9 @@ private:
     QComboBox *statusFilter_{nullptr};
     bool loadingInventory_{false};
     QLabel *deviceDetailsLabel_{nullptr};
+    QLabel *selectedDeviceSummary_{nullptr};
+    QLabel *selectedNetworkSummary_{nullptr};
+    void updateSelectedDevicePanel();
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};
