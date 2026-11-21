@@ -856,7 +856,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         tr("Refresh retrieves available ONVIF device information. Open web interface launches the camera's HTTP page in your default browser."),
         devicePanel);
     deviceLayout->addWidget(deviceDescription);
-    auto *deviceActions = new QHBoxLayout();
+    auto *deviceActions = new QGridLayout();
+    deviceActions->setHorizontalSpacing(8);
+    deviceActions->setVerticalSpacing(8);
     refreshDeviceButton_ = actionButton(tr("Refresh device info"), devicePanel);
     refreshDeviceButton_->setEnabled(false);
     openWebButton_ = actionButton(tr("Open web interface"), devicePanel);
@@ -864,9 +866,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *reboot = actionButton(tr("Reboot selected"), devicePanel);
     reboot->setEnabled(false);
     reboot->setToolTip(tr("Reboot is unavailable until a verified device adapter exposes a supported reboot operation."));
-    deviceActions->addWidget(refreshDeviceButton_);
-    deviceActions->addWidget(openWebButton_);
-    deviceActions->addWidget(reboot);
+    deviceActions->addWidget(refreshDeviceButton_, 0, 0);
+    deviceActions->addWidget(openWebButton_, 0, 1);
+    deviceActions->addWidget(reboot, 1, 0, 1, 2);
     deviceLayout->addLayout(deviceActions);
     layout->addWidget(devicePanel);
 
@@ -876,11 +878,12 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addWidget(mutedLabel(
         tr("Preview validates proposed values locally and does not contact the camera. Apply sends an ONVIF static IPv4 request only when the camera exposes the required verified interface details."),
         networkPanel));
-    auto *networkActions = new QHBoxLayout();
+    auto *networkActions = new QGridLayout();
+    networkActions->setHorizontalSpacing(8);
     auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), networkPanel);
     auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), networkPanel, true);
-    networkActions->addWidget(previewNetworkButton);
-    networkActions->addWidget(applyNetworkButton);
+    networkActions->addWidget(previewNetworkButton, 0, 0);
+    networkActions->addWidget(applyNetworkButton, 0, 1);
     networkLayout->addLayout(networkActions);
     layout->addWidget(networkPanel);
 
