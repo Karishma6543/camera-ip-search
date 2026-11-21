@@ -887,6 +887,26 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addLayout(networkActions);
     layout->addWidget(networkPanel);
 
+    auto *firmwarePanel = panel(tr("Firmware & device maintenance"), page);
+    auto *firmwareLayout = new QVBoxLayout(firmwarePanel);
+    firmwareLayout->setSpacing(8);
+    firmwareStatusSummary_ = new QLabel(tr("Select a camera to inspect its reported firmware version."), firmwarePanel);
+    firmwareStatusSummary_->setWordWrap(true);
+    firmwareStatusSummary_->setObjectName(QStringLiteral("deviceDetails"));
+    firmwareLayout->addWidget(firmwareStatusSummary_);
+    auto *firmwareNote = mutedLabel(
+        tr("Firmware packages are not installed or transferred by this build. A verified vendor update adapter, package validation and recovery procedure are required before flashing can be enabled."),
+        firmwarePanel);
+    firmwareLayout->addWidget(firmwareNote);
+    auto *firmwareActions = new QHBoxLayout();
+    auto *firmwareUpdateButton = actionButton(tr("Firmware update unavailable"), firmwarePanel);
+    firmwareUpdateButton->setEnabled(false);
+    firmwareUpdateButton->setToolTip(tr("Firmware update is planned but not implemented. No firmware will be uploaded."));
+    firmwareActions->addWidget(firmwareUpdateButton);
+    firmwareActions->addStretch();
+    firmwareLayout->addLayout(firmwareActions);
+    layout->addWidget(firmwarePanel);
+
     auto *safetyNote = new QLabel(
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
         page);
@@ -1085,6 +1105,8 @@ void MainWindow::updateSelectedDevicePanel()
         selectedDeviceSummary_->setText(tr("No device selected"));
         selectedNetworkSummary_->setText(
             tr("Select a camera in the inventory to inspect its network and verification state."));
+        if (firmwareStatusSummary_)
+            firmwareStatusSummary_->setText(tr("Select a camera to inspect its reported firmware version."));
         return;
     }
 
@@ -1120,6 +1142,14 @@ void MainWindow::updateSelectedDevicePanel()
         if (!service.isEmpty()) details << tr("Device service: %1").arg(service);
     }
     selectedNetworkSummary_->setText(details.join(QLatin1Char('\n')));
+    if (firmwareStatusSummary_) {
+        const QString firmware = cell(6);
+        const QString model = cell(4);
+        firmwareStatusSummary_->setText(
+            tr("Device: %1\nModel: %2\nReported firmware: %3\nUpdate capability: Not available in this build")
+                .arg(cell(1), model.isEmpty() ? tr("Not reported") : model,
+                     firmware.isEmpty() ? tr("Not reported") : firmware));
+    }
 }
 
 void MainWindow::updateLocalNetworkSummary()
