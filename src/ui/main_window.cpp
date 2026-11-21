@@ -381,55 +381,61 @@ void MainWindow::buildUi()
     rightLayout->setContentsMargins(2, 2, 5, 2);
     rightLayout->setSpacing(9);
 
-    auto *ipPanel = panel(tr("IP Assignment"), rightContent);
-    auto *ipGrid = new QGridLayout(ipPanel);
-    ipGrid->addWidget(mutedLabel(tr("Applies to selected devices. Configuration controls will activate when a verified device adapter is available."), ipPanel), 0, 0, 1, 2);
-    ipGrid->addWidget(new QLabel(tr("Gateway"), ipPanel), 1, 0);
-    ipGrid->addWidget(new QLabel(tr("Subnet Mask"), ipPanel), 1, 1);
-    auto *gateway = new QLineEdit(ipPanel); gateway->setPlaceholderText("192.168.1.1"); gateway->setEnabled(false);
-    auto *mask = new QLineEdit(ipPanel); mask->setPlaceholderText("255.255.255.0"); mask->setEnabled(false);
-    ipGrid->addWidget(gateway, 2, 0); ipGrid->addWidget(mask, 2, 1);
-    ipGrid->addWidget(new QLabel(tr("IP address / range"), ipPanel), 3, 0);
-    ipGrid->addWidget(new QLabel(tr("DNS server"), ipPanel), 3, 1);
-    auto *ipRange = new QLineEdit(ipPanel); ipRange->setPlaceholderText(tr("Start – End")); ipRange->setEnabled(false);
-    auto *dns = new QLineEdit(ipPanel); dns->setPlaceholderText("8.8.8.8"); dns->setEnabled(false);
-    ipGrid->addWidget(ipRange, 4, 0); ipGrid->addWidget(dns, 4, 1);
-    auto *dhcp = new QCheckBox(tr("Enable DHCP"), ipPanel); dhcp->setEnabled(false);
-    ipGrid->addWidget(dhcp, 5, 0, 1, 2);
-    auto *autoIp = actionButton(tr("Auto IP Assign"), ipPanel, true); autoIp->setEnabled(false);
-    auto *rangeIp = actionButton(tr("Range IP Assign"), ipPanel); rangeIp->setEnabled(false);
-    ipGrid->addWidget(autoIp, 6, 0); ipGrid->addWidget(rangeIp, 6, 1);
-    rightLayout->addWidget(ipPanel);
+    auto *selectedPanel = panel(tr("Selected device"), rightContent);
+    auto *selectedLayout = new QVBoxLayout(selectedPanel);
+    selectedLayout->setSpacing(7);
+    selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
+    selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
+    selectedDeviceSummary_->setWordWrap(true);
+    selectedNetworkSummary_ = mutedLabel(
+        tr("Select a camera in the inventory to inspect its network and verification state."),
+        selectedPanel);
+    selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    selectedLayout->addWidget(selectedDeviceSummary_);
+    selectedLayout->addWidget(selectedNetworkSummary_);
+    rightLayout->addWidget(selectedPanel);
 
-    auto *firmwarePanel = panel(tr("Firmware Update"), rightContent);
-    auto *fwLayout = new QVBoxLayout(firmwarePanel);
-    fwLayout->addWidget(mutedLabel(tr("Choose a firmware package and compatible product series. Device and firmware compatibility checks will be required before updating."), firmwarePanel));
-    auto *chooseFw = actionButton(tr("Choose firmware file"), firmwarePanel); chooseFw->setEnabled(false);
-    fwLayout->addWidget(chooseFw);
-    auto *series = new QComboBox(firmwarePanel); series->addItem(tr("Select product series")); series->setEnabled(false);
-    fwLayout->addWidget(series);
-    auto *fwButtons = new QHBoxLayout();
-    auto *update = actionButton(tr("Update"), firmwarePanel, true); update->setEnabled(false);
-    auto *smartUpdate = actionButton(tr("Smart Update"), firmwarePanel); smartUpdate->setEnabled(false);
-    fwButtons->addWidget(update); fwButtons->addWidget(smartUpdate);
-    fwLayout->addLayout(fwButtons);
-    rightLayout->addWidget(firmwarePanel);
+    auto *networkPanel = panel(tr("Network configuration"), rightContent);
+    auto *networkLayout = new QVBoxLayout(networkPanel);
+    networkLayout->setSpacing(8);
+    networkLayout->addWidget(mutedLabel(
+        tr("Network details are read from the selected camera when its ONVIF device service is available."),
+        networkPanel));
+    auto *networkHint = new QLabel(
+        tr("To preview or apply a static IPv4 address, open the Device Info tab below the inventory. "
+           "The apply action requires a verified interface token and current address information."),
+        networkPanel);
+    networkHint->setWordWrap(true);
+    networkHint->setObjectName(QStringLiteral("muted"));
+    networkLayout->addWidget(networkHint);
+    rightLayout->addWidget(networkPanel);
 
-    auto *bulkPanel = panel(tr("Camera Bulk Config"), rightContent);
-    auto *bulkLayout = new QVBoxLayout(bulkPanel);
-    auto *selectionRow = new QHBoxLayout();
-    auto *selectAll = actionButton(tr("Select all"), bulkPanel); selectAll->setEnabled(false);
-    auto *clearSelection = actionButton(tr("Clear selection"), bulkPanel); clearSelection->setEnabled(false);
-    selectionRow->addWidget(selectAll); selectionRow->addWidget(clearSelection);
-    bulkLayout->addLayout(selectionRow);
-    bulkLayout->addWidget(mutedLabel(tr("Bulk settings are shown here and will be enabled per supported model and firmware."), bulkPanel));
-    auto *dayNight = new QComboBox(bulkPanel); dayNight->addItems({tr("Day-Night: Select"), tr("Day"), tr("Night"), tr("Auto")}); dayNight->setEnabled(false);
-    auto *icr = new QComboBox(bulkPanel); icr->addItems({tr("ICR: Select"), tr("On"), tr("Off"), tr("Auto")}); icr->setEnabled(false);
-    bulkLayout->addWidget(dayNight); bulkLayout->addWidget(icr);
-    auto *easyMode = actionButton(tr("Easy Mode"), bulkPanel); easyMode->setEnabled(false);
-    auto *imageIr = actionButton(tr("Apply Image / IR"), bulkPanel); imageIr->setEnabled(false);
-    bulkLayout->addWidget(easyMode); bulkLayout->addWidget(imageIr);
-    rightLayout->addWidget(bulkPanel);
+    auto *capabilityPanel = panel(tr("Feature availability"), rightContent);
+    auto *capabilityLayout = new QVBoxLayout(capabilityPanel);
+    capabilityLayout->setSpacing(8);
+    const auto addCapability = [capabilityPanel, capabilityLayout](const QString &name,
+                                                                    const QString &state,
+                                                                    bool available) {
+        auto *row = new QHBoxLayout();
+        auto *nameLabel = new QLabel(name, capabilityPanel);
+        auto *stateLabel = new QLabel(state, capabilityPanel);
+        stateLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        stateLabel->setStyleSheet(available
+            ? QStringLiteral("color:#176B4D;font-weight:700;")
+            : QStringLiteral("color:#8A909A;font-weight:600;"));
+        row->addWidget(nameLabel, 1);
+        row->addWidget(stateLabel);
+        capabilityLayout->addLayout(row);
+    };
+    addCapability(tr("ONVIF discovery"), tr("Available"), true);
+    addCapability(tr("Device information"), tr("Available"), true);
+    addCapability(tr("TCP reachability"), tr("Available"), true);
+    addCapability(tr("Static IPv4"), tr("Adapter / device dependent"), true);
+    addCapability(tr("Bulk image settings"), tr("Planned"), false);
+    addCapability(tr("Firmware update"), tr("Planned"), false);
+    addCapability(tr("NVR channels"), tr("Planned"), false);
+    addCapability(tr("Remote reboot"), tr("Planned"), false);
+    rightLayout->addWidget(capabilityPanel);
     rightLayout->addStretch();
     rightScroll->setWidget(rightContent);
     mainRow->addWidget(left, 3);
@@ -586,6 +592,7 @@ void MainWindow::buildUi()
         const bool hasSelection = deviceTable_->currentRow() >= 0;
         openWebButton_->setEnabled(hasSelection);
         refreshDeviceButton_->setEnabled(hasSelection);
+        updateSelectedDevicePanel();
     });
     connect(help, &QPushButton::clicked, this, [this] {
         QMessageBox::information(this, tr("Oxita Camera Device Manager — Help"),
@@ -947,6 +954,45 @@ QWidget *MainWindow::makeNvrTab(QWidget *parent)
     layout->addWidget(emptyState);
     layout->addStretch();
     return page;
+}
+
+void MainWindow::updateSelectedDevicePanel()
+{
+    if (!selectedDeviceSummary_ || !selectedNetworkSummary_ || !deviceTable_) return;
+    const int row = deviceTable_->currentRow();
+    if (row < 0) {
+        selectedDeviceSummary_->setText(tr("No device selected"));
+        selectedNetworkSummary_->setText(
+            tr("Select a camera in the inventory to inspect its network and verification state."));
+        return;
+    }
+
+    const auto cell = [this, row](int column) {
+        const auto *item = deviceTable_->item(row, column);
+        return item ? item->text().trimmed() : QString();
+    };
+    const auto *ipItem = deviceTable_->item(row, 1);
+    selectedDeviceSummary_->setText(
+        cell(2).isEmpty() ? cell(1) : cell(2) + QStringLiteral("\n") + cell(1));
+    QStringList details;
+    details << tr("Manufacturer: %1").arg(cell(3).isEmpty() ? tr("Not reported") : cell(3));
+    details << tr("Model: %1").arg(cell(4).isEmpty() ? tr("Not reported") : cell(4));
+    details << tr("Reachability: %1").arg(cell(11).isEmpty() ? tr("Not checked") : cell(11));
+    details << tr("Discovery: %1").arg(cell(8).isEmpty() ? tr("Manual / unknown") : cell(8));
+    if (ipItem) {
+        const QString interfaceToken = ipItem->data(Qt::UserRole + 7).toString();
+        details << tr("ONVIF network interface: %1")
+                       .arg(interfaceToken.isEmpty() ? tr("Not verified") : tr("Available"));
+        const QString cameraIp = ipItem->data(Qt::UserRole + 8).toString();
+        const QString mask = ipItem->data(Qt::UserRole + 9).toString();
+        const QString gateway = ipItem->data(Qt::UserRole + 10).toString();
+        const QString dns = ipItem->data(Qt::UserRole + 11).toString();
+        details << tr("IPv4: %1").arg(cameraIp.isEmpty() ? tr("Not reported") : cameraIp);
+        details << tr("Subnet: %1").arg(mask.isEmpty() ? tr("Not reported") : mask);
+        details << tr("Gateway: %1").arg(gateway.isEmpty() ? tr("Not reported") : gateway);
+        details << tr("DNS: %1").arg(dns.isEmpty() ? tr("Not reported") : dns);
+    }
+    selectedNetworkSummary_->setText(details.join(QLatin1Char('\n')));
 }
 
 void MainWindow::updateStatus(const QString &message)
