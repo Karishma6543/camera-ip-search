@@ -288,6 +288,30 @@ void MainWindow::buildUi()
     tools->addLayout(actionRow);
     root->addWidget(toolbar);
 
+    // At-a-glance inventory metrics keep the dashboard useful before and after discovery.
+    auto *metricsRow = new QHBoxLayout();
+    metricsRow->setSpacing(10);
+    const auto addMetricCard = [central, metricsRow](const QString &caption, QLabel **valueLabel) {
+        auto *card = new QFrame(central);
+        card->setObjectName(QStringLiteral("metricCard"));
+        auto *layout = new QVBoxLayout(card);
+        layout->setContentsMargins(15, 11, 15, 12);
+        layout->setSpacing(4);
+        auto *eyebrow = new QLabel(caption, card);
+        eyebrow->setObjectName(QStringLiteral("eyebrow"));
+        auto *value = new QLabel(QStringLiteral("0"), card);
+        value->setObjectName(QStringLiteral("metric"));
+        layout->addWidget(eyebrow);
+        layout->addWidget(value);
+        metricsRow->addWidget(card, 1);
+        *valueLabel = value;
+    };
+    addMetricCard(tr("DISCOVERED DEVICES"), &discoveredMetric_);
+    addMetricCard(tr("REACHABLE"), &reachableMetric_);
+    addMetricCard(tr("ONVIF VERIFIED"), &verifiedMetric_);
+    addMetricCard(tr("NEEDS REVIEW"), &unverifiedMetric_);
+    root->addLayout(metricsRow);
+
     auto *mainRow = new QHBoxLayout();
     mainRow->setSpacing(10);
 
@@ -766,8 +790,24 @@ void MainWindow::updateStatus(const QString &message)
 void MainWindow::updateDeviceSummary()
 {
     const int count = deviceTable_ ? deviceTable_->rowCount() : 0;
+    int reachable = 0;
+    int verified = 0;
+    for (int row = 0; row < count; ++row) {
+        const auto *reachability = deviceTable_->item(row, 11);
+        if (reachability && reachability->text() == QStringLiteral("Reachable"))
+            ++reachable;
+        const auto *ipItem = deviceTable_->item(row, 1);
+        if (ipItem && (!ipItem->data(Qt::UserRole + 3).toString().isEmpty() ||
+                       !ipItem->data(Qt::UserRole + 7).toString().isEmpty()))
+            ++verified;
+    }
     if (deviceCountValue_) deviceCountValue_->setText(tr("%1 devices").arg(count));
-    if (summaryLabel_) summaryLabel_->setText(count == 1 ? tr("1 device found") : tr("%1 devices found").arg(count));
+    if (discoveredMetric_) discoveredMetric_->setText(QString::number(count));
+    if (reachableMetric_) reachableMetric_->setText(QString::number(reachable));
+    if (verifiedMetric_) verifiedMetric_->setText(QString::number(verified));
+    if (unverifiedMetric_) unverifiedMetric_->setText(QString::number(count - verified));
+    if (summaryLabel_)
+        summaryLabel_->setText(count == 1 ? tr("1 device in inventory") : tr("%1 devices in inventory").arg(count));
 }
 void MainWindow::upsertDevice(const DeviceRecord &device)
 {
