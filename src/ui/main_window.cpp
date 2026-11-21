@@ -1133,9 +1133,11 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     }
     if (row < 0) { row = deviceTable_->rowCount(); deviceTable_->insertRow(row); }
     const QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+    const auto *previousCheck = deviceTable_->item(row, 0);
+    const Qt::CheckState previousCheckState = previousCheck ? previousCheck->checkState() : Qt::Unchecked;
     auto *check = new QTableWidgetItem();
     check->setFlags(check->flags() | Qt::ItemIsUserCheckable);
-    check->setCheckState(Qt::Unchecked);
+    check->setCheckState(previousCheckState);
     deviceTable_->setItem(row, 0, check);
     const auto *previousIpItem = deviceTable_->item(row, 1);
     auto *ipItem = new QTableWidgetItem(device.ipAddress);
