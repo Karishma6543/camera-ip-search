@@ -16,6 +16,7 @@
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLocale>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollArea>
@@ -655,20 +656,37 @@ void MainWindow::buildUi()
         layout->addWidget(mutedLabel(
             tr("The device inventory is stored locally on this computer. Camera credentials are not written to the inventory database."),
             &dialog));
+        const QString databasePath = dataDirectory + QStringLiteral("/inventory.sqlite");
+        const QFileInfo databaseInfo(databasePath);
         auto *path = new QLabel(dataDirectory, &dialog);
         path->setWordWrap(true);
         path->setTextInteractionFlags(Qt::TextSelectableByMouse);
         path->setStyleSheet(QStringLiteral("background:#F6F7F9;border:1px solid #E7EAF0;border-radius:7px;padding:10px;"));
         layout->addWidget(path);
+        auto *databaseHeading = new QLabel(tr("Inventory database"), &dialog);
+        databaseHeading->setObjectName(QStringLiteral("sectionTitle"));
+        layout->addWidget(databaseHeading);
+        auto *database = mutedLabel(
+            tr("%1\n%2 · %3")
+                .arg(databasePath,
+                     databaseInfo.exists() ? tr("File present") : tr("Not created yet"),
+                     databaseInfo.exists() ? QLocale().formattedDataSize(databaseInfo.size()) : tr("No stored data")),
+            &dialog);
+        database->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        layout->addWidget(database);
         layout->addWidget(mutedLabel(
-            tr("Application version: %1\nInventory database: %2\nScan interface: %3")
+            tr("Application version: %1\nDatabase connection: %2\nSelected scan interface: %3")
                 .arg(QCoreApplication::applicationVersion(),
                      inventoryDb_.isOpen() ? tr("Connected") : tr("Unavailable"),
                      interfaceSelector_ ? interfaceSelector_->currentText() : tr("Not selected")),
             &dialog));
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+        auto *copyPath = buttons->addButton(tr("Copy location"), QDialogButtonBox::ActionRole);
         auto *openFolder = buttons->addButton(tr("Open data folder"), QDialogButtonBox::ActionRole);
         layout->addWidget(buttons);
+        connect(copyPath, &QPushButton::clicked, &dialog, [dataDirectory] {
+            if (auto *clipboard = QApplication::clipboard()) clipboard->setText(dataDirectory);
+        });
         connect(openFolder, &QPushButton::clicked, &dialog, [this, dataDirectory] {
             if (!QDir().mkpath(dataDirectory)) {
                 QMessageBox::warning(this, tr("Storage folder unavailable"),
