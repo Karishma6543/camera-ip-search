@@ -43,6 +43,8 @@
 #include <QStringConverter>
 #include <QTextStream>
 #include <QPainter>
+#include <QPainterPath>
+#include <QRadialGradient>
 #include <QPaintEvent>
 #include "oxita_theme.h"
 
@@ -61,15 +63,31 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(QStringLiteral("#C92D3B")));
-        painter.drawEllipse(QRectF(2, 2, 38, 38));
-        painter.setBrush(Qt::white);
-        painter.drawEllipse(QRectF(8, 8, 26, 26));
-        painter.setBrush(QColor(QStringLiteral("#737780")));
-        painter.drawEllipse(QRectF(14, 14, 14, 14));
-        painter.setBrush(QColor(QStringLiteral("#C92D3B")));
-        painter.drawEllipse(QRectF(18, 18, 6, 6));
+        QPainterPath outerSwirl;
+        outerSwirl.moveTo(5.5, 25.5);
+        outerSwirl.cubicTo(1.5, 14.5, 9.5, 3.5, 21.0, 3.5);
+        outerSwirl.cubicTo(33.0, 3.5, 41.0, 13.5, 37.5, 25.0);
+        outerSwirl.cubicTo(34.0, 36.5, 20.0, 42.0, 9.5, 33.0);
+        painter.setPen(QPen(QColor(QStringLiteral("#C92D3B")), 5.2,
+                            Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPath(outerSwirl);
+
+        QPainterPath innerSwirl;
+        innerSwirl.moveTo(11.5, 26.0);
+        innerSwirl.cubicTo(8.0, 18.0, 14.0, 10.0, 22.0, 9.5);
+        innerSwirl.cubicTo(30.0, 9.0, 35.5, 16.0, 32.0, 23.5);
+        innerSwirl.cubicTo(29.5, 29.5, 22.0, 33.0, 16.5, 28.5);
+        painter.setPen(QPen(QColor(QStringLiteral("#D84B56")), 3.2,
+                            Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPath(innerSwirl);
+
+        QRadialGradient core(QPointF(20.5, 19.5), 8.5, QPointF(17.5, 16.5));
+        core.setColorAt(0.0, QColor(QStringLiteral("#D7D9DE")));
+        core.setColorAt(0.55, QColor(QStringLiteral("#9297A0")));
+        core.setColorAt(1.0, QColor(QStringLiteral("#555B65")));
+        painter.setPen(QPen(Qt::white, 0.8));
+        painter.setBrush(core);
+        painter.drawEllipse(QRectF(13.5, 12.5, 15.5, 15.5));
     }
 };
 QLabel *mutedLabel(const QString &text, QWidget *parent)
@@ -199,7 +217,7 @@ void MainWindow::buildUi()
     topLayout->setContentsMargins(20, 14, 20, 14);
     topLayout->setSpacing(10);
     auto *mark = new OxitaMark(top);
-    auto *brand = new QLabel(tr("OXITA"), top);
+    auto *brand = new QLabel(tr("OXITA®"), top);
     brand->setObjectName(QStringLiteral("brand"));
     auto *productName = new QLabel(tr("CAMERA DEVICE MANAGER"), top);
     productName->setObjectName(QStringLiteral("productName"));
@@ -211,7 +229,7 @@ void MainWindow::buildUi()
     topLayout->addSpacing(5);
     topLayout->addLayout(brandStack);
     topLayout->addStretch();
-    auto *brandTagline = mutedLabel(tr("DRIVEN BY INNOVATION  ·  PROFESSIONAL DEVICE MANAGEMENT"), top);
+    auto *brandTagline = mutedLabel(tr("DRIVEN BY INNOVATION"), top);
     brandTagline->setObjectName(QStringLiteral("brandTagline"));
     topLayout->addWidget(brandTagline);
     topLayout->addSpacing(18);
