@@ -34,6 +34,7 @@ qt_add_executable(camera-ip-search
     src/discovery/reachability_checker.cpp
     src/ui/main_window.cpp
     src/ui/main_window.h
+    src/ui/oxita_theme.h
 )
 
 target_link_libraries(camera-ip-search PRIVATE Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml)
