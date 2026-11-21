@@ -59,7 +59,9 @@ private:
     QLabel *deviceDetailsLabel_{nullptr};
     QLabel *selectedDeviceSummary_{nullptr};
     QLabel *selectedNetworkSummary_{nullptr};
+    QLabel *localNetworkSummary_{nullptr};
     void updateSelectedDevicePanel();
+    void updateLocalNetworkSummary();
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};
