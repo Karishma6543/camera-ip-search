@@ -700,7 +700,52 @@ QWidget *MainWindow::makeBulkTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
-    layout->addWidget(mutedLabel(tr("Select multiple devices to apply model-supported settings together. Day/Night, ICR, Easy Mode and Image / IR controls will be enabled only for verified adapters."), page));
+    layout->setContentsMargins(18, 16, 18, 16);
+    layout->setSpacing(10);
+
+    auto *heading = new QLabel(tr("Multi-camera configuration"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(
+        tr("The workflow is designed for applying a consistent image profile across selected cameras. "
+           "Per-vendor adapters and capability checks are required before any setting can be sent."),
+        page));
+
+    auto *statusPanel = new QFrame(page);
+    statusPanel->setObjectName(QStringLiteral("metricCard"));
+    auto *statusLayout = new QVBoxLayout(statusPanel);
+    statusLayout->setContentsMargins(14, 12, 14, 12);
+    auto *statusTitle = new QLabel(tr("NOT AVAILABLE IN THIS BUILD"), statusPanel);
+    statusTitle->setObjectName(QStringLiteral("eyebrow"));
+    auto *statusText = new QLabel(
+        tr("No bulk configuration adapter is currently registered. These controls remain unavailable rather than sending unverified vendor commands."),
+        statusPanel);
+    statusText->setWordWrap(true);
+    statusLayout->addWidget(statusTitle);
+    statusLayout->addWidget(statusText);
+    layout->addWidget(statusPanel);
+
+    auto *capabilities = new QGridLayout();
+    capabilities->setHorizontalSpacing(14);
+    capabilities->setVerticalSpacing(10);
+    const QStringList features = {
+        tr("Day / Night profile"), tr("ICR / IR-cut control"),
+        tr("Image and IR settings"), tr("Easy Mode")
+    };
+    for (int i = 0; i < features.size(); ++i) {
+        auto *name = new QLabel(features.at(i), page);
+        auto *state = new QLabel(tr("Adapter required"), page);
+        state->setObjectName(QStringLiteral("muted"));
+        capabilities->addWidget(name, i, 0);
+        capabilities->addWidget(state, i, 1, Qt::AlignRight);
+        if (i + 1 < features.size()) {
+            auto *line = new QFrame(page);
+            line->setFrameShape(QFrame::HLine);
+            line->setStyleSheet(QStringLiteral("color:#ECEEF2;"));
+            capabilities->addWidget(line, i, 0, 1, 2);
+        }
+    }
+    layout->addLayout(capabilities);
     layout->addStretch();
     return page;
 }
@@ -708,7 +753,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QHBoxLayout(page);
-    auto *reboot = actionButton(tr("Reboot selected"), page); reboot->setEnabled(false);
+    auto *reboot = actionButton(tr("Reboot selected"), page);
+    reboot->setEnabled(false);
+    reboot->setToolTip(tr("Reboot is unavailable until a verified device adapter exposes a supported reboot operation."));
     refreshDeviceButton_ = actionButton(tr("Refresh device info"), page);
     refreshDeviceButton_->setEnabled(false);
     openWebButton_ = actionButton(tr("Open web interface"), page);
@@ -876,7 +923,28 @@ QWidget *MainWindow::makeNvrTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
     auto *layout = new QVBoxLayout(page);
-    layout->addWidget(mutedLabel(tr("NVR channel discovery and management will appear here for recorders that expose a verified supported interface."), page));
+    layout->setContentsMargins(18, 16, 18, 16);
+    layout->setSpacing(10);
+
+    auto *heading = new QLabel(tr("Recorder channel management"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    auto *emptyState = new QFrame(page);
+    emptyState->setObjectName(QStringLiteral("metricCard"));
+    auto *emptyLayout = new QVBoxLayout(emptyState);
+    emptyLayout->setContentsMargins(18, 18, 18, 18);
+    auto *eyebrow = new QLabel(tr("NVR INTEGRATION"), emptyState);
+    eyebrow->setObjectName(QStringLiteral("eyebrow"));
+    auto *title = new QLabel(tr("No recorder adapter is available"), emptyState);
+    title->setObjectName(QStringLiteral("sectionTitle"));
+    auto *description = mutedLabel(
+        tr("Channel listing, camera-to-channel mapping, stream profiles and recorder configuration require a verified NVR protocol adapter. "
+           "The current build does not send recorder-specific commands."),
+        emptyState);
+    emptyLayout->addWidget(eyebrow);
+    emptyLayout->addWidget(title);
+    emptyLayout->addWidget(description);
+    layout->addWidget(emptyState);
     layout->addStretch();
     return page;
 }
