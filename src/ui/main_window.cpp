@@ -361,7 +361,7 @@ void MainWindow::buildUi()
     deviceTable_->verticalHeader()->setDefaultSectionSize(48);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
-    deviceTable_->setToolTip(tr("Select a row to inspect device details. Use the checkbox column for future multi-device workflows."));
+    deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
@@ -451,11 +451,21 @@ void MainWindow::buildUi()
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
         if (reachabilityChecker_->isRunning()) return;
         QVector<DeviceRecord> devices;
-        const auto selected = deviceTable_->selectionModel()->selectedRows();
-        for (const QModelIndex &index : selected) {
+        // Checked rows take priority so operators can explicitly target a group.
+        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+            const auto *check = deviceTable_->item(row, 0);
+            if (!check || check->checkState() != Qt::Checked) continue;
             DeviceRecord device;
-            device.ipAddress = deviceTable_->item(index.row(), 1) ? deviceTable_->item(index.row(), 1)->text() : QString();
+            device.ipAddress = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
             if (!device.ipAddress.isEmpty()) devices.append(device);
+        }
+        if (devices.isEmpty()) {
+            const auto selected = deviceTable_->selectionModel()->selectedRows();
+            for (const QModelIndex &index : selected) {
+                DeviceRecord device;
+                device.ipAddress = deviceTable_->item(index.row(), 1) ? deviceTable_->item(index.row(), 1)->text() : QString();
+                if (!device.ipAddress.isEmpty()) devices.append(device);
+            }
         }
         if (devices.isEmpty()) {
             for (int row = 0; row < deviceTable_->rowCount(); ++row) {
@@ -467,7 +477,7 @@ void MainWindow::buildUi()
         if (devices.isEmpty()) { updateStatus(tr("Add or discover devices before checking reachability.")); return; }
         reachabilityButton_->setEnabled(false);
         reachabilityButton_->setText(tr("Checking…"));
-        updateStatus(tr("Checking TCP reachability. Selected rows only; if none are selected, all devices are checked."));
+        updateStatus(tr("Checking TCP reachability. Checked cameras take priority, then highlighted rows; if neither is selected, all devices are checked."));
         reachabilityChecker_->start(devices);
     });
     connect(reachabilityChecker_, &ReachabilityChecker::deviceChecked, this,
@@ -644,8 +654,8 @@ void MainWindow::buildUi()
         connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
         dialog.exec();
     });
-    connect(selectAll, &QPushButton::clicked, this, [this] { updateStatus(tr("Bulk selection actions will be enabled with the bulk configuration implementation.")); });
-    connect(clearSelection, &QPushButton::clicked, this, [this] { deviceTable_->clearSelection(); });
+    // Device checkboxes are the explicit multi-select mechanism. Highlighted
+    // rows remain available for single-device inspection and keyboard workflows.
     connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
         if (row < 0 || !deviceDetailsLabel_) return;
         QStringList details;
