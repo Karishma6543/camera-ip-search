@@ -54,9 +54,37 @@
 #include <QRegularExpression>
 #include <QStringConverter>
 #include <QTextStream>
+#include <QPainter>
+#include <QPaintEvent>
+#include "oxita_theme.h"
 #include <memory>
 
 namespace {
+class OxitaMark final : public QWidget
+{
+public:
+    explicit OxitaMark(QWidget *parent = nullptr) : QWidget(parent)
+    {
+        setFixedSize(42, 42);
+        setAttribute(Qt::WA_TranslucentBackground);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(QStringLiteral("#C92D3B")));
+        painter.drawEllipse(QRectF(2, 2, 38, 38));
+        painter.setBrush(Qt::white);
+        painter.drawEllipse(QRectF(8, 8, 26, 26));
+        painter.setBrush(QColor(QStringLiteral("#737780")));
+        painter.drawEllipse(QRectF(14, 14, 14, 14));
+        painter.setBrush(QColor(QStringLiteral("#C92D3B")));
+        painter.drawEllipse(QRectF(18, 18, 6, 6));
+    }
+};
 QLabel *mutedLabel(const QString &text, QWidget *parent)
 {
     auto *label = new QLabel(text, parent);
@@ -170,61 +198,36 @@ void MainWindow::buildUi()
     setMinimumSize(1120, 720);
     resize(1480, 900);
 
-    setStyleSheet(QStringLiteral(R"(
-        QMainWindow, QWidget#appRoot { background: #202226; color: #eceef1; }
-        QWidget { font-family: "Segoe UI", "Inter", sans-serif; font-size: 12px; }
-        QLabel { color: #e6e8eb; }
-        QLabel#brand { color: #ffffff; font-size: 21px; font-weight: 800; }
-        QLabel#brandMark { color: #ffffff; background: #c62835; border-radius: 8px; font-size: 17px; font-weight: 900; padding: 7px; }
-        QLabel#muted { color: #a4a8b0; font-size: 11px; }
-        QLabel#sectionTitle { color: #f4f4f5; font-size: 14px; font-weight: 750; }
-        QLabel#metric { color: #ffffff; font-size: 16px; font-weight: 800; }
-        QFrame#topBar { background: #292c31; border: 1px solid #3c4048; border-radius: 10px; }
-        QFrame#surface { background: #292c31; border: 1px solid #41454e; border-radius: 10px; }
-        QFrame#toolbar { background: #25282d; border: 1px solid #3b3f47; border-radius: 8px; }
-        QFrame#metricCard { background: #292c31; border: 1px solid #41454e; border-radius: 9px; }
-        QGroupBox#actionPanel { background: #2b2e34; border: 1px solid #454a54; border-radius: 9px; margin-top: 12px; padding: 13px 10px 10px 10px; color: #f1f1f2; font-weight: 700; }
-        QGroupBox#actionPanel::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; color: #f2f2f3; }
-        QLineEdit, QComboBox { background: #1f2227; color: #f1f2f4; border: 1px solid #646a75; border-radius: 6px; padding: 8px 9px; selection-background-color: #bd2634; min-height: 18px; }
-        QLineEdit:focus, QComboBox:focus { border: 1px solid #d43a47; }
-        QComboBox::drop-down { border: 0; width: 22px; }
-        QPushButton { background: #383c44; color: #f4f4f5; border: 1px solid #555b66; border-radius: 6px; padding: 8px 12px; font-weight: 650; }
-        QPushButton:hover { background: #454a54; border-color: #858b96; }
-        QPushButton#primaryButton { background: #bd2634; color: white; border: 1px solid #d13b48; padding: 9px 15px; }
-        QPushButton#primaryButton:hover { background: #d33240; }
-        QPushButton:disabled { color: #858a93; background: #30333a; border-color: #454952; }
-        QTableWidget { background: #23262b; alternate-background-color: #292d34; border: 0; gridline-color: #383d46; selection-background-color: #573139; selection-color: #ffffff; font-size: 11px; }
-        QHeaderView::section { background: #30343b; color: #c4c8cf; border: 0; border-bottom: 1px solid #505661; padding: 10px 7px; font-size: 10px; font-weight: 800; }
-        QTableWidget::item { padding: 7px 5px; border-bottom: 1px solid #343941; }
-        QTabWidget::pane { border: 1px solid #414650; background: #292c31; border-radius: 7px; }
-        QTabBar::tab { background: #30343b; color: #c5c8ce; padding: 11px 20px; border: 1px solid #454a54; border-bottom: 0; margin-right: 3px; border-top-left-radius: 6px; border-top-right-radius: 6px; font-weight: 700; }
-        QTabBar::tab:selected { background: #bd2634; color: white; border-color: #d13b48; }
-        QCheckBox { color: #e8e9eb; spacing: 7px; }
-        QCheckBox::indicator { width: 15px; height: 15px; }
-        QStatusBar { background: #25282d; color: #b7bbc2; border-top: 1px solid #41454e; }
-        QScrollArea { border: 0; background: transparent; }
-    )"));
+    setStyleSheet(OxitaTheme::styleSheet());
 
     auto *central = new QWidget(this);
     central->setObjectName(QStringLiteral("appRoot"));
     auto *root = new QVBoxLayout(central);
-    root->setContentsMargins(16, 14, 16, 10);
-    root->setSpacing(10);
+    root->setContentsMargins(22, 20, 22, 14);
+    root->setSpacing(14);
 
     auto *top = new QFrame(central);
     top->setObjectName(QStringLiteral("topBar"));
     auto *topLayout = new QHBoxLayout(top);
-    topLayout->setContentsMargins(14, 9, 14, 9);
-    auto *mark = new QLabel(QStringLiteral("O"), top);
-    mark->setObjectName(QStringLiteral("brandMark"));
-    auto *brand = new QLabel(tr("OXITA  |  CAMERA DEVICE MANAGER"), top);
+    topLayout->setContentsMargins(20, 14, 20, 14);
+    topLayout->setSpacing(10);
+    auto *mark = new OxitaMark(top);
+    auto *brand = new QLabel(tr("OXITA"), top);
     brand->setObjectName(QStringLiteral("brand"));
+    auto *productName = new QLabel(tr("CAMERA DEVICE MANAGER"), top);
+    productName->setObjectName(QStringLiteral("productName"));
     auto *brandStack = new QVBoxLayout();
-    brandStack->setSpacing(0);
+    brandStack->setSpacing(1);
     brandStack->addWidget(brand);
-    brandStack->addWidget(mutedLabel(tr("IP SEARCH  •  DISCOVERY  •  DEVICE CONFIGURATION"), top));
+    brandStack->addWidget(productName);
     topLayout->addWidget(mark);
+    topLayout->addSpacing(5);
     topLayout->addLayout(brandStack);
+    topLayout->addStretch();
+    auto *brandTagline = mutedLabel(tr("DRIVEN BY INNOVATION  ·  PROFESSIONAL DEVICE MANAGEMENT"), top);
+    brandTagline->setObjectName(QStringLiteral("brandTagline"));
+    topLayout->addWidget(brandTagline);
+    topLayout->addSpacing(18);
     topLayout->addStretch();
     auto *help = actionButton(tr("Help"), top);
     auto *settings = actionButton(tr("Settings"), top);
@@ -234,13 +237,18 @@ void MainWindow::buildUi()
 
     auto *toolbar = new QFrame(central);
     toolbar->setObjectName(QStringLiteral("toolbar"));
-    auto *tools = new QHBoxLayout(toolbar);
-    tools->setContentsMargins(9, 7, 9, 7);
+    auto *tools = new QVBoxLayout(toolbar);
+    tools->setContentsMargins(16, 13, 16, 13);
+    tools->setSpacing(11);
+
+    auto *filterRow = new QHBoxLayout();
+    filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
-    searchEdit_->setPlaceholderText(tr("Search IP, MAC, model or manufacturer"));
+    searchEdit_->setPlaceholderText(tr("Search by IP address, MAC, model or manufacturer"));
     searchEdit_->setMinimumWidth(250);
+    searchEdit_->setClearButtonEnabled(true);
     interfaceSelector_ = new QComboBox(toolbar);
-    interfaceSelector_->setMinimumWidth(155);
+    interfaceSelector_->setMinimumWidth(175);
     manufacturerFilter_ = new QComboBox(toolbar);
     auto *vendorFilter = manufacturerFilter_;
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
@@ -249,24 +257,30 @@ void MainWindow::buildUi()
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("metric"));
-    tools->addWidget(searchEdit_, 2);
-    tools->addWidget(interfaceSelector_);
-    tools->addWidget(vendorFilter);
-    tools->addWidget(statusFilter);
-    tools->addStretch();
-    tools->addWidget(deviceCountValue_);
+    filterRow->addWidget(searchEdit_, 2);
+    filterRow->addWidget(interfaceSelector_);
+    filterRow->addWidget(vendorFilter);
+    filterRow->addWidget(statusFilter);
+    filterRow->addStretch();
+    filterRow->addWidget(deviceCountValue_);
+    tools->addLayout(filterRow);
+
+    auto *actionRow = new QHBoxLayout();
+    actionRow->setSpacing(8);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
-    tools->addWidget(addDeviceButton_);
+    actionRow->addWidget(addDeviceButton_);
     auto *exportButton = actionButton(tr("Export CSV"), toolbar);
-    tools->addWidget(exportButton);
+    actionRow->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
-    tools->addWidget(renameButton);
-    scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
-    tools->addWidget(scanButton_);
-    subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
-    tools->addWidget(subnetScanButton_);
+    actionRow->addWidget(renameButton);
+    actionRow->addStretch();
     reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
-    tools->addWidget(reachabilityButton_);
+    actionRow->addWidget(reachabilityButton_);
+    subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
+    actionRow->addWidget(subnetScanButton_);
+    scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
+    actionRow->addWidget(scanButton_);
+    tools->addLayout(actionRow);
     root->addWidget(toolbar);
 
     // Device health summary uses observed TCP service reachability only.
@@ -322,10 +336,13 @@ void MainWindow::buildUi()
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
     deviceTable_->setMinimumHeight(310);
+    deviceTable_->verticalHeader()->setDefaultSectionSize(44);
+    deviceTable_->setShowGrid(false);
+    deviceTable_->setWordWrap(false);
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
-    tabs->setTabPosition(QTabWidget::South);
+    tabs->setTabPosition(QTabWidget::North);
     tabs->addTab(makeInfoTab(tabs), tr("Device Info"));
     tabs->addTab(makeBulkTab(tabs), tr("Bulk Config"));
     tabs->addTab(makeMaintenanceTab(tabs), tr("Maintenance"));
