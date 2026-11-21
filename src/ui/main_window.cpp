@@ -467,7 +467,21 @@ void MainWindow::buildUi()
         [this](const QString &ip, const QString &status, const QString &checkedAt, const QString &lastSuccessAt) {
             for (int row = 0; row < deviceTable_->rowCount(); ++row) {
                 if (!deviceTable_->item(row, 1) || deviceTable_->item(row, 1)->text() != ip) continue;
-                deviceTable_->setItem(row, 11, new QTableWidgetItem(status));
+                auto *reachabilityItem = new QTableWidgetItem(status);
+                reachabilityItem->setTextAlignment(Qt::AlignCenter);
+                reachabilityItem->setFont(QFont(QStringLiteral("Segoe UI"), 9, QFont::DemiBold));
+                if (status == QStringLiteral("Reachable")) {
+                    reachabilityItem->setForeground(QColor(QStringLiteral("#176B4D")));
+                    reachabilityItem->setBackground(QColor(QStringLiteral("#EAF5EF")));
+                } else if (status == QStringLiteral("Unreachable")) {
+                    reachabilityItem->setForeground(QColor(QStringLiteral("#A33A42")));
+                    reachabilityItem->setBackground(QColor(QStringLiteral("#FBECEE")));
+                } else {
+                    reachabilityItem->setForeground(QColor(QStringLiteral("#68707C")));
+                    reachabilityItem->setBackground(QColor(QStringLiteral("#F1F3F5")));
+                }
+                reachabilityItem->setToolTip(tr("TCP reachability check: %1").arg(status));
+                deviceTable_->setItem(row, 11, reachabilityItem);
                 const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
                 if (inventoryDb_.isOpen()) {
                     QSqlQuery query(inventoryDb_);
