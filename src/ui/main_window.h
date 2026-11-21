@@ -60,6 +60,7 @@ private:
     QLabel *selectedDeviceSummary_{nullptr};
     QLabel *selectedNetworkSummary_{nullptr};
     QLabel *localNetworkSummary_{nullptr};
+    QLabel *firmwareStatusSummary_{nullptr};
     void updateSelectedDevicePanel();
     void updateLocalNetworkSummary();
     QPushButton *addDeviceButton_{nullptr};
