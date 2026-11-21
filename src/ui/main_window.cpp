@@ -6,6 +6,7 @@
 #include "adapters/network_config_validator.h"
 
 #include <QAbstractItemView>
+#include <QCoreApplication>
 #include <QColor>
 #include <QFont>
 #include <QCheckBox>
@@ -586,8 +587,56 @@ void MainWindow::buildUi()
         openWebButton_->setEnabled(hasSelection);
         refreshDeviceButton_->setEnabled(hasSelection);
     });
-    connect(help, &QPushButton::clicked, this, [this] { updateStatus(tr("See the project documentation for supported discovery protocols and current feature status.")); });
-    connect(settings, &QPushButton::clicked, this, [this] { updateStatus(tr("Application preferences are planned; no settings have been changed.")); });
+    connect(help, &QPushButton::clicked, this, [this] {
+        QMessageBox::information(this, tr("Oxita Camera Device Manager — Help"),
+            tr("<b>Discover devices</b><br>Uses ONVIF WS-Discovery and the application's supported vendor discovery broadcast. "
+               "Discovery results are not a guarantee that every camera on the network was found.<br><br>"
+               "<b>Scan selected subnet</b><br>Checks candidate addresses on the selected IPv4 interface. "
+               "A TCP response is reachability evidence, not proof of ONVIF compatibility or camera identity.<br><br>"
+               "<b>Device information</b><br>Select a device and use Refresh device info to query its reachable ONVIF device service. "
+               "Reported fields depend on the camera and its firmware.<br><br>"
+               "<b>Network configuration</b><br>Static IPv4 changes require a verified ONVIF interface token and current interface details. "
+               "The camera may disconnect after an address change; this operation currently has no automatic rollback.<br><br>"
+               "<b>Feature availability</b><br>Bulk camera settings, NVR channel management and firmware update are not yet implemented. "
+               "They are intentionally not presented as working controls."));
+    });
+    connect(settings, &QPushButton::clicked, this, [this] {
+        const QString dataDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Application settings & storage"));
+        dialog.setMinimumWidth(500);
+        auto *layout = new QVBoxLayout(&dialog);
+        auto *heading = new QLabel(tr("Local application data"), &dialog);
+        heading->setObjectName(QStringLiteral("sectionTitle"));
+        layout->addWidget(heading);
+        layout->addWidget(mutedLabel(
+            tr("The device inventory is stored locally on this computer. Camera credentials are not written to the inventory database."),
+            &dialog));
+        auto *path = new QLabel(dataDirectory, &dialog);
+        path->setWordWrap(true);
+        path->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        path->setStyleSheet(QStringLiteral("background:#F6F7F9;border:1px solid #E7EAF0;border-radius:7px;padding:10px;"));
+        layout->addWidget(path);
+        layout->addWidget(mutedLabel(
+            tr("Application version: %1\nInventory database: %2\nScan interface: %3")
+                .arg(QCoreApplication::applicationVersion(),
+                     inventoryDb_.isOpen() ? tr("Connected") : tr("Unavailable"),
+                     interfaceSelector_ ? interfaceSelector_->currentText() : tr("Not selected")),
+            &dialog));
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+        auto *openFolder = buttons->addButton(tr("Open data folder"), QDialogButtonBox::ActionRole);
+        layout->addWidget(buttons);
+        connect(openFolder, &QPushButton::clicked, &dialog, [this, dataDirectory] {
+            if (!QDir().mkpath(dataDirectory)) {
+                QMessageBox::warning(this, tr("Storage folder unavailable"),
+                                     tr("Could not create the application data folder."));
+                return;
+            }
+            QDesktopServices::openUrl(QUrl::fromLocalFile(dataDirectory));
+        });
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        dialog.exec();
+    });
     connect(selectAll, &QPushButton::clicked, this, [this] { updateStatus(tr("Bulk selection actions will be enabled with the bulk configuration implementation.")); });
     connect(clearSelection, &QPushButton::clicked, this, [this] { deviceTable_->clearSelection(); });
     connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
