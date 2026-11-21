@@ -330,9 +330,24 @@ void MainWindow::buildUi()
 
     deviceTable_ = new QTableWidget(0, 12, left);
     deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
-    deviceTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    deviceTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
-    deviceTable_->horizontalHeader()->setStretchLastSection(true);
+    auto *deviceHeader = deviceTable_->horizontalHeader();
+    deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
+    deviceHeader->setSectionResizeMode(0, QHeaderView::Fixed);
+    deviceHeader->resizeSection(0, 34);
+    deviceHeader->resizeSection(1, 128);
+    deviceHeader->resizeSection(2, 160);
+    deviceHeader->resizeSection(3, 132);
+    deviceHeader->setSectionResizeMode(4, QHeaderView::Stretch);
+    deviceHeader->resizeSection(5, 138);
+    deviceHeader->resizeSection(6, 112);
+    deviceHeader->resizeSection(7, 112);
+    deviceHeader->resizeSection(8, 116);
+    deviceHeader->resizeSection(9, 126);
+    deviceHeader->resizeSection(10, 118);
+    deviceHeader->resizeSection(11, 118);
+    deviceHeader->setMinimumSectionSize(72);
+    deviceTable_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    deviceTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->verticalHeader()->setVisible(false);
     deviceTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
     deviceTable_->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -340,8 +355,10 @@ void MainWindow::buildUi()
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
     deviceTable_->setMinimumHeight(310);
-    deviceTable_->verticalHeader()->setDefaultSectionSize(44);
+    deviceTable_->verticalHeader()->setDefaultSectionSize(48);
     deviceTable_->setWordWrap(false);
+    deviceTable_->setCornerButtonEnabled(false);
+    deviceTable_->setToolTip(tr("Select a row to inspect device details. Use the checkbox column for future multi-device workflows."));
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
@@ -584,7 +601,19 @@ void MainWindow::buildUi()
             addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
             addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
         }
-        deviceDetailsLabel_->setText(details.join(QLatin1Char('\n')));
+        QString html = QStringLiteral("<html><body style='margin:4px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
+            "<div style='font-size:10px;font-weight:700;letter-spacing:1px;color:#8A909A;margin-bottom:8px;'>DEVICE PROFILE</div>"
+            "<table width='100%' cellspacing='0' cellpadding='5'>");
+        for (const QString &detail : details) {
+            const int separator = detail.indexOf(QStringLiteral(": "));
+            const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
+            const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
+            html += QStringLiteral("<tr><td width='34%' valign='top' style='color:#7B818B;border-bottom:1px solid #ECEEF1;font-size:11px;'>%1</td>"
+                "<td valign='top' style='color:#303640;border-bottom:1px solid #ECEEF1;font-size:11px;font-weight:600;'>%2</td></tr>")
+                .arg(key, value);
+        }
+        html += QStringLiteral("</table></body></html>");
+        deviceDetailsLabel_->setText(html);
     });
     updateDeviceSummary();
 }
@@ -595,6 +624,9 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *layout = new QVBoxLayout(page);
     deviceDetailsLabel_ = new QLabel(tr("Select a discovered device to view its details. ONVIF information is queried automatically when the device exposes a reachable device service."), page);
     deviceDetailsLabel_->setWordWrap(true);
+    deviceDetailsLabel_->setTextFormat(Qt::RichText);
+    deviceDetailsLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    deviceDetailsLabel_->setObjectName(QStringLiteral("deviceDetails"));
     layout->addWidget(deviceDetailsLabel_);
     layout->addStretch();
     return page;
@@ -798,8 +830,10 @@ void MainWindow::updateDeviceSummary()
         if (reachability && reachability->text() == QStringLiteral("Reachable"))
             ++reachable;
         const auto *ipItem = deviceTable_->item(row, 1);
-        if (ipItem && (!ipItem->data(Qt::UserRole + 3).toString().isEmpty() ||
-                       !ipItem->data(Qt::UserRole + 7).toString().isEmpty()))
+        // A device is counted as ONVIF-verified only when discovery has retained
+        // an ONVIF endpoint or device-service URL, not merely because TCP responds.
+        if (ipItem && (!ipItem->data(Qt::UserRole + 2).toString().isEmpty() ||
+                       !ipItem->data(Qt::UserRole + 3).toString().isEmpty()))
             ++verified;
     }
     if (deviceCountValue_) deviceCountValue_->setText(tr("%1 devices").arg(count));
@@ -856,6 +890,34 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     };
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, col == 0 ? ipItem : new QTableWidgetItem(values.at(col)));
+
+    // Give operational states a restrained visual treatment so users can scan
+    // the inventory quickly without relying on colour alone.
+    for (int column : {7, 11}) {
+        auto *stateItem = deviceTable_->item(row, column);
+        if (!stateItem) continue;
+        stateItem->setTextAlignment(Qt::AlignCenter);
+        stateItem->setFont(QFont(QStringLiteral("Segoe UI"), 9, QFont::DemiBold));
+        const QString state = stateItem->text();
+        if (column == 11 && state == QStringLiteral("Reachable")) {
+            stateItem->setForeground(QColor(QStringLiteral("#176B4D")));
+            stateItem->setBackground(QColor(QStringLiteral("#EAF5EF")));
+        } else if ((column == 7 && state.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
+                   (column == 11 && state == QStringLiteral("Unreachable"))) {
+            stateItem->setForeground(column == 7 ? QColor(QStringLiteral("#176B4D")) : QColor(QStringLiteral("#A33A42")));
+            stateItem->setBackground(column == 7 ? QColor(QStringLiteral("#EAF5EF")) : QColor(QStringLiteral("#FBECEE")));
+        } else if (column == 7 && state.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0) {
+            stateItem->setForeground(QColor(QStringLiteral("#8A5B13")));
+            stateItem->setBackground(QColor(QStringLiteral("#FBF3E4")));
+        } else {
+            stateItem->setForeground(QColor(QStringLiteral("#68707C")));
+            stateItem->setBackground(QColor(QStringLiteral("#F1F3F5")));
+        }
+    }
+    for (int column = 1; column < deviceTable_->columnCount(); ++column) {
+        if (auto *item = deviceTable_->item(row, column))
+            item->setToolTip(item->text().isEmpty() ? tr("Not reported by this device") : item->text());
+    }
     updateDeviceSummary();
     applyFilters();
     if (!loadingInventory_) persistDevice(device);
