@@ -1094,6 +1094,166 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     });
     return page;
 }
+
+QWidget *MainWindow::makeHistoryTab(QWidget *parent)
+{
+    auto *page = new QWidget(parent);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(10);
+    auto *heading = new QLabel(tr("Recent application activity"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(
+        tr("Local history of discovery, scanning, reachability, inventory and network-configuration outcomes. Credentials and ONVIF interface tokens are not intentionally recorded."),
+        page));
+    auto *actions = new QHBoxLayout();
+    auto *refresh = actionButton(tr("Refresh history"), page);
+    auto *export = actionButton(tr("Export diagnostics"), page, true);
+    actions->addWidget(refresh);
+    actions->addWidget(export);
+    actions->addStretch();
+    layout->addLayout(actions);
+    historyTable_ = new QTableWidget(0, 5, page);
+    historyTable_->setHorizontalHeaderLabels({
+        tr("TIME (UTC)"), tr("OPERATION"), tr("TARGET"), tr("RESULT"), tr("DETAILS")
+    });
+    historyTable_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    historyTable_->verticalHeader()->setVisible(false);
+    historyTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    historyTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    historyTable_->setAlternatingRowColors(true);
+    historyTable_->setMinimumHeight(260);
+    layout->addWidget(historyTable_, 1);
+    layout->addWidget(mutedLabel(
+        tr("Diagnostic exports include OS/application details, selected interface addresses and recent operation history. Review the file before sharing it."),
+        page));
+    connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshOperationHistory);
+    connect(export, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
+    refreshOperationHistory();
+    return page;
+}
+
+void MainWindow::recordOperation(const QString &operation, const QString &target,
+                                 const QString &outcome, const QString &details)
+{
+    if (!inventoryDb_.isOpen()) return;
+    const QRegularExpression secret(
+        QStringLiteral(R"((password|passwd|authorization|token|credential)\s*[:=]\s*[^\s,;]+)"),
+        QRegularExpression::CaseInsensitiveOption);
+    const auto safe = [&secret](QString value) {
+        value.replace(secret, QStringLiteral("\\1=[REDACTED]"));
+        return value.left(2000);
+    };
+    QSqlQuery query(inventoryDb_);
+    query.prepare(QStringLiteral(
+        "INSERT INTO operation_history (occurred_at,operation,target,outcome,details) "
+        "VALUES (:time,:operation,:target,:outcome,:details)"));
+    query.bindValue(":time", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    query.bindValue(":operation", safe(operation));
+    query.bindValue(":target", safe(target));
+    query.bindValue(":outcome", safe(outcome));
+    query.bindValue(":details", safe(details));
+    if (!query.exec())
+        updateStatus(tr("Could not record operation history: %1").arg(query.lastError().text()));
+}
+
+void MainWindow::refreshOperationHistory()
+{
+    if (!historyTable_ || !inventoryDb_.isOpen()) return;
+    QSqlQuery query(inventoryDb_);
+    if (!query.exec(QStringLiteral(
+        "SELECT occurred_at,operation,target,outcome,details "
+        "FROM operation_history ORDER BY id DESC LIMIT 250"))) {
+        updateStatus(tr("Could not load operation history: %1").arg(query.lastError().text()));
+        return;
+    }
+    historyTable_->setRowCount(0);
+    while (query.next()) {
+        const int row = historyTable_->rowCount();
+        historyTable_->insertRow(row);
+        for (int column = 0; column < 5; ++column) {
+            auto *item = new QTableWidgetItem(query.value(column).toString());
+            item->setToolTip(item->text());
+            historyTable_->setItem(row, column, item);
+        }
+    }
+}
+
+void MainWindow::exportDiagnosticBundle()
+{
+    if (!inventoryDb_.isOpen()) {
+        QMessageBox::warning(this, tr("Diagnostics unavailable"),
+            tr("The local inventory database is unavailable, so a support bundle cannot be created."));
+        return;
+    }
+    const auto answer = QMessageBox::warning(this, tr("Export diagnostic bundle"),
+        tr("The bundle includes OS/application details, selected interface addresses and recent operation history. "
+           "It excludes the inventory database, passwords and ONVIF interface tokens. Review the file before sharing it."),
+        QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (answer != QMessageBox::Save) return;
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Save diagnostic bundle"), QStringLiteral("oxita-diagnostics.txt"),
+        tr("Text files (*.txt)"));
+    if (path.isEmpty()) return;
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Diagnostics export failed"), file.errorString());
+        return;
+    }
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf8);
+    stream << "OXITA CAMERA DEVICE MANAGER - DIAGNOSTIC BUNDLE\n";
+    stream << "Generated UTC: " << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs) << "\n";
+    stream << "Application: " << QCoreApplication::applicationName() << " "
+           << QCoreApplication::applicationVersion() << "\n";
+    stream << "Qt: " << qVersion() << "\n";
+    stream << "OS: " << QSysInfo::prettyProductName() << " ("
+           << QSysInfo::kernelType() << " " << QSysInfo::kernelVersion() << ")\n";
+    stream << "Architecture: " << QSysInfo::currentCpuArchitecture() << "\n\n";
+    stream << "NETWORK INTERFACES (IPv4 ONLY)\n";
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        if (!(interface.flags() & QNetworkInterface::IsUp) ||
+            (interface.flags() & QNetworkInterface::IsLoopBack)) continue;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) continue;
+            stream << "- " << interface.humanReadableName() << ": "
+                   << entry.ip().toString() << "/" << entry.prefixLength() << "\n";
+        }
+    }
+    stream << "\nINVENTORY SUMMARY\n";
+    QSqlQuery countQuery(inventoryDb_);
+    if (countQuery.exec(QStringLiteral("SELECT COUNT(*) FROM devices")) && countQuery.next())
+        stream << "Devices: " << countQuery.value(0).toInt() << "\n";
+    stream << "\nRECENT OPERATIONS (MAX 250)\n";
+    QSqlQuery history(inventoryDb_);
+    if (history.exec(QStringLiteral(
+        "SELECT occurred_at,operation,target,outcome,details "
+        "FROM operation_history ORDER BY id DESC LIMIT 250"))) {
+        while (history.next()) {
+            stream << history.value(0).toString() << " | "
+                   << history.value(1).toString() << " | "
+                   << history.value(2).toString() << " | "
+                   << history.value(3).toString() << " | "
+                   << history.value(4).toString() << "\n";
+        }
+    }
+    stream.flush();
+    if (!file.commit()) {
+        QMessageBox::warning(this, tr("Diagnostics export failed"), file.errorString());
+        return;
+    }
+    recordOperation(tr("Diagnostic export"), QFileInfo(path).fileName(), tr("Completed"),
+                    tr("Support bundle created"));
+    refreshOperationHistory();
+    QMessageBox::information(this, tr("Diagnostics exported"),
+        tr("The support bundle was saved. Review it before sharing; network addresses and operation details may be sensitive."));
+}
+
 QWidget *MainWindow::makeNvrTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
