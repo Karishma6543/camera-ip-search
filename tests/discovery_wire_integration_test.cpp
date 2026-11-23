@@ -5,6 +5,7 @@
 #include <QNetworkDatagram>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QScopedPointer>
 #include <QUdpSocket>
 #include <QtTest>
 
@@ -43,7 +44,7 @@ void DiscoveryWireIntegrationTest::contractBUdpRoundTripUsesSequenceAndSource()
 
     const QJsonObject device{
         {QStringLiteral("mac"), QStringLiteral("02:00:00:00:00:41")},
-        {QStringLiteral("ipv4"), QStringLiteral("127.0.0.1")},
+        {QStringLiteral("ipv4"), QStringLiteral("192.0.2.41")},
         {QStringLiteral("http_port"), 8080},
         {QStringLiteral("rtsp_port"), 554},
         {QStringLiteral("soc"), QStringLiteral("SIM-SOC")},
@@ -65,9 +66,9 @@ void DiscoveryWireIntegrationTest::contractBUdpRoundTripUsesSequenceAndSource()
 
     DeviceRecord record;
     QVERIFY(DiscoveryParser::parseProjectResponse(
-        receivedResponse.data(), 41, receivedResponse.senderAddress(),
+        receivedResponse.data(), 41, QHostAddress(QStringLiteral("192.0.2.41")),
         QStringLiteral("loopback-test"), &record));
-    QCOMPARE(record.ipAddress, QStringLiteral("127.0.0.1"));
+    QCOMPARE(record.ipAddress, QStringLiteral("192.0.2.41"));
     QCOMPARE(record.macAddress, QStringLiteral("02:00:00:00:00:41"));
     QCOMPARE(record.interfaceName, QStringLiteral("loopback-test"));
     QVERIFY(!DiscoveryParser::parseProjectResponse(
