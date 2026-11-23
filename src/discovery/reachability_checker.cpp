@@ -98,8 +98,8 @@ void ReachabilityChecker::tryNextPort()
     const quint16 port = ports_.at(portIndex_++).toUShort(&ok);
     if (!ok) { tryNextPort(); return; }
     attemptInProgress_ = true;
-    socket_->connectToHost(devices_.at(deviceIndex_).ipAddress.trimmed(), port);
     timeout_.start(550);
+    socket_->connectToHost(devices_.at(deviceIndex_).ipAddress.trimmed(), port);
 }
 
 void ReachabilityChecker::advanceAfterFailedAttempt()
