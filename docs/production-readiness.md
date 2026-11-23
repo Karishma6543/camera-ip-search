@@ -38,18 +38,18 @@ Not implemented:
 
 ### P1 — Required for a dependable general release
 
-- [ ] Add discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast behavior, timeouts, duplicate responses and cancellation.
+- [ ] Complete end-to-end discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast behavior, timeouts, duplicate responses and cancellation. A deterministic Contract B/ONVIF simulator and Python fixture tests are now present; they are not yet an end-to-end proof of the C++ discovery service.
 - [ ] Add scanner tests for full-subnet and capped-window selection, progress, cancellation, multiple open ports per host, and no-camera false positives.
-- [ ] Add UI tests for startup, empty inventory, device selection, filters, scan cancellation, manual entry, CSV export and error states.
-- [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory, corrupt DB and disk-full behavior.
+- [ ] Expand UI tests beyond the new startup/Operation History smoke test to cover empty inventory, device selection, filters, scan cancellation, manual entry, CSV export and error states.
+- [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory and disk-full behavior. Startup now runs SQLite PRAGMA quick_check and leaves a database untouched when integrity fails; automated recovery coverage remains outstanding.
 - [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
-- [ ] Add an operation history/audit record for configuration attempts and partial failures.
+- [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
 - [x] Add per-device progress and user-visible cancellation for reachability checks.
 - [ ] Add automated tests for reachability timeout, cancellation and overlapping operations.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.
 - [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
-- [ ] Add structured, redacted logs and a support bundle with secrets removed.
+- [ ] Add structured application log files with rotation and comprehensive redaction. A user-confirmed diagnostics text export now includes OS/application/interface summary and recent operation history; it excludes the inventory database and ONVIF interface tokens.
 - [ ] Verify application shutdown while network requests/scans are active.
 
 ### P2 — Distribution and maintainability
@@ -71,6 +71,18 @@ Not implemented:
 - Static IPv4 changes can disconnect a device. There is no automatic rollback.
 - Project Contract B currently defines discovery only; activation/configuration/firmware commands must not be guessed.
 - No CP Plus, Hikvision or Prama vendor-specific adapter is present in this build.
+
+## New pre-production hardening work
+
+- [x] Add a local simulator for the documented Contract B discovery exchange and a limited ONVIF WS-Discovery/device-service fixture.
+- [x] Add deterministic Python tests for simulator response construction and malformed/stale/invalid fixtures.
+- [x] Run simulator fixture tests in the Windows/macOS/Linux CI matrix before the Qt build.
+- [x] Add a Qt startup smoke-test target that checks the Operation History workspace is present.
+- [x] Add an operation-history table and a bounded recent-activity view.
+- [x] Add user-confirmed diagnostic text export with OS/application/interface summary and recent operation records.
+- [x] Check SQLite integrity before schema changes and leave an invalid database untouched.
+
+These are source changes only until the workflow runs successfully. Simulator fixtures do not certify real cameras or the physical network stack.
 
 ## Release decision
 
