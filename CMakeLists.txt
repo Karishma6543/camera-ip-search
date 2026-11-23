@@ -129,6 +129,16 @@ if(BUILD_TESTING)
     target_link_libraries(device-identity-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME device-identity-tests COMMAND device-identity-tests)
 
+    qt_add_executable(discovery-wire-integration-tests
+        tests/discovery_wire_integration_test.cpp
+        src/core/device_record.h
+        src/discovery/discovery_parser.h
+        src/discovery/discovery_parser.cpp
+    )
+    target_include_directories(discovery-wire-integration-tests PRIVATE src)
+    target_link_libraries(discovery-wire-integration-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
+    add_test(NAME discovery-wire-integration-tests COMMAND discovery-wire-integration-tests)
+
     qt_add_executable(diagnostic-log-tests
         tests/diagnostic_log_test.cpp
         src/core/diagnostic_log.h
@@ -182,6 +192,7 @@ if(BUILD_TESTING)
         reachability-checker-tests
         main-window-smoke-tests
         diagnostic-log-tests
+        discovery-wire-integration-tests
         PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()
