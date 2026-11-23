@@ -13,10 +13,12 @@ public:
     explicit ReachabilityChecker(QObject *parent = nullptr);
     bool isRunning() const;
     void start(const QVector<DeviceRecord> &devices);
+    void cancel();
 signals:
     void deviceChecked(const QString &ipAddress, const QString &status,
                        const QString &checkedAt, const QString &lastSuccessfulResponseAt);
     void finished(int checkedCount);
+    void cancelled(int checkedCount);
 private:
     void checkNextDevice();
     void tryNextPort();
