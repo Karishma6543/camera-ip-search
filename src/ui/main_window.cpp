@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "core/device_identity.h"
 
 #include "discovery/discovery_service.h"
 #include "discovery/subnet_scanner.h"
@@ -1221,7 +1222,7 @@ void MainWindow::updateDeviceSummary()
         summaryLabel_->setText(tr("%1 devices · %2 checked").arg(count).arg(checked));
     }
 }
-void MainWindow::upsertDevice(const DeviceRecord &device)
+void MainWindow::upsertDevice(DeviceRecord device)
 {
     int row = -1;
     for (int i = 0; i < deviceTable_->rowCount(); ++i) {
@@ -1253,6 +1254,44 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
             break;
         }
     }
+    if (row >= 0) {
+        DeviceRecord existing;
+        const auto *ipItem = deviceTable_->item(row, 1);
+        const auto cellText = [this, row](int column) {
+            const auto *item = deviceTable_->item(row, column);
+            return item ? item->text() : QString();
+        };
+        existing.ipAddress = cellText(1);
+        existing.userLabel = cellText(2);
+        existing.manufacturer = cellText(3);
+        existing.model = cellText(4);
+        existing.macAddress = cellText(5);
+        existing.firmwareVersion = cellText(6);
+        existing.activationState = cellText(7);
+        existing.discoverySources = cellText(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        existing.serialNumber = cellText(9);
+        existing.hardwareId = cellText(10);
+        existing.reachabilityStatus = cellText(11);
+        if (ipItem) {
+            existing.interfaceName = ipItem->data(Qt::UserRole + 1).toString();
+            existing.onvifEndpoint = ipItem->data(Qt::UserRole + 2).toString();
+            existing.deviceServiceUrl = ipItem->data(Qt::UserRole + 3).toString();
+            existing.networkSummary = ipItem->data(Qt::UserRole + 4).toString();
+            existing.capabilities = ipItem->data(Qt::UserRole + 5).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+            existing.openPorts = ipItem->data(Qt::UserRole + 6).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+            existing.networkInterfaceToken = ipItem->data(Qt::UserRole + 7).toString();
+            existing.ipv4Address = ipItem->data(Qt::UserRole + 8).toString();
+            existing.ipv4SubnetMask = ipItem->data(Qt::UserRole + 9).toString();
+            existing.ipv4Gateway = ipItem->data(Qt::UserRole + 10).toString();
+            existing.ipv4DnsServer = ipItem->data(Qt::UserRole + 11).toString();
+            const QString dhcp = ipItem->data(Qt::UserRole + 12).toString();
+            existing.ipv4ConfigurationKnown = dhcp == QStringLiteral("true") ||
+                                               dhcp == QStringLiteral("false");
+            existing.ipv4DhcpEnabled = dhcp == QStringLiteral("true");
+            existing.isCandidate = ipItem->data(Qt::UserRole + 13).toBool();
+        }
+        device = DeviceIdentity::mergeObservations(existing, device);
+    }
     if (row < 0) { row = deviceTable_->rowCount(); deviceTable_->insertRow(row); }
     const QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
     const auto *previousCheck = deviceTable_->item(row, 0);
@@ -1282,6 +1321,7 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
         ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
         : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
+    ipItem->setData(Qt::UserRole + 13, device.isCandidate);
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
