@@ -1663,38 +1663,82 @@ void MainWindow::initializeInventory()
         updateStatus(tr("Local inventory unavailable; devices remain session-only."));
         return;
     }
-    inventoryDb_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("camera_inventory"));
+
+    inventoryDb_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                             QStringLiteral("camera_inventory"));
     inventoryDb_.setDatabaseName(directory + QStringLiteral("/inventory.sqlite"));
     if (!inventoryDb_.open()) {
         updateStatus(tr("Could not open local inventory: %1").arg(inventoryDb_.lastError().text()));
         return;
     }
+
     QSqlQuery integrityQuery(inventoryDb_);
     if (!integrityQuery.exec(QStringLiteral("PRAGMA quick_check")) ||
-        !integrityQuery.next() || integrityQuery.value(0).toString().compare(QStringLiteral("ok"), Qt::CaseInsensitive) != 0) {
+        !integrityQuery.next() ||
+        integrityQuery.value(0).toString().compare(QStringLiteral("ok"), Qt::CaseInsensitive) != 0) {
         updateStatus(tr("Inventory database integrity check failed. The database was left untouched; close the app and preserve a copy before attempting recovery."));
         inventoryDb_.close();
         return;
     }
-    QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"))) {
-        updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
-        return;
-    }
-    QSqlQuery historyTable(inventoryDb_);
-    if (!historyTable.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS operation_history (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, operation TEXT NOT NULL, target TEXT NOT NULL, outcome TEXT NOT NULL, details TEXT NOT NULL)"))) {
-        updateStatus(tr("Could not initialize operation history: %1").arg(historyTable.lastError().text()));
-        return;
-    }
-    QSqlQuery columnQuery(inventoryDb_);
-    if (!columnQuery.exec(QStringLiteral("PRAGMA table_info(devices)"))) {
-        updateStatus(tr("Could not inspect inventory schema: %1").arg(columnQuery.lastError().text()));
-        return;
-    }
-    QStringList existingColumns;
-    while (columnQuery.next())
-        existingColumns << columnQuery.value(1).toString();
 
+    int schemaVersion = 0;
+    QSqlQuery versionQuery(inventoryDb_);
+    if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next()) {
+        updateStatus(tr("Could not read inventory schema version: %1").arg(versionQuery.lastError().text()));
+        inventoryDb_.close();
+        return;
+    }
+    schemaVersion = versionQuery.value(0).toInt();
+    if (schemaVersion > 1) {
+        updateStatus(tr("Inventory schema version %1 is newer than this application supports. The database was not modified.")
+                         .arg(schemaVersion));
+        inventoryDb_.close();
+        return;
+    }
+
+    if (!inventoryDb_.transaction()) {
+        updateStatus(tr("Could not start inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
+        inventoryDb_.close();
+        return;
+    }
+
+    const auto executeMigrationSql = [this](const QString &sql, QString *error) {
+        QSqlQuery query(inventoryDb_);
+        if (query.exec(sql)) return true;
+        if (error) *error = query.lastError().text();
+        return false;
+    };
+    const auto failMigration = [this](const QString &message) {
+        inventoryDb_.rollback();
+        inventoryDb_.close();
+        updateStatus(message);
+    };
+
+    QString sqlError;
+    const QStringList baseSchema = {
+        QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        QStringLiteral("CREATE TABLE IF NOT EXISTS operation_history (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, operation TEXT NOT NULL, target TEXT NOT NULL, outcome TEXT NOT NULL, details TEXT NOT NULL)")
+    };
+    for (const QString &sql : baseSchema) {
+        if (!executeMigrationSql(sql, &sqlError)) {
+            failMigration(tr("Could not initialize inventory tables: %1").arg(sqlError));
+            return;
+        }
+    }
+
+    QStringList existingColumns;
+    {
+        QSqlQuery columnQuery(inventoryDb_);
+        if (!columnQuery.exec(QStringLiteral("PRAGMA table_info(devices)"))) {
+            failMigration(tr("Could not inspect inventory schema: %1").arg(columnQuery.lastError().text()));
+            return;
+        }
+        while (columnQuery.next())
+            existingColumns << columnQuery.value(1).toString();
+    }
+
+    // Version 1 upgrades legacy unversioned inventories idempotently. The
+    // user_version marker is committed in the same transaction as every DDL step.
     const QStringList migrations = {
         QStringLiteral("user_label|ALTER TABLE devices ADD COLUMN user_label TEXT DEFAULT ''"),
         QStringLiteral("reachability_status|ALTER TABLE devices ADD COLUMN reachability_status TEXT DEFAULT 'Not checked'"),
@@ -1715,26 +1759,38 @@ void MainWindow::initializeInventory()
         QStringLiteral("ipv4_config_known|ALTER TABLE devices ADD COLUMN ipv4_config_known INTEGER DEFAULT 0")
     };
 
-    if (!inventoryDb_.transaction()) {
-        updateStatus(tr("Could not start inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
-        return;
-    }
     for (const QString &migration : migrations) {
         const int separator = migration.indexOf(QLatin1Char('|'));
         const QString columnName = migration.left(separator);
         if (existingColumns.contains(columnName)) continue;
-        QSqlQuery alterQuery(inventoryDb_);
-        if (!alterQuery.exec(migration.mid(separator + 1))) {
-            inventoryDb_.rollback();
-            updateStatus(tr("Inventory migration failed for %1: %2")
-                             .arg(columnName, alterQuery.lastError().text()));
+        if (!executeMigrationSql(migration.mid(separator + 1), &sqlError)) {
+            failMigration(tr("Inventory migration failed for %1: %2").arg(columnName, sqlError));
             return;
         }
         existingColumns << columnName;
     }
+
+    const QStringList indexes = {
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen DESC)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_time ON operation_history(occurred_at DESC)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_target ON operation_history(target)")
+    };
+    for (const QString &sql : indexes) {
+        if (!executeMigrationSql(sql, &sqlError)) {
+            failMigration(tr("Could not create inventory index: %1").arg(sqlError));
+            return;
+        }
+    }
+
+    if (!executeMigrationSql(QStringLiteral("PRAGMA user_version = 1"), &sqlError)) {
+        failMigration(tr("Could not update inventory schema version: %1").arg(sqlError));
+        return;
+    }
     if (!inventoryDb_.commit()) {
+        const QString error = inventoryDb_.lastError().text();
         inventoryDb_.rollback();
-        updateStatus(tr("Could not commit inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
+        inventoryDb_.close();
+        updateStatus(tr("Could not commit inventory schema migration: %1").arg(error));
         return;
     }
 }
