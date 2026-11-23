@@ -19,6 +19,8 @@ qt_standard_project_setup()
 
 qt_add_executable(camera-ip-search
     src/main.cpp
+    src/core/diagnostic_log.h
+    src/core/diagnostic_log.cpp
     src/adapters/device_adapter.h
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
@@ -118,6 +120,8 @@ if(BUILD_TESTING)
     qt_add_executable(device-identity-tests
         tests/device_identity_test.cpp
         src/core/device_record.h
+        src/core/diagnostic_log.h
+        src/core/diagnostic_log.cpp
         src/core/device_identity.h
         src/core/device_identity.cpp
     )
