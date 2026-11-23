@@ -20,9 +20,9 @@ bool isKnownValue(const QString &value)
 {
     const QString normalized = value.trimmed().toLower();
     return !normalized.isEmpty() &&
-           normalized != QStringLiteral("unknown") &&
-           normalized != QStringLiteral("model unknown") &&
-           normalized != QStringLiteral("n/a");
+           normalized != QStringLiteral("n/a") &&
+           !normalized.contains(QStringLiteral("unknown")) &&
+           !normalized.contains(QStringLiteral("unverified"));
 }
 
 void appendUnique(QStringList &target, const QStringList &incoming)
@@ -88,7 +88,11 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
     if (merged.id.isEmpty()) merged.id = observation.id;
     if (merged.userLabel.isEmpty()) merged.userLabel = observation.userLabel;
 
-    const bool verifiedObservation = !observation.isCandidate;
+    const bool hasProtocolEvidence =
+        observation.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
+        observation.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
+        observation.discoverySources.contains(QStringLiteral("Project UDP 9988"));
+    const bool verifiedObservation = !observation.isCandidate && hasProtocolEvidence;
     if (verifiedObservation && !observation.ipAddress.trimmed().isEmpty())
         merged.ipAddress = observation.ipAddress;
     if (merged.macAddress.isEmpty()) merged.macAddress = observation.macAddress;

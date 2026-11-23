@@ -11,6 +11,8 @@ private slots:
     void doesNotMergeDifferentMacsAtSameAddress();
     void matchesStableOnvifEndpoint();
     void preservesVerifiedFieldsAndCombinesSourcesAndPorts();
+    void manualEntryDoesNotUpgradeUnverifiedCandidate();
+    void replacesOnvifUnknownManufacturerPlaceholder();
 };
 
 void DeviceIdentityTest::mergesScannerCandidateWithProtocolObservation()
@@ -107,6 +109,39 @@ void DeviceIdentityTest::preservesVerifiedFieldsAndCombinesSourcesAndPorts()
     QCOMPARE(merged.openPorts.size(), 2);
     QCOMPARE(merged.discoverySources.size(), 2);
     QVERIFY(!merged.isCandidate);
+}
+
+
+void DeviceIdentityTest::manualEntryDoesNotUpgradeUnverifiedCandidate()
+{
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("192.168.1.20");
+    candidate.isCandidate = true;
+    candidate.discoverySources << QStringLiteral("Local subnet TCP scan");
+
+    DeviceRecord manual;
+    manual.ipAddress = candidate.ipAddress;
+    manual.discoverySources << QStringLiteral("Manual");
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(candidate, manual);
+    QVERIFY(merged.isCandidate);
+}
+
+void DeviceIdentityTest::replacesOnvifUnknownManufacturerPlaceholder()
+{
+    DeviceRecord discovered;
+    discovered.manufacturer = QStringLiteral("ONVIF device (manufacturer unknown)");
+    discovered.model = QStringLiteral("Model unknown");
+    discovered.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+
+    DeviceRecord enriched;
+    enriched.manufacturer = QStringLiteral("Example Camera Co.");
+    enriched.model = QStringLiteral("IPC-500");
+    enriched.discoverySources << QStringLiteral("ONVIF GetDeviceInformation");
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(discovered, enriched);
+    QCOMPARE(merged.manufacturer, enriched.manufacturer);
+    QCOMPARE(merged.model, enriched.model);
 }
 
 QTEST_GUILESS_MAIN(DeviceIdentityTest)
