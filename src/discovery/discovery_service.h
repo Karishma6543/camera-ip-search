@@ -33,6 +33,7 @@ signals:
     void deviceFound(const DeviceRecord &device);
     void statusChanged(const QString &message);
     void finished(int deviceCount);
+    void cancelled(int deviceCount);
     void authenticationRequested(QAuthenticator *authenticator);
     void networkConfigurationFinished(const DeviceRecord &device, bool verified,
                                       const QString &message);
