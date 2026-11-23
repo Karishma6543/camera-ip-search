@@ -212,6 +212,13 @@ MainWindow::~MainWindow()
     if (discovery_) discovery_->cancel();
     if (subnetScanner_) subnetScanner_->cancel();
     if (reachabilityChecker_) reachabilityChecker_->cancel();
+    if (inventoryDb_.isOpen()) {
+        recordOperation(tr("Application shutdown"), QString(), tr("Completed"),
+                        tr("Active network operations were asked to cancel during shutdown"));
+        inventoryDb_.close();
+    }
+    inventoryDb_ = QSqlDatabase();
+    QSqlDatabase::removeDatabase(QStringLiteral("camera_inventory"));
 }
 
 void MainWindow::populateInterfaces()
