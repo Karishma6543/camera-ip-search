@@ -20,7 +20,8 @@ class DiscoveryService final : public QObject
     Q_OBJECT
 public:
     explicit DiscoveryService(QObject *parent = nullptr);
-    void start();
+    // Empty selects every eligible interface; a non-empty name scopes discovery to one interface.
+    void start(const QString &interfaceName = QString());
     void cancel();
     bool isRunning() const;
     void refreshDeviceInfo(const DeviceRecord &device);
