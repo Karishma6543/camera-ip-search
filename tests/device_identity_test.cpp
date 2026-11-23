@@ -217,6 +217,9 @@ void DeviceIdentityTest::revokesStaleOnvifInterfaceToken()
     const DeviceRecord merged = DeviceIdentity::mergeObservations(existing, unmatched);
     QVERIFY(merged.networkInterfaceToken.isEmpty());
     QVERIFY(!merged.ipv4ConfigurationKnown);
+    QVERIFY(merged.ipv4Address.isEmpty());
+    QVERIFY(merged.ipv4SubnetMask.isEmpty());
+    QVERIFY(merged.ipv4Gateway.isEmpty());
 }
 
 void DeviceIdentityTest::refreshesDnsFromOnvifObservation()
