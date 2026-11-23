@@ -23,6 +23,7 @@ signals:
 private:
     void checkNextDevice();
     void tryNextPort();
+    void advanceAfterFailedAttempt();
     void completeCurrent(const QString &status);
     QVector<DeviceRecord> devices_;
     QStringList ports_;
@@ -31,7 +32,7 @@ private:
     int checkedCount_{0};
     bool running_{false};
     bool completed_{false};
-    bool suppressSocketError_{false};
+    bool attemptInProgress_{false};
     QTcpSocket *socket_{nullptr};
     QTimer timeout_;
 };
