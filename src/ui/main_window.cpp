@@ -1227,8 +1227,31 @@ void MainWindow::upsertDevice(const DeviceRecord &device)
     for (int i = 0; i < deviceTable_->rowCount(); ++i) {
         const auto *macItem = deviceTable_->item(i, 5);
         const auto *ipItem = deviceTable_->item(i, 1);
-        if ((macItem && !device.macAddress.isEmpty() && macItem->text() == device.macAddress) ||
-            (ipItem && ipItem->text() == device.ipAddress)) { row = i; break; }
+        const auto *serialItem = deviceTable_->item(i, 8);
+        const auto *manufacturerItem = deviceTable_->item(i, 3);
+        const QString existingMac = macItem ? macItem->text().trimmed() : QString();
+        const QString existingIp = ipItem ? ipItem->text().trimmed() : QString();
+        const QString existingEndpoint = ipItem
+            ? ipItem->data(Qt::UserRole + 2).toString().trimmed() : QString();
+        const QString incomingMac = device.macAddress.trimmed();
+        const QString incomingEndpoint = device.onvifEndpoint.trimmed();
+        const bool sameMac = !incomingMac.isEmpty() && !existingMac.isEmpty() &&
+            incomingMac.compare(existingMac, Qt::CaseInsensitive) == 0;
+        const bool sameEndpoint = !incomingEndpoint.isEmpty() && !existingEndpoint.isEmpty() &&
+            incomingEndpoint.compare(existingEndpoint, Qt::CaseInsensitive) == 0;
+        const bool sameSerial = !device.serialNumber.trimmed().isEmpty() && serialItem &&
+            !serialItem->text().trimmed().isEmpty() && manufacturerItem &&
+            !manufacturerItem->text().trimmed().isEmpty() &&
+            device.serialNumber.trimmed().compare(serialItem->text().trimmed(), Qt::CaseInsensitive) == 0 &&
+            device.manufacturer.trimmed().compare(manufacturerItem->text().trimmed(), Qt::CaseInsensitive) == 0;
+        const bool sameIpWithoutIdentityConflict = !device.ipAddress.trimmed().isEmpty() &&
+            existingIp.compare(device.ipAddress.trimmed(), Qt::CaseInsensitive) == 0 &&
+            (existingMac.isEmpty() || incomingMac.isEmpty() ||
+             existingMac.compare(incomingMac, Qt::CaseInsensitive) == 0);
+        if (sameMac || sameEndpoint || sameSerial || sameIpWithoutIdentityConflict) {
+            row = i;
+            break;
+        }
     }
     if (row < 0) { row = deviceTable_->rowCount(); deviceTable_->insertRow(row); }
     const QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
@@ -1378,7 +1401,37 @@ void MainWindow::initializeInventory()
 void MainWindow::persistDevice(const DeviceRecord &device)
 {
     if (!inventoryDb_.isOpen() || device.ipAddress.isEmpty()) return;
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    // Keep the original SQLite primary key when a later discovery source adds
+    // a MAC address or the camera receives a new IP. This prevents a second
+    // row from being created for the same physical device after restart.
+    QSqlQuery identityQuery(inventoryDb_);
+    identityQuery.prepare(QStringLiteral(
+        "SELECT device_key FROM devices WHERE "
+        "(:mac_match <> '' AND COALESCE(mac,'') = :mac_match) OR "
+        "(:endpoint_match <> '' AND COALESCE(onvif_endpoint,'') = :endpoint_match) OR "
+        "(:serial_match <> '' AND :manufacturer_match <> '' AND "
+        "COALESCE(serial,'') = :serial_match AND "
+        "lower(COALESCE(manufacturer,'')) = lower(:manufacturer_match)) OR "
+        "(COALESCE(ip,'') = :ip_match AND "
+        "(COALESCE(mac,'') = '' OR :incoming_mac = '' OR COALESCE(mac,'') = :incoming_mac)) "
+        "ORDER BY CASE "
+        "WHEN :mac_order <> '' AND COALESCE(mac,'') = :mac_order THEN 0 "
+        "WHEN :endpoint_order <> '' AND COALESCE(onvif_endpoint,'') = :endpoint_order THEN 1 "
+        "WHEN :serial_order <> '' AND COALESCE(serial,'') = :serial_order THEN 2 "
+        "ELSE 3 END LIMIT 1"));
+    identityQuery.bindValue(":mac_match", device.macAddress.trimmed());
+    identityQuery.bindValue(":endpoint_match", device.onvifEndpoint.trimmed());
+    identityQuery.bindValue(":serial_match", device.serialNumber.trimmed());
+    identityQuery.bindValue(":manufacturer_match", device.manufacturer.trimmed());
+    identityQuery.bindValue(":ip_match", device.ipAddress.trimmed());
+    identityQuery.bindValue(":incoming_mac", device.macAddress.trimmed());
+    identityQuery.bindValue(":mac_order", device.macAddress.trimmed());
+    identityQuery.bindValue(":endpoint_order", device.onvifEndpoint.trimmed());
+    identityQuery.bindValue(":serial_order", device.serialNumber.trimmed());
+    if (identityQuery.exec() && identityQuery.next())
+        key = identityQuery.value(0).toString();
+
     QSqlQuery query(inventoryDb_);
     query.prepare(QStringLiteral("INSERT INTO devices (device_key,ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,network_interface_token,ipv4_address,ipv4_subnet_mask,ipv4_gateway,ipv4_dns_server,ipv4_dhcp_enabled,ipv4_config_known,last_seen) VALUES (:key,:ip,:mac,:manufacturer,:model,:firmware,:serial,:hardware,:activation,:source,:candidate,:label,:reachability,:checked,:success,:interface,:endpoint,:service,:network,:capabilities,:ports,:if_token,:ipv4,:mask,:gateway,:dns,:dhcp,:config_known,CURRENT_TIMESTAMP) ON CONFLICT(device_key) DO UPDATE SET ip=excluded.ip,mac=excluded.mac,manufacturer=excluded.manufacturer,model=excluded.model,firmware=excluded.firmware,serial=excluded.serial,hardware=excluded.hardware,activation=excluded.activation,source=excluded.source,is_candidate=excluded.is_candidate,user_label=CASE WHEN excluded.user_label='' THEN devices.user_label ELSE excluded.user_label END,reachability_status=CASE WHEN excluded.reachability_status='Not checked' THEN devices.reachability_status ELSE excluded.reachability_status END,reachability_checked_at=CASE WHEN excluded.reachability_checked_at='' THEN devices.reachability_checked_at ELSE excluded.reachability_checked_at END,last_successful_response_at=CASE WHEN excluded.last_successful_response_at='' THEN devices.last_successful_response_at ELSE excluded.last_successful_response_at END,interface_name=CASE WHEN excluded.interface_name='' THEN devices.interface_name ELSE excluded.interface_name END,onvif_endpoint=CASE WHEN excluded.onvif_endpoint='' THEN devices.onvif_endpoint ELSE excluded.onvif_endpoint END,device_service_url=CASE WHEN excluded.device_service_url='' THEN devices.device_service_url ELSE excluded.device_service_url END,network_summary=CASE WHEN excluded.network_summary='' THEN devices.network_summary ELSE excluded.network_summary END,capabilities=CASE WHEN excluded.capabilities='' THEN devices.capabilities ELSE excluded.capabilities END,open_ports=CASE WHEN excluded.open_ports='' THEN devices.open_ports ELSE excluded.open_ports END,network_interface_token=CASE WHEN excluded.network_interface_token='' THEN devices.network_interface_token ELSE excluded.network_interface_token END,ipv4_address=CASE WHEN excluded.ipv4_address='' THEN devices.ipv4_address ELSE excluded.ipv4_address END,ipv4_subnet_mask=CASE WHEN excluded.ipv4_subnet_mask='' THEN devices.ipv4_subnet_mask ELSE excluded.ipv4_subnet_mask END,ipv4_gateway=CASE WHEN excluded.ipv4_gateway='' THEN devices.ipv4_gateway ELSE excluded.ipv4_gateway END,ipv4_dns_server=CASE WHEN excluded.ipv4_dns_server='' THEN devices.ipv4_dns_server ELSE excluded.ipv4_dns_server END,ipv4_dhcp_enabled=CASE WHEN excluded.ipv4_config_known=0 THEN devices.ipv4_dhcp_enabled ELSE excluded.ipv4_dhcp_enabled END,ipv4_config_known=MAX(devices.ipv4_config_known,excluded.ipv4_config_known),last_seen=CURRENT_TIMESTAMP"));
     query.bindValue(":key", key); query.bindValue(":ip", device.ipAddress); query.bindValue(":mac", device.macAddress);
