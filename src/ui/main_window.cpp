@@ -1236,10 +1236,18 @@ void MainWindow::upsertDevice(DeviceRecord device)
             ? ipItem->data(Qt::UserRole + 2).toString().trimmed() : QString();
         const QString incomingMac = device.macAddress.trimmed();
         const QString incomingEndpoint = device.onvifEndpoint.trimmed();
-        const bool compatibleMac = existingMac.isEmpty() || incomingMac.isEmpty() ||
-            existingMac.compare(incomingMac, Qt::CaseInsensitive) == 0;
-        const bool sameMac = !incomingMac.isEmpty() && !existingMac.isEmpty() &&
-            incomingMac.compare(existingMac, Qt::CaseInsensitive) == 0;
+        const auto normalizeMac = [](QString value) {
+            value = value.trimmed().toUpper();
+            value.replace(QLatin1Char('-'), QLatin1Char(':'));
+            return value;
+        };
+        const QString normalizedExistingMac = normalizeMac(existingMac);
+        const QString normalizedIncomingMac = normalizeMac(incomingMac);
+        const bool compatibleMac = normalizedExistingMac.isEmpty() ||
+            normalizedIncomingMac.isEmpty() ||
+            normalizedExistingMac == normalizedIncomingMac;
+        const bool sameMac = !normalizedIncomingMac.isEmpty() &&
+            normalizedIncomingMac == normalizedExistingMac;
         const bool sameEndpoint = compatibleMac && !incomingEndpoint.isEmpty() &&
             !existingEndpoint.isEmpty() &&
             incomingEndpoint.compare(existingEndpoint, Qt::CaseInsensitive) == 0;
@@ -1320,14 +1328,30 @@ void MainWindow::upsertDevice(DeviceRecord device)
     keepExistingWhenEmpty(Qt::UserRole + 4, device.networkSummary);
     keepExistingWhenEmpty(Qt::UserRole + 5, device.capabilities.join(QStringLiteral(", ")));
     keepExistingWhenEmpty(Qt::UserRole + 6, device.openPorts.join(QStringLiteral(", ")));
-    keepExistingWhenEmpty(Qt::UserRole + 7, device.networkInterfaceToken);
-    keepExistingWhenEmpty(Qt::UserRole + 8, device.ipv4Address);
-    keepExistingWhenEmpty(Qt::UserRole + 9, device.ipv4SubnetMask);
-    keepExistingWhenEmpty(Qt::UserRole + 10, device.ipv4Gateway);
+    const bool networkInterfacesUpdated =
+        device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces"));
+    if (networkInterfacesUpdated && !device.ipv4ConfigurationKnown) {
+        // An unmatched ONVIF interface response must revoke stale write data.
+        ipItem->setData(Qt::UserRole + 7, QString());
+        ipItem->setData(Qt::UserRole + 8, QString());
+        ipItem->setData(Qt::UserRole + 9, QString());
+        ipItem->setData(Qt::UserRole + 10, QString());
+    } else {
+        keepExistingWhenEmpty(Qt::UserRole + 7, device.networkInterfaceToken);
+        keepExistingWhenEmpty(Qt::UserRole + 8, device.ipv4Address);
+        keepExistingWhenEmpty(Qt::UserRole + 9, device.ipv4SubnetMask);
+        keepExistingWhenEmpty(Qt::UserRole + 10, device.ipv4Gateway);
+    }
     keepExistingWhenEmpty(Qt::UserRole + 11, device.ipv4DnsServer);
-    ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
-        ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
-        : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
+    if (networkInterfacesUpdated) {
+        ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
+            ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
+            : QString());
+    } else {
+        ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
+            ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
+            : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
+    }
     ipItem->setData(Qt::UserRole + 13, device.isCandidate);
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
