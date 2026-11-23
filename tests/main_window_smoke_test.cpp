@@ -19,6 +19,9 @@ class MainWindowSmokeTest final : public QObject
     Q_OBJECT
 private slots:
     void startupShowsOperationHistory();
+    void exposesAllWorkspacesAndAutomationControls();
+    void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
+    void leavesCorruptInventoryDatabaseUntouched();
     void migratesLegacyInventorySchema();
     void rollsBackFailedInventoryMigration();
     void rejectsOversizedOnvifResponseDuringReceive();
@@ -57,6 +60,108 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
 }
 
 
+
+void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
+    QVERIFY(tabs);
+    const QStringList expectedTabs{
+        QStringLiteral("Device Info"), QStringLiteral("Bulk Config"),
+        QStringLiteral("Maintenance"), QStringLiteral("NVR Channels"),
+        QStringLiteral("Operation History")
+    };
+    QCOMPARE(tabs->count(), expectedTabs.size());
+    for (int index = 0; index < expectedTabs.size(); ++index) {
+        QCOMPARE(tabs->tabText(index), expectedTabs.at(index));
+        tabs->setCurrentIndex(index);
+        QCOMPARE(tabs->currentIndex(), index);
+        QVERIFY(tabs->widget(index));
+    }
+
+    QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("deviceSearch")));
+    QVERIFY(window.findChild<QComboBox *>(QStringLiteral("interfaceSelector")));
+    QVERIFY(window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter")));
+    QVERIFY(window.findChild<QComboBox *>(QStringLiteral("statusFilter")));
+    QVERIFY(window.findChild<QTableWidget *>(QStringLiteral("deviceTable")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("addDeviceButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("exportCsvButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("renameLabelButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("reachabilityButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("subnetScanButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("discoverButton")));
+
+    auto *reachability = window.findChild<QPushButton *>(QStringLiteral("reachabilityButton"));
+    QTest::mouseClick(reachability, Qt::LeftButton);
+    const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
+    QVERIFY(status);
+    QVERIFY(status->text().contains(QStringLiteral("Add or discover devices")));
+}
+
+void MainWindowSmokeTest::discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface()
+{
+    QNetworkInterface selected;
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack))
+            continue;
+        bool hasIpv4 = false;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                !entry.ip().isLoopback()) {
+                hasIpv4 = true;
+                break;
+            }
+        }
+        if (hasIpv4) { selected = interface; break; }
+    }
+    if (!selected.isValid())
+        QSKIP("No active non-loopback IPv4 interface is available on this runner.");
+
+    DiscoveryService service;
+    QSignalSpy cancelled(&service, &DiscoveryService::cancelled);
+    QSignalSpy statuses(&service, &DiscoveryService::statusChanged);
+    service.start(selected.name());
+    QVERIFY2(service.isRunning(), "Discovery should bind its selected interface before sending probes.");
+    bool probeStatusSeen = false;
+    for (const QList<QVariant> &event : statuses) {
+        if (!event.isEmpty() &&
+            event.first().toString().contains(QStringLiteral("Sending ONVIF and project-camera"))) {
+            probeStatusSeen = true;
+            break;
+        }
+    }
+    QVERIFY(probeStatusSeen);
+    service.cancel();
+    QVERIFY(!service.isRunning());
+    QCOMPARE(cancelled.count(), 1);
+}
+
+void MainWindowSmokeTest::leavesCorruptInventoryDatabaseUntouched()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+    QVERIFY(QDir().mkpath(appData));
+    const QString databasePath = appData + QStringLiteral("/inventory.sqlite");
+    const QByteArray corruptBytes = QByteArrayLiteral("this is deliberately not a sqlite database");
+    QFile corrupt(databasePath);
+    QVERIFY(corrupt.open(QIODevice::WriteOnly));
+    QCOMPARE(corrupt.write(corruptBytes), qint64(corruptBytes.size()));
+    corrupt.close();
+
+    MainWindow window;
+    QFile preserved(databasePath);
+    QVERIFY(preserved.open(QIODevice::ReadOnly));
+    QCOMPARE(preserved.readAll(), corruptBytes);
+    const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
+    QVERIFY(status);
+    QVERIFY(status->text().contains(QStringLiteral("integrity check failed"),
+                                    Qt::CaseInsensitive));
+}
 
 void MainWindowSmokeTest::migratesLegacyInventorySchema()
 {
