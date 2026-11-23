@@ -41,7 +41,7 @@ Not implemented:
 - [ ] Complete end-to-end discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast behavior, timeouts, duplicate responses and cancellation. C++ loopback UDP/TCP tests now exercise datagram round trips, ONVIF parsing and TCP connectability; they are not yet a proof of the C++ service on physical interfaces.
 - [ ] Add scanner tests for full-subnet and capped-window selection, progress, cancellation, multiple open ports per host, and no-camera false positives. [x] Add validation coverage for network/broadcast boundaries and /30 host boundaries.
 - [ ] Expand UI tests beyond the new startup/Operation History smoke test to cover empty inventory, device selection, filters, scan cancellation, manual entry, CSV export and error states.
-- [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory and disk-full behavior. The startup migration is now transactional and versioned with SQLite `user_version`; automated recovery coverage remains outstanding.
+- [ ] Add SQLite migration/recovery tests for read-only directory, disk-full, backup/restore and process interruption. [x] Add legacy-schema migration and forced-failure rollback tests. The startup migration is transactional and versioned with SQLite `user_version`.
 - [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
 - [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
@@ -49,7 +49,7 @@ Not implemented:
 - [ ] Add automated tests for reachability timeout and cancellation. [x] Test cancellation and ensure a second start cannot replace an active reachability batch.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.
 - [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
-- [x] Add rotating application log files and regression tests for common key/value, Bearer, URL user-info and XML secret redaction. Redaction remains best-effort and needs broader security review.
+- [x] Add rotating application log files and regression tests for common key/value, Bearer, URL user-info and XML secret redaction. [x] Add an archive-rotation/three-file-retention regression test. Redaction remains best-effort and needs broader security review.
 - [x] Add a user-confirmed diagnostics text export with OS/application/interface summary, recent operation history and redacted rotating logs; it excludes the inventory database and ONVIF interface tokens.
 - [x] Distinguish completed and cancelled discovery/subnet scan outcomes in the activity history.
 - [x] Request cancellation of discovery, subnet scanning and reachability work during MainWindow shutdown.
