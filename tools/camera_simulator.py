@@ -174,7 +174,12 @@ class Scenario:
                     self.send_header("WWW-Authenticate", 'Basic realm="Oxita Simulator"')
                     self.end_headers()
                     return
-                if scenario.args.scenario == "soap-fault":
+                if scenario.args.scenario == "oversized":
+                    # Deliberately exceed the desktop client's 1 MiB response
+                    # budget so the streaming-abort path can be exercised.
+                    payload = (b"<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'>"
+                               + b"x" * (2 * 1024 * 1024) + b"</s:Envelope>")
+                elif scenario.args.scenario == "soap-fault":
                     payload = b'''<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><s:Fault><s:Reason><s:Text>Simulated device fault</s:Text></s:Reason></s:Fault></s:Body></s:Envelope>'''
                 elif b"GetDeviceInformation" in body:
                     payload = b'''<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:tds="http://www.onvif.org/ver10/device/wsdl"><s:Body><tds:GetDeviceInformationResponse><tds:Manufacturer>Oxita</tds:Manufacturer><tds:Model>Simulator</tds:Model><tds:FirmwareVersion>sim-1.0.0</tds:FirmwareVersion><tds:SerialNumber>SIM-0001</tds:SerialNumber><tds:HardwareId>SIM-HW-1</tds:HardwareId></tds:GetDeviceInformationResponse></s:Body></s:Envelope>'''
