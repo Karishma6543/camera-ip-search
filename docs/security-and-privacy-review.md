@@ -6,7 +6,7 @@ This is a review aid, not a security certification. Complete it against the exac
 
 - Discovery parses bounded UDP payloads and validates the documented Contract B magic, version, command, sequence and field types.
 - ONVIF XAddrs are restricted to same-host HTTP(S) URLs and reject user information, query strings and fragments.
-- Device-service redirects are disabled for ONVIF requests; request timeouts are applied and incoming SOAP responses are aborted once more than 1 MiB is buffered.
+- Device-service redirects are disabled for ONVIF requests; request timeouts are applied and all tracked ONVIF SOAP replies, including static-IPv4 configuration stages, are aborted once more than 1 MiB is buffered.
 - Device identity merging avoids merging conflicting MAC addresses.
 - Network writes require a matching ONVIF interface token and adapter-declared implemented operations.
 - No default camera credentials or credential guessing are included.
