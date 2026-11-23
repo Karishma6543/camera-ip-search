@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QLoggingCategory>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTextStream>
