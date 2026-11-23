@@ -59,7 +59,7 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
     requestOnvifDeviceInformation(device);
 }
 
-void DiscoveryService::start()
+void DiscoveryService::start(const QString &interfaceName)
 {
     if (running_) return;
     devices_.clear();
@@ -69,6 +69,7 @@ void DiscoveryService::start()
 
     const auto interfaces = QNetworkInterface::allInterfaces();
     for (const auto &interface : interfaces) {
+        if (!interfaceName.isEmpty() && interface.name() != interfaceName) continue;
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
             !flags.testFlag(QNetworkInterface::IsRunning) ||
@@ -87,8 +88,9 @@ void DiscoveryService::start()
         return;
     }
 
-    emit statusChanged(tr("Sending ONVIF and project-camera discovery probes on %1 interface address(es)…")
-                           .arg(sockets_.size()));
+    emit statusChanged(interfaceName.isEmpty()
+        ? tr("Sending ONVIF and project-camera discovery probes on %1 interface address(es)…").arg(sockets_.size())
+        : tr("Sending ONVIF and project-camera discovery probes on the selected interface (%1 address(es))…").arg(sockets_.size()));
     for (auto &entry : sockets_) {
         sendOnvifProbe(entry);
         sendProjectProbe(entry);
