@@ -33,7 +33,7 @@ Not implemented:
 - [ ] Run discovery against real ONVIF cameras and the project's own Contract B firmware; attach sanitized logs/packet evidence.
 - [ ] Validate ONVIF static IPv4 changes on each specifically supported camera model/firmware, including authentication, rejected writes, address change, gateway failure and reboot-required response.
 - [ ] Verify multi-NIC cameras never expose a configuration token unless the interface IPv4 address matches the discovered camera address.
-- [ ] Complete a security review of network parsing, endpoint handling, credential prompts, local database contents and high-impact actions.
+- [ ] Complete the security and privacy review in [security-and-privacy-review.md](security-and-privacy-review.md), including TLS, WS-Security, OS credential vault, redaction tests and malformed-input testing.
 - [ ] Fill the compatibility matrix with exact model, hardware revision, firmware, topology and operation results. Until then, do not advertise named brands as supported.
 
 ### P1 — Required for a dependable general release
