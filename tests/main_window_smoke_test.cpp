@@ -42,6 +42,11 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     query.bindValue(":name", QStringLiteral("operation_history"));
     QVERIFY(query.exec());
     QVERIFY(query.next());
+
+    QSqlQuery version(database);
+    QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(version.next());
+    QCOMPARE(version.value(0).toInt(), 1);
 }
 
 
