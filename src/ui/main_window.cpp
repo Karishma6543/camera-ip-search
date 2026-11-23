@@ -1211,12 +1211,8 @@ void MainWindow::recordOperation(const QString &operation, const QString &target
                                  const QString &outcome, const QString &details)
 {
     if (!inventoryDb_.isOpen()) return;
-    const QRegularExpression secret(
-        QStringLiteral(R"((password|passwd|authorization|token|credential)\s*[:=]\s*[^\s,;]+)"),
-        QRegularExpression::CaseInsensitiveOption);
-    const auto safe = [&secret](QString value) {
-        value.replace(secret, QStringLiteral("\\1=[REDACTED]"));
-        return value.left(2000);
+    const auto safe = [](QString value) {
+        return DiagnosticLog::redactSensitiveData(value).left(2000);
     };
     QSqlQuery query(inventoryDb_);
     query.prepare(QStringLiteral(
