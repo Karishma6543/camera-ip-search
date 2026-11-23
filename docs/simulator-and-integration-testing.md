@@ -96,6 +96,6 @@ These tests require no camera, external network, multicast route or privileged p
 
 ## ONVIF response resource limit
 
-The desktop client now monitors each ONVIF enrichment reply as it arrives and aborts a response when more than 1 MiB is buffered. This prevents an untrusted camera from making the client buffer an arbitrarily large SOAP response before checking its size. A local HTTP peer regression test sends a 2 MiB SOAP body and expects the service to report the 1 MiB rejection.
+The desktop client now monitors ONVIF SOAP replies, including enrichment and static-IPv4 configuration stages, as data arrives and aborts a response when more than 1 MiB is buffered. This prevents an untrusted camera from making the client buffer an arbitrarily large SOAP response before checking its size. A local HTTP peer regression test sends a 2 MiB SOAP body and expects the service to report the 1 MiB rejection.
 
 The existing post-read size checks remain as defense in depth. This guard is not a substitute for testing fragmented delivery, slow-drip responses, TLS behavior and all supported Qt/OS combinations.
