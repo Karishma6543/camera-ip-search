@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/oxita-production-ready, release/preproduction-hardening]
   pull_request:
-    branches: [main]
+    branches: [main, release/oxita-production-ready]
   workflow_dispatch:
 
 jobs:
@@ -19,6 +19,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test camera simulator fixtures
+        run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
