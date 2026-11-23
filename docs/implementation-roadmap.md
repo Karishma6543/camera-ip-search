@@ -75,7 +75,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [ ] Complete model/firmware hardware validation matrix.
 - [ ] Package installers and portable builds; test install, upgrade and uninstall.
 - [ ] Sign/notarize releases where applicable and define update distribution.
-- [ ] Complete security, privacy, dependency/license and support review.
+- [ ] Complete security, privacy, dependency/license and support review using [security-and-privacy-review.md](security-and-privacy-review.md).
 - [ ] Publish supported models, known limitations, troubleshooting and release notes.
 
 ## Evidence levels
