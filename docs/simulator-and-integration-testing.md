@@ -92,6 +92,8 @@ The CTest target `discovery-wire-integration-tests` exercises actual Qt UDP and 
 
 These tests require no camera, external network, multicast route or privileged port. They validate the socket transport and parser boundary deterministically.
 
+Additional C++ wire cases now attempt real Qt multicast delivery to the ONVIF group on loopback and directed-broadcast delivery through an available non-loopback interface. They explicitly skip when the host OS/container disables those delivery modes. A skipped multicast/broadcast case is not a pass and must be followed by the physical-interface packet-capture procedure below.
+
 **Scope limitation:** this is not yet a full `DiscoveryService` integration test. It does not exercise OS multicast group delivery, broadcast delivery on multiple physical NICs, the service's interface binding/selection, in-flight ONVIF HTTP enrichment, cancellation races or real camera behavior. Those remain separate CI/manual and hardware acceptance gates. A passing loopback test must not be described as proof of end-to-end camera discovery.
 
 ## ONVIF response resource limit
