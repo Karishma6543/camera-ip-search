@@ -463,7 +463,10 @@ void MainWindow::buildUi()
     statusBar()->addWidget(statusLabel_, 1);
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
-        if (reachabilityChecker_->isRunning()) return;
+        if (reachabilityChecker_->isRunning()) {
+            reachabilityChecker_->cancel();
+            return;
+        }
         QVector<DeviceRecord> devices;
         // Checked rows take priority so operators can explicitly target a group.
         for (int row = 0; row < deviceTable_->rowCount(); ++row) {
@@ -489,8 +492,8 @@ void MainWindow::buildUi()
             }
         }
         if (devices.isEmpty()) { updateStatus(tr("Add or discover devices before checking reachability.")); return; }
-        reachabilityButton_->setEnabled(false);
-        reachabilityButton_->setText(tr("Checking…"));
+        reachabilityButton_->setEnabled(true);
+        reachabilityButton_->setText(tr("Cancel reachability check"));
         updateStatus(tr("Checking TCP reachability. Checked cameras take priority, then highlighted rows; if neither is selected, all devices are checked."));
         reachabilityChecker_->start(devices);
     });
@@ -532,6 +535,11 @@ void MainWindow::buildUi()
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
         updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
+    });
+    connect(reachabilityChecker_, &ReachabilityChecker::cancelled, this, [this](int checked) {
+        reachabilityButton_->setEnabled(true);
+        reachabilityButton_->setText(tr("Check reachability"));
+        updateStatus(tr("Reachability check cancelled after %1 device(s).").arg(checked));
     });
     connect(scanButton_, &QPushButton::clicked, this, [this] {
         if (discovery_->isRunning()) {
