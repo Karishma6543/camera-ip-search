@@ -9,8 +9,12 @@ private slots:
     void mergesScannerCandidateWithProtocolObservation();
     void matchesMacAfterAddressChanges();
     void doesNotMergeDifferentMacsAtSameAddress();
+    void doesNotMergeDifferentMacsWithSameEndpointOrSerial();
     void matchesStableOnvifEndpoint();
     void preservesVerifiedFieldsAndCombinesSourcesAndPorts();
+    void refreshesOnvifNetworkStateAfterAddressChange();
+    void revokesStaleOnvifInterfaceToken();
+    void refreshesDnsFromOnvifObservation();
     void manualEntryDoesNotUpgradeUnverifiedCandidate();
     void replacesOnvifUnknownManufacturerPlaceholder();
 };
@@ -71,6 +75,28 @@ void DeviceIdentityTest::doesNotMergeDifferentMacsAtSameAddress()
     DeviceRecord current;
     current.ipAddress = previous.ipAddress;
     current.macAddress = QStringLiteral("00:11:22:33:44:66");
+    QVERIFY(DeviceIdentity::findMatchingKey(inventory, current).isEmpty());
+}
+
+
+void DeviceIdentityTest::doesNotMergeDifferentMacsWithSameEndpointOrSerial()
+{
+    DeviceRecord previous;
+    previous.ipAddress = QStringLiteral("192.168.1.20");
+    previous.macAddress = QStringLiteral("00:11:22:33:44:55");
+    previous.onvifEndpoint = QStringLiteral("urn:uuid:cloned-endpoint");
+    previous.serialNumber = QStringLiteral("SERIAL-123");
+    previous.manufacturer = QStringLiteral("Example");
+    QHash<QString, DeviceRecord> inventory;
+    inventory.insert(previous.macAddress, previous);
+
+    DeviceRecord current = previous;
+    current.macAddress = QStringLiteral("00:11:22:33:44:66");
+    current.ipAddress = QStringLiteral("192.168.1.45");
+    QVERIFY(DeviceIdentity::findMatchingKey(inventory, current).isEmpty());
+
+    current.onvifEndpoint.clear();
+    QCOMPARE(current.serialNumber, previous.serialNumber);
     QVERIFY(DeviceIdentity::findMatchingKey(inventory, current).isEmpty());
 }
 
@@ -142,6 +168,68 @@ void DeviceIdentityTest::replacesOnvifUnknownManufacturerPlaceholder()
     const DeviceRecord merged = DeviceIdentity::mergeObservations(discovered, enriched);
     QCOMPARE(merged.manufacturer, enriched.manufacturer);
     QCOMPARE(merged.model, enriched.model);
+}
+
+
+void DeviceIdentityTest::refreshesOnvifNetworkStateAfterAddressChange()
+{
+    DeviceRecord existing;
+    existing.ipAddress = QStringLiteral("192.168.1.20");
+    existing.deviceServiceUrl = QStringLiteral("http://192.168.1.20/onvif/device_service");
+    existing.networkInterfaceToken = QStringLiteral("old-token");
+    existing.ipv4Address = QStringLiteral("192.168.1.20");
+    existing.ipv4SubnetMask = QStringLiteral("255.255.255.0");
+    existing.ipv4ConfigurationKnown = true;
+
+    DeviceRecord updated;
+    updated.ipAddress = QStringLiteral("192.168.1.45");
+    updated.deviceServiceUrl = QStringLiteral("http://192.168.1.45/onvif/device_service");
+    updated.networkInterfaceToken = QStringLiteral("new-token");
+    updated.ipv4Address = QStringLiteral("192.168.1.45");
+    updated.ipv4SubnetMask = QStringLiteral("255.255.0.0");
+    updated.ipv4Gateway = QStringLiteral("192.168.0.1");
+    updated.ipv4DhcpEnabled = false;
+    updated.ipv4ConfigurationKnown = true;
+    updated.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(existing, updated);
+    QCOMPARE(merged.ipAddress, updated.ipAddress);
+    QCOMPARE(merged.deviceServiceUrl, updated.deviceServiceUrl);
+    QCOMPARE(merged.networkInterfaceToken, QStringLiteral("new-token"));
+    QCOMPARE(merged.ipv4Address, updated.ipv4Address);
+    QCOMPARE(merged.ipv4SubnetMask, updated.ipv4SubnetMask);
+    QCOMPARE(merged.ipv4Gateway, updated.ipv4Gateway);
+    QVERIFY(merged.ipv4ConfigurationKnown);
+}
+
+void DeviceIdentityTest::revokesStaleOnvifInterfaceToken()
+{
+    DeviceRecord existing;
+    existing.ipAddress = QStringLiteral("192.168.1.20");
+    existing.networkInterfaceToken = QStringLiteral("stale-token");
+    existing.ipv4ConfigurationKnown = true;
+
+    DeviceRecord unmatched;
+    unmatched.ipAddress = existing.ipAddress;
+    unmatched.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
+    unmatched.ipv4ConfigurationKnown = false;
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(existing, unmatched);
+    QVERIFY(merged.networkInterfaceToken.isEmpty());
+    QVERIFY(!merged.ipv4ConfigurationKnown);
+}
+
+void DeviceIdentityTest::refreshesDnsFromOnvifObservation()
+{
+    DeviceRecord existing;
+    existing.ipv4DnsServer = QStringLiteral("1.1.1.1");
+
+    DeviceRecord updated;
+    updated.ipv4DnsServer = QStringLiteral("8.8.8.8");
+    updated.discoverySources << QStringLiteral("ONVIF GetDNS");
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(existing, updated);
+    QCOMPARE(merged.ipv4DnsServer, QStringLiteral("8.8.8.8"));
 }
 
 QTEST_GUILESS_MAIN(DeviceIdentityTest)
