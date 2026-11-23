@@ -49,6 +49,10 @@
 #include <QFileInfo>
 #include <QStringConverter>
 #include <QTextStream>
+#include <QDateTime>
+#include <QSysInfo>
+#include <QSaveFile>
+#include <QRegularExpression>
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
@@ -126,6 +130,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     buildUi();
     initializeInventory();
     loadInventory();
+    refreshOperationHistory();
     populateInterfaces();
     updateLocalNetworkSummary();
     updateStatus(tr("Ready — choose a local interface to scan your subnet."));
@@ -383,6 +388,7 @@ void MainWindow::buildUi()
     tabs->addTab(makeBulkTab(tabs), tr("Bulk Config"));
     tabs->addTab(makeMaintenanceTab(tabs), tr("Maintenance"));
     tabs->addTab(makeNvrTab(tabs), tr("NVR Channels"));
+    tabs->addTab(makeHistoryTab(tabs), tr("Operation History"));
     leftLayout->addWidget(tabs);
 
     auto *rightScroll = new QScrollArea(central);
@@ -1444,6 +1450,11 @@ void MainWindow::initializeInventory()
     QSqlQuery query(inventoryDb_);
     if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"))) {
         updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
+        return;
+    }
+    QSqlQuery historyTable(inventoryDb_);
+    if (!historyTable.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS operation_history (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, operation TEXT NOT NULL, target TEXT NOT NULL, outcome TEXT NOT NULL, details TEXT NOT NULL)"))) {
+        updateStatus(tr("Could not initialize operation history: %1").arg(historyTable.lastError().text()));
         return;
     }
     QSqlQuery columnQuery(inventoryDb_);
