@@ -165,6 +165,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 break;
             }
         }
+        const int selectedRow = deviceTable_ ? deviceTable_->currentRow() : -1;
+        const QString target = selectedRow >= 0 && deviceTable_->item(selectedRow, 1) ? deviceTable_->item(selectedRow, 1)->text() : QString();
+        recordOperation(tr("Static IPv4"), target, verified ? tr("Verified") : tr("Not verified"), message);
+        refreshOperationHistory();
         QMessageBox::information(this, verified ? tr("Network configuration verified")
                                                 : tr("Network configuration result"), message);
         updateStatus(message);
@@ -173,6 +177,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         scanButton_->setText(tr("Discover devices"));
         scanButton_->setEnabled(true);
         updateDeviceSummary();
+        recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
+        refreshOperationHistory();
         updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
     });
     connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
@@ -187,6 +193,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
         updateDeviceSummary();
+        recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 unverified candidate(s)").arg(count));
+        refreshOperationHistory();
         updateStatus(tr("Subnet scan finished — %1 unverified candidate(s).").arg(count));
     });
 }
@@ -534,12 +542,15 @@ void MainWindow::buildUi()
                 }
                 break;
             }
+            recordOperation(tr("Reachability"), ip, status, tr("TCP connection check completed"));
             updateDeviceSummary();
             applyFilters();
         });
     connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        recordOperation(tr("Reachability batch"), QString(), tr("Completed"), tr("%1 device(s) checked").arg(checked));
+        refreshOperationHistory();
         updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
     });
     connect(reachabilityChecker_, &ReachabilityChecker::progressChanged, this,
@@ -551,6 +562,8 @@ void MainWindow::buildUi()
     connect(reachabilityChecker_, &ReachabilityChecker::cancelled, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        recordOperation(tr("Reachability batch"), QString(), tr("Cancelled"), tr("%1 device(s) checked before cancellation").arg(checked));
+        refreshOperationHistory();
         updateStatus(tr("Reachability check cancelled after %1 device(s).").arg(checked));
     });
     connect(scanButton_, &QPushButton::clicked, this, [this] {
@@ -645,6 +658,8 @@ void MainWindow::buildUi()
             ++exported;
         }
         file.close();
+        recordOperation(tr("Inventory export"), QFileInfo(path).fileName(), tr("Completed"), tr("%1 device(s) exported").arg(exported));
+        refreshOperationHistory();
         updateStatus(tr("Exported %1 device(s) to %2.").arg(exported).arg(QFileInfo(path).fileName()));
     });
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
@@ -1090,6 +1105,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             ? deviceTable_->item(row, 8)->text().split(QStringLiteral(", "), Qt::SkipEmptyParts) : QStringList{};
         device.serialNumber = deviceTable_->item(row, 9) ? deviceTable_->item(row, 9)->text() : QString();
         device.hardwareId = deviceTable_->item(row, 10) ? deviceTable_->item(row, 10)->text() : QString();
+        recordOperation(tr("Refresh device information"), device.ipAddress, tr("Requested"), tr("ONVIF information refresh requested"));
+        refreshOperationHistory();
         discovery_->refreshDeviceInfo(device);
     });
     return page;
@@ -1795,6 +1812,8 @@ void MainWindow::addManualDevice()
     device.discoverySources << QStringLiteral("Manual");
     device.activationState=QStringLiteral("Unknown");
     upsertDevice(device);
+    recordOperation(tr("Manual device entry"), device.ipAddress, tr("Completed"), tr("Device added to local inventory"));
+    refreshOperationHistory();
     updateStatus(tr("Added %1 manually. No credentials were requested or stored.").arg(device.ipAddress));
 }
 
