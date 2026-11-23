@@ -2,6 +2,8 @@
 
 #include <QStandardPaths>
 #include <QTabWidget>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QtTest>
 
 class MainWindowSmokeTest final : public QObject
@@ -26,6 +28,14 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
         }
     }
     QVERIFY2(historyFound, "The operation-history workspace must be present at startup.");
+    const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY2(database.isValid() && database.isOpen(), "The local inventory database should open in test mode.");
+    QSqlQuery query(database);
+    query.prepare(QStringLiteral("SELECT name FROM sqlite_master WHERE type=:type AND name=:name"));
+    query.bindValue(":type", QStringLiteral("table"));
+    query.bindValue(":name", QStringLiteral("operation_history"));
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
 }
 
 QTEST_MAIN(MainWindowSmokeTest)
