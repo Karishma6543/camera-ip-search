@@ -38,10 +38,10 @@ Not implemented:
 
 ### P1 — Required for a dependable general release
 
-- [ ] Complete end-to-end discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast behavior, timeouts, duplicate responses and cancellation. A deterministic Contract B/ONVIF simulator and Python fixture tests are now present; they are not yet an end-to-end proof of the C++ discovery service.
+- [ ] Complete end-to-end discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast behavior, timeouts, duplicate responses and cancellation. C++ loopback UDP/TCP tests now exercise datagram round trips, ONVIF parsing and TCP connectability; they are not yet a proof of the C++ service on physical interfaces.
 - [ ] Add scanner tests for full-subnet and capped-window selection, progress, cancellation, multiple open ports per host, and no-camera false positives.
 - [ ] Expand UI tests beyond the new startup/Operation History smoke test to cover empty inventory, device selection, filters, scan cancellation, manual entry, CSV export and error states.
-- [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory and disk-full behavior. Startup now runs SQLite PRAGMA quick_check and leaves a database untouched when integrity fails; automated recovery coverage remains outstanding.
+- [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory and disk-full behavior. The startup migration is now transactional and versioned with SQLite `user_version`; automated recovery coverage remains outstanding.
 - [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
 - [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
@@ -61,7 +61,7 @@ Not implemented:
 - [ ] Test clean install, upgrade, uninstall, application-data preservation and rollback.
 - [ ] Sign Windows artifacts and notarize macOS artifacts where distribution requires it.
 - [ ] Add dependency/license inventory, privacy notice, support policy and release notes.
-- [ ] Refactor database access out of MainWindow and introduce versioned migrations.
+- [ ] Refactor database access out of MainWindow. [x] Introduce transactional, versioned SQLite schema migration (`user_version = 1`) with future-version rejection.
 - [ ] Separate discovery providers and application coordination from the UI.
 - [ ] Add localization/accessibility and high-DPI visual validation.
 
@@ -80,10 +80,13 @@ Not implemented:
 - [x] Add a local simulator for the documented Contract B discovery exchange and a limited ONVIF WS-Discovery/device-service fixture.
 - [x] Add deterministic Python tests for simulator response construction and malformed/stale/invalid fixtures.
 - [x] Run simulator fixture tests in the Windows/macOS/Linux CI matrix before the Qt build.
-- [x] Add a Qt startup smoke-test target that checks the Operation History workspace is present.
+- [x] Add a Qt startup smoke-test target that checks the Operation History workspace and SQLite schema version are initialized.
+- [x] Add an in-flight ONVIF SOAP response limit (1 MiB) and a regression test using a 2 MiB local HTTP peer.
 - [x] Add an operation-history table and a bounded recent-activity view.
 - [x] Add user-confirmed diagnostic text export with OS/application/interface summary and recent operation records.
 - [x] Check SQLite integrity before schema changes and leave an invalid database untouched.
+- [x] Make the initial legacy-schema upgrade transactional and record the schema version atomically.
+- [x] Add a startup assertion for the schema version.
 
 These are source changes only until the workflow runs successfully. Simulator fixtures do not certify real cameras or the physical network stack.
 
