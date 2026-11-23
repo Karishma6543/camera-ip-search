@@ -1623,6 +1623,13 @@ void MainWindow::initializeInventory()
         updateStatus(tr("Could not open local inventory: %1").arg(inventoryDb_.lastError().text()));
         return;
     }
+    QSqlQuery integrityQuery(inventoryDb_);
+    if (!integrityQuery.exec(QStringLiteral("PRAGMA quick_check")) ||
+        !integrityQuery.next() || integrityQuery.value(0).toString().compare(QStringLiteral("ok"), Qt::CaseInsensitive) != 0) {
+        updateStatus(tr("Inventory database integrity check failed. The database was left untouched; close the app and preserve a copy before attempting recovery."));
+        inventoryDb_.close();
+        return;
+    }
     QSqlQuery query(inventoryDb_);
     if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"))) {
         updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
