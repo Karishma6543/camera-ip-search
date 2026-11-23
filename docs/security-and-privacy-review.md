@@ -18,9 +18,11 @@ This is a review aid, not a security certification. Complete it against the exac
 
 - [ ] Review every log call and network error path for passwords, Authorization headers, cookies, WS-Security UsernameToken material, tokens and full SOAP payloads.
 - [x] Add regression tests for common key/value, Bearer, URL user-info and XML secret redaction.
-- [ ] Add automated tests for log rotation, archive retention and redaction edge cases.
+- [x] Add automated tests for log rotation and three-archive retention.
+- [ ] Expand redaction edge cases, including multiline credentials, cookie headers, Authorization variants and malformed XML.
 - [ ] Perform a source-level threat review of XML entity handling, XML depth/size, JSON nesting, URL parsing, redirects, DNS rebinding and endpoint trust.
-- [ ] Verify TLS certificate validation and user-visible handling of invalid/self-signed certificates.
+- [x] Explicitly abort ONVIF requests when Qt reports TLS certificate validation errors; no certificate errors are ignored.
+- [ ] Add cross-platform tests for trusted, expired, hostname-mismatched and self-signed certificates and verify operator guidance.
 - [ ] Implement OS credential-vault integration before offering persistent credential storage. Until then, credentials remain session-only and must not be cached in app settings or SQLite.
 - [ ] Review ONVIF authentication behavior, including WS-Security UsernameToken digest/nonce/timestamp requirements for target devices. HTTP Basic challenge support alone is not sufficient for every ONVIF camera.
 - [ ] Review database file permissions and whether local inventory metadata is sensitive in the deployment environment.
