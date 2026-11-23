@@ -1283,6 +1283,8 @@ void MainWindow::upsertDevice(DeviceRecord device)
         };
         existing.ipAddress = cellText(1);
         existing.userLabel = cellText(2);
+        if (existing.userLabel == QStringLiteral("Unverified candidate"))
+            existing.userLabel.clear();
         existing.manufacturer = cellText(3);
         existing.model = cellText(4);
         existing.macAddress = cellText(5);
@@ -1317,7 +1319,9 @@ void MainWindow::upsertDevice(DeviceRecord device)
         device = DeviceIdentity::mergeObservations(existing, device);
     }
     if (row < 0) { row = deviceTable_->rowCount(); deviceTable_->insertRow(row); }
-    const QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+    QString oldLabel = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
+    if (oldLabel == QStringLiteral("Unverified candidate"))
+        oldLabel.clear();
     const auto *previousCheck = deviceTable_->item(row, 0);
     const Qt::CheckState previousCheckState = previousCheck ? previousCheck->checkState() : Qt::Unchecked;
     auto *check = new QTableWidgetItem();
