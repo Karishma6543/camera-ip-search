@@ -60,6 +60,28 @@ class ContractBSimulatorTests(unittest.TestCase):
         import json
         self.assertEqual(json.loads(payload)["device"]["http_port"], 70000)
 
+    def test_onvif_probe_contains_same_host_device_service(self):
+        payload = make_simulator().probe_match("192.0.2.50")
+        self.assertIn(b"192.0.2.50:18080/onvif/device_service", payload)
+        self.assertIn(b"ProbeMatches", payload)
+
+    def test_unsafe_xaddr_fixture_contains_credentials_and_query(self):
+        payload = make_simulator("unsafe-xaddr").probe_match("192.0.2.50")
+        self.assertIn(b"user:pass@", payload)
+        self.assertIn(b"?token=bad", payload)
+
+    def test_multiple_xaddr_fixture_contains_wrong_host_then_valid_host(self):
+        payload = make_simulator("multiple-xaddrs").probe_match("192.0.2.50")
+        self.assertIn(b"198.51.100.7", payload)
+        self.assertIn(b"192.0.2.50:18080", payload)
+
+    def test_advertised_ip_mismatch_fixture_is_explicit(self):
+        payload = make_simulator("advertised-mismatch").project_payload({
+            "magic": "CAM_DISCOVER", "version": 1, "seq": 19, "cmd": "PROBE_REQUEST"
+        })
+        import json
+        self.assertEqual(json.loads(payload)["device"]["ipv4"], "192.0.2.253")
+
     def test_missing_mac_is_allowed_as_a_negative_fixture(self):
         payload = make_simulator("missing-mac").project_payload({
             "magic": "CAM_DISCOVER", "version": 1, "seq": 7, "cmd": "PROBE_REQUEST"
