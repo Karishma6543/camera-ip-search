@@ -44,9 +44,9 @@ Not implemented:
 - [ ] Add SQLite migration/recovery tests, including old schema, interrupted migration, read-only directory, corrupt DB and disk-full behavior.
 - [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
 - [ ] Add an operation history/audit record for configuration attempts and partial failures.
-- [ ] Add per-device progress and tests for cancellation/overlapping operations.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
-- [ ] Add per-device progress and automated cancellation tests for reachability.
+- [x] Add per-device progress and user-visible cancellation for reachability checks.
+- [ ] Add automated tests for reachability timeout, cancellation and overlapping operations.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.
 - [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
 - [ ] Add structured, redacted logs and a support bundle with secrets removed.
