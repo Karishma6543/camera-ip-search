@@ -73,6 +73,7 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
 void DiscoveryService::start(const QString &interfaceName)
 {
     if (running_) return;
+    cancelEnrichmentRequests();
     devices_.clear();
     sockets_.clear();
     running_ = true;
@@ -111,15 +112,20 @@ void DiscoveryService::start(const QString &interfaceName)
 
 void DiscoveryService::cancel()
 {
-    if (!running_) return;
+    const bool wasRunning = running_;
+    if (!wasRunning && enrichmentReplies_.isEmpty()) return;
     timeout_.stop();
     running_ = false;
+    cancelEnrichmentRequests();
     for (auto &entry : sockets_) {
         if (entry.socket) entry.socket->close();
     }
     sockets_.clear();
-    emit statusChanged(tr("Discovery cancelled."));
-    emit finished(devices_.size());
+    emit statusChanged(wasRunning
+        ? tr("Discovery and device enrichment cancelled.")
+        : tr("Device enrichment cancelled."));
+    if (wasRunning)
+        emit finished(devices_.size());
 }
 
 void DiscoveryService::addInterfaceSocket(const QNetworkInterface &interface,
@@ -225,6 +231,30 @@ QString DiscoveryService::storageKeyForDevice(const DeviceRecord &device) const
     if (!device.macAddress.isEmpty()) return device.macAddress;
     if (!device.ipAddress.isEmpty()) return device.ipAddress;
     return device.onvifEndpoint;
+}
+
+void DiscoveryService::cancelEnrichmentRequests()
+{
+    ++enrichmentGeneration_;
+    const auto pending = enrichmentReplies_;
+    enrichmentReplies_.clear();
+    for (const auto &reply : pending) {
+        if (reply)
+            reply->abort();
+    }
+}
+
+void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
+{
+    if (!reply) return;
+    enrichmentReplies_.append(QPointer<QNetworkReply>(reply));
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        for (int index = enrichmentReplies_.size() - 1; index >= 0; --index) {
+            if (enrichmentReplies_.at(index).isNull() ||
+                enrichmentReplies_.at(index).data() == reply)
+                enrichmentReplies_.removeAt(index);
+        }
+    });
 }
 
 
@@ -438,8 +468,14 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifDeviceInformation(reply, key);
     });
 }
@@ -496,8 +532,14 @@ void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifCapabilities(reply, key);
     });
 }
@@ -547,8 +589,14 @@ void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifNetworkInterfaces(reply, key);
     });
 }
@@ -618,8 +666,14 @@ void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifDns(reply, key);
     });
 }

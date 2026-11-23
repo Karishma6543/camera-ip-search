@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <QUdpSocket>
 #include <QVector>
+#include <QList>
 
 class DiscoveryService final : public QObject
 {
@@ -49,6 +50,8 @@ private:
     void processDatagram(QUdpSocket *socket);
     void mergeAndEmit(DeviceRecord device);
     QString storageKeyForDevice(const DeviceRecord &device) const;
+    void cancelEnrichmentRequests();
+    void trackEnrichmentReply(QNetworkReply *reply);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);
@@ -59,10 +62,12 @@ private:
     void handleOnvifDns(QNetworkReply *reply, const QString &deviceKey);
 
     QVector<InterfaceSocket> sockets_;
+    QList<QPointer<QNetworkReply>> enrichmentReplies_;
     QHash<QString, DeviceRecord> devices_;
     QTimer timeout_;
     QNetworkAccessManager networkManager_;
     AdapterRegistry adapterRegistry_;
     bool running_{false};
     quint32 sequence_{0};
+    quint64 enrichmentGeneration_{0};
 };
