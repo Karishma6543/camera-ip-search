@@ -169,8 +169,30 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         recordOperation(tr("Static IPv4"), updatedDevice.ipAddress,
                         verified ? tr("Verified") : tr("Not verified"), message);
         refreshOperationHistory();
-        QMessageBox::information(this, verified ? tr("Network configuration verified")
-                                                : tr("Network configuration result"), message);
+        if (!verified && message.contains(QStringLiteral("gateway change was not confirmed"),
+                                             Qt::CaseInsensitive)) {
+            QMessageBox recovery(this);
+            recovery.setIcon(QMessageBox::Warning);
+            recovery.setWindowTitle(tr("IP address verified — gateway needs attention"));
+            recovery.setText(message);
+            recovery.setInformativeText(
+                tr("The camera is now recorded at %1. If the camera is no longer reachable from this computer, reconnect using the new address before attempting another change.")
+                    .arg(updatedDevice.ipAddress));
+            recovery.setDetailedText(
+                tr("Suggested recovery steps:\\n"
+                   "1. Confirm that your computer is connected to the camera's new subnet.\\n"
+                   "2. Open the camera at %1 using a browser or ONVIF client.\\n"
+                   "3. Check the IPv4 address, subnet mask and default gateway on the camera.\\n"
+                   "4. Correct the gateway manually in the camera interface if it is still incorrect.\\n"
+                   "5. Return to this application and run discovery again.\\n\\n"
+                   "The application does not automatically roll back a verified IP change.")
+                    .arg(updatedDevice.ipAddress));
+            recovery.setStandardButtons(QMessageBox::Ok);
+            recovery.exec();
+        } else {
+            QMessageBox::information(this, verified ? tr("Network configuration verified")
+                                                    : tr("Network configuration result"), message);
+        }
         updateStatus(message);
     });
     connect(discovery_, &DiscoveryService::cancelled, this, [this](int count) {
