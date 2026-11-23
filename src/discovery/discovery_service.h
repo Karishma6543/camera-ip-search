@@ -48,6 +48,7 @@ private:
     void sendProjectProbe(InterfaceSocket &entry);
     void processDatagram(QUdpSocket *socket);
     void mergeAndEmit(DeviceRecord device);
+    QString storageKeyForDevice(const DeviceRecord &device) const;
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);

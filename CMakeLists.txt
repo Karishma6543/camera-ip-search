@@ -27,6 +27,8 @@ qt_add_executable(camera-ip-search
     src/adapters/network_config_validator.h
     src/adapters/network_config_validator.cpp
     src/core/device_record.h
+    src/core/device_identity.h
+    src/core/device_identity.cpp
     src/discovery/discovery_service.h
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
@@ -103,12 +105,23 @@ if(BUILD_TESTING)
     target_link_libraries(subnet-scanner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME subnet-scanner-tests COMMAND subnet-scanner-tests)
 
+    qt_add_executable(device-identity-tests
+        tests/device_identity_test.cpp
+        src/core/device_record.h
+        src/core/device_identity.h
+        src/core/device_identity.cpp
+    )
+    target_include_directories(device-identity-tests PRIVATE src)
+    target_link_libraries(device-identity-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME device-identity-tests COMMAND device-identity-tests)
+
     set_tests_properties(
         discovery-parser-tests
         adapter-registry-tests
         onvif-network-config-tests
         network-config-validator-tests
         subnet-scanner-tests
+        device-identity-tests
         PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()

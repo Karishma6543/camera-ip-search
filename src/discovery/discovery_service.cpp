@@ -1,4 +1,5 @@
 #include "discovery_service.h"
+#include "core/device_identity.h"
 #include "onvif_network_config.h"
 #include "discovery_parser.h"
 #include "adapters/network_config_validator.h"
@@ -59,7 +60,7 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
         emit statusChanged(tr("No verified protocol adapter is available for this device. Refresh requires a valid ONVIF device-service endpoint."));
         return;
     }
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     if (key.isEmpty()) {
         emit statusChanged(tr("Cannot refresh device information without a stable device address."));
         return;
@@ -193,31 +194,37 @@ void DiscoveryService::processDatagram(QUdpSocket *socket)
 
 void DiscoveryService::mergeAndEmit(DeviceRecord device)
 {
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress
-        : (!device.ipAddress.isEmpty() ? device.ipAddress : device.onvifEndpoint);
-    if (key.isEmpty()) return;
-    if (devices_.contains(key)) {
-        auto &existing = devices_[key];
-        for (const auto &source : device.discoverySources)
-            if (!existing.discoverySources.contains(source)) existing.discoverySources.append(source);
-        if (existing.macAddress.isEmpty()) existing.macAddress = device.macAddress;
-        if (existing.manufacturer.isEmpty() ||
-            existing.manufacturer.startsWith(QStringLiteral("ONVIF")))
-            existing.manufacturer = device.manufacturer;
-        if (existing.model.isEmpty() || existing.model == tr("Model unknown"))
-            existing.model = device.model;
-        if (existing.firmwareVersion.isEmpty()) existing.firmwareVersion = device.firmwareVersion;
-        if (existing.onvifEndpoint.isEmpty()) existing.onvifEndpoint = device.onvifEndpoint;
-        const bool needsOnvifInfo = existing.deviceServiceUrl.isEmpty() &&
+    QString key = DeviceIdentity::findMatchingKey(devices_, device);
+    if (!key.isEmpty()) {
+        DeviceRecord merged = DeviceIdentity::mergeObservations(devices_.value(key), device);
+        const bool needsOnvifInfo = merged.deviceServiceUrl.isEmpty() &&
                                     !device.deviceServiceUrl.isEmpty();
-        if (needsOnvifInfo) existing.deviceServiceUrl = device.deviceServiceUrl;
-        emit deviceFound(existing);
-        if (needsOnvifInfo) requestOnvifDeviceInformation(existing);
+        if (needsOnvifInfo)
+            merged.deviceServiceUrl = device.deviceServiceUrl;
+        devices_.insert(key, merged);
+        emit deviceFound(merged);
+        if (needsOnvifInfo)
+            requestOnvifDeviceInformation(merged);
         return;
     }
+
+    key = !device.macAddress.isEmpty() ? device.macAddress
+        : (!device.ipAddress.isEmpty() ? device.ipAddress : device.onvifEndpoint);
+    if (key.isEmpty()) return;
     devices_.insert(key, device);
     emit deviceFound(device);
-    if (!device.deviceServiceUrl.isEmpty()) requestOnvifDeviceInformation(device);
+    if (!device.deviceServiceUrl.isEmpty())
+        requestOnvifDeviceInformation(device);
+}
+
+QString DiscoveryService::storageKeyForDevice(const DeviceRecord &device) const
+{
+    const QString existingKey = DeviceIdentity::findMatchingKey(devices_, device);
+    if (!existingKey.isEmpty())
+        return existingKey;
+    if (!device.macAddress.isEmpty()) return device.macAddress;
+    if (!device.ipAddress.isEmpty()) return device.ipAddress;
+    return device.onvifEndpoint;
 }
 
 
@@ -299,7 +306,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *setReply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -424,7 +431,7 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
         handleOnvifDeviceInformation(reply, key);
     });
@@ -482,7 +489,7 @@ void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
         handleOnvifCapabilities(reply, key);
     });
@@ -533,7 +540,7 @@ void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
         handleOnvifNetworkInterfaces(reply, key);
     });
@@ -604,7 +611,7 @@ void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
         handleOnvifDns(reply, key);
     });
