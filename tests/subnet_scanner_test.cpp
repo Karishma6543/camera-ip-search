@@ -11,24 +11,6 @@ private slots:
     void rejectsPointToPointAndHostOnlySubnets();
 };
 
-static QNetworkInterface activeIpv4Interface()
-{
-    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
-        const auto flags = interface.flags();
-        if (!interface.isValid() ||
-            !flags.testFlag(QNetworkInterface::IsUp) ||
-            !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack))
-            continue;
-        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                !entry.ip().isLoopback())
-                return interface;
-        }
-    }
-    return {};
-}
-
 void SubnetScannerTest::rejectsInvalidInterface()
 {
     QNetworkAddressEntry entry;
