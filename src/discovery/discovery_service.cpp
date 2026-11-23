@@ -364,24 +364,32 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
                     return;
                 }
-                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl] {
+                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl]
+                    (bool gatewayApplied) {
                     DeviceRecord updated = device;
                     updated.ipAddress = address;
                     updated.ipv4Address = address;
                     updated.ipv4SubnetMask = subnetMask;
-                    if (!gateway.trimmed().isEmpty()) updated.ipv4Gateway = gateway.trimmed();
+                    if (!gateway.trimmed().isEmpty() && gatewayApplied)
+                        updated.ipv4Gateway = gateway.trimmed();
                     updated.ipv4DhcpEnabled = false;
                     updated.ipv4ConfigurationKnown = true;
                     updated.deviceServiceUrl = verifyUrl.toString();
                     if (devices_.contains(key)) devices_[key] = updated;
+                    // The address change is independently verified. Persist it
+                    // even when the subsequent gateway operation fails, so the
+                    // inventory never continues pointing at the camera's old IP.
                     emit deviceFound(updated);
-                    emit networkConfigurationFinished(updated, true,
-                        tr("Static IPv4 address was verified at %1%2.")
+                    const bool complete = gateway.trimmed().isEmpty() || gatewayApplied;
+                    const QString message = !complete
+                        ? tr("The new IP address was verified, but the gateway change was not confirmed. Inventory now records the new IP and retains the previous gateway; review the gateway setting and reconnect if needed.")
+                        : tr("Static IPv4 address was verified at %1%2.")
                             .arg(address, gateway.trimmed().isEmpty()
-                                ? QString() : tr("; gateway was also applied")));
+                                ? QString() : tr("; gateway was also applied"));
+                    emit networkConfigurationFinished(updated, complete, message);
                 };
                 if (gateway.trimmed().isEmpty()) {
-                    finishVerified();
+                    finishVerified(true);
                     return;
                 }
                 const QByteArray gatewaySoap =
@@ -405,11 +413,10 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                                 gatewayResponse, QStringLiteral("SetNetworkDefaultGatewayResponse"));
                         gatewayReply->deleteLater();
                         if (!gatewayOk) {
-                            emit networkConfigurationFinished(device, false,
-                                tr("The new IP was verified, but the gateway change was not confirmed. The camera may now have the new IP with its previous gateway."));
+                            finishVerified(false);
                             return;
                         }
-                        finishVerified();
+                        finishVerified(true);
                     });
             });
     });
