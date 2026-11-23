@@ -3,6 +3,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkDatagram>
+#include <QNetworkInterface>
+#include <QNetworkAddressEntry>
+#include <QElapsedTimer>
 #include <QElapsedTimer>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -17,6 +20,8 @@ private slots:
     void contractBUdpRoundTripUsesSequenceAndSource();
     void onvifUdpRoundTripAcceptsSameHostServiceEndpoint();
     void tcpCandidateProbeConnectsToListeningService();
+    void onvifMulticastDatagramReachesJoinedInterface();
+    void projectBroadcastDatagramUsesSelectedInterface();
 };
 
 void DiscoveryWireIntegrationTest::contractBUdpRoundTripUsesSequenceAndSource()
@@ -126,6 +131,85 @@ void DiscoveryWireIntegrationTest::tcpCandidateProbeConnectsToListeningService()
     QVERIFY(accepted);
     QCOMPARE(scannerProbe.peerAddress(), QHostAddress::LocalHost);
     QCOMPARE(scannerProbe.peerPort(), cameraService.serverPort());
+}
+
+
+void DiscoveryWireIntegrationTest::onvifMulticastDatagramReachesJoinedInterface()
+{
+    const QHostAddress group(QStringLiteral("239.255.255.250"));
+    QNetworkInterface loopback;
+    for (const QNetworkInterface &candidate : QNetworkInterface::allInterfaces()) {
+        if (!candidate.flags().testFlag(QNetworkInterface::IsLoopBack)) continue;
+        for (const QNetworkAddressEntry &entry : candidate.addressEntries()) {
+            if (entry.ip() == QHostAddress::LocalHost) { loopback = candidate; break; }
+        }
+        if (loopback.isValid()) break;
+    }
+    if (!loopback.isValid()) QSKIP("No IPv4 loopback interface for multicast test.");
+
+    QUdpSocket receiver;
+    if (!receiver.bind(QHostAddress::AnyIPv4, quint16(0),
+                       QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint))
+        QSKIP("Cannot bind multicast receiver on this runner.");
+    if (!receiver.joinMulticastGroup(group, loopback))
+        QSKIP("Multicast group join on loopback is unsupported by this runner.");
+
+    QUdpSocket sender;
+    if (!sender.bind(QHostAddress::LocalHost, quint16(0)))
+        QSKIP("Cannot bind multicast sender on loopback.");
+    sender.setMulticastInterface(loopback);
+    sender.setSocketOption(QAbstractSocket::MulticastLoopbackOption, 1);
+    const QByteArray probe("ONVIF-WS-DISCOVERY-LOOPBACK");
+    QCOMPARE(sender.writeDatagram(probe, group, receiver.localPort()), qint64(probe.size()));
+
+    QElapsedTimer wait;
+    wait.start();
+    while (!receiver.hasPendingDatagrams() && wait.elapsed() < 750) QTest::qWait(10);
+    if (!receiver.hasPendingDatagrams()) QSKIP("Multicast loopback delivery is disabled.");
+    const QNetworkDatagram datagram = receiver.receiveDatagram();
+    QCOMPARE(datagram.data(), probe);
+    QCOMPARE(datagram.destinationAddress(), group);
+}
+
+void DiscoveryWireIntegrationTest::projectBroadcastDatagramUsesSelectedInterface()
+{
+    QNetworkInterface selected;
+    QHostAddress localAddress;
+    QHostAddress broadcastAddress;
+    for (const QNetworkInterface &candidate : QNetworkInterface::allInterfaces()) {
+        const auto flags = candidate.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        for (const QNetworkAddressEntry &entry : candidate.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                entry.broadcast().isNull()) continue;
+            selected = candidate;
+            localAddress = entry.ip();
+            broadcastAddress = entry.broadcast();
+            break;
+        }
+        if (selected.isValid()) break;
+    }
+    if (!selected.isValid()) QSKIP("No active IPv4 interface with broadcast address.");
+
+    QUdpSocket receiver;
+    if (!receiver.bind(QHostAddress::AnyIPv4, quint16(0),
+                       QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint))
+        QSKIP("Cannot bind broadcast receiver.");
+    QUdpSocket sender;
+    if (!sender.bind(localAddress, quint16(0))) QSKIP("Cannot bind sender to selected NIC.");
+    const QByteArray probe("CAM-DISCOVER-BROADCAST-TEST");
+    if (sender.writeDatagram(probe, broadcastAddress, receiver.localPort()) != probe.size())
+        QSKIP("Directed broadcast send is not supported on this runner.");
+
+    QElapsedTimer wait;
+    wait.start();
+    while (!receiver.hasPendingDatagrams() && wait.elapsed() < 750) QTest::qWait(10);
+    if (!receiver.hasPendingDatagrams()) QSKIP("Directed broadcast loopback delivery is disabled.");
+    const QNetworkDatagram datagram = receiver.receiveDatagram();
+    QCOMPARE(datagram.data(), probe);
+    QCOMPARE(datagram.senderAddress(), localAddress);
 }
 
 QTEST_GUILESS_MAIN(DiscoveryWireIntegrationTest)
