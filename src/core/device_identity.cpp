@@ -163,14 +163,18 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
         merged.lastSuccessfulResponseAt = observation.lastSuccessfulResponseAt;
 
     appendUnique(merged.discoverySources, observation.discoverySources);
-    appendUnique(merged.capabilities, observation.capabilities);
+    if (observation.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
+        merged.capabilities = observation.capabilities;
+    else
+        appendUnique(merged.capabilities, observation.capabilities);
     appendUnique(merged.openPorts, observation.openPorts);
 
     // A confirmed protocol observation upgrades a TCP-only candidate.
     if (verifiedObservation)
         merged.isCandidate = false;
-    if (merged.activationState == QStringLiteral("Unverified") &&
-        observation.activationState != QStringLiteral("Unverified"))
+    // ONVIF does not define activation state. Only a trusted source that
+    // actually reports a known state may replace the inventory value.
+    if (verifiedObservation && isKnownValue(observation.activationState))
         merged.activationState = observation.activationState;
     return merged;
 }
