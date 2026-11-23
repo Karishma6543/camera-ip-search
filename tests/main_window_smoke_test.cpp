@@ -16,6 +16,7 @@ class MainWindowSmokeTest final : public QObject
 private slots:
     void startupShowsOperationHistory();
     void rejectsOversizedOnvifResponseDuringReceive();
+    void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
 };
 
 void MainWindowSmokeTest::startupShowsOperationHistory()
@@ -82,6 +83,74 @@ void MainWindowSmokeTest::rejectsOversizedOnvifResponseDuringReceive()
                 return true;
         return false;
     }(), 3000);
+}
+
+
+void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [peer] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                if (headerEnd < 0) return;
+                const QByteArray headers = request.left(headerEnd);
+                const QRegularExpression lengthPattern(
+                    QStringLiteral("Content-Length\\\\s*:\\\\s*(\\\\d+)"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(headers));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+
+                const QByteArray body = QByteArrayLiteral(
+                    "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                    "xmlns:tds='http://www.onvif.org/ver10/device/wsdl'><s:Body>"
+                    "<tds:GetDeviceInformationResponse>"
+                    "<tds:Manufacturer>Loopback Camera</tds:Manufacturer>"
+                    "<tds:Model>Integration Fixture</tds:Model>"
+                    "<tds:FirmwareVersion>test-1</tds:FirmwareVersion>"
+                    "<tds:SerialNumber>LOOP-001</tds:SerialNumber>"
+                    "<tds:HardwareId>HW-001</tds:HardwareId>"
+                    "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\n")
+                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\\r\\n")
+                    + QByteArrayLiteral("Content-Length: ") + QByteArray::number(body.size())
+                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + body;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    DeviceRecord enriched;
+    bool receivedDevice = false;
+    connect(&discovery, &DiscoveryService::deviceFound, &discovery,
+            [&enriched, &receivedDevice](const DeviceRecord &device) {
+        enriched = device;
+        receivedDevice = true;
+    });
+
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:local-onvif-integration");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(receivedDevice, 3000);
+    QCOMPARE(enriched.manufacturer, QStringLiteral("Loopback Camera"));
+    QCOMPARE(enriched.model, QStringLiteral("Integration Fixture"));
+    QCOMPARE(enriched.firmwareVersion, QStringLiteral("test-1"));
+    QCOMPARE(enriched.serialNumber, QStringLiteral("LOOP-001"));
+    QCOMPARE(enriched.hardwareId, QStringLiteral("HW-001"));
 }
 
 QTEST_MAIN(MainWindowSmokeTest)
