@@ -21,9 +21,21 @@ bool SubnetScanner::isRunning() const { return running_; }
 bool SubnetScanner::start(const QNetworkInterface &interface,
                           const QNetworkAddressEntry &entry)
 {
-    if (running_ || entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+    const auto flags = interface.flags();
+    if (running_ || !interface.isValid() ||
+        !flags.testFlag(QNetworkInterface::IsUp) ||
+        !flags.testFlag(QNetworkInterface::IsRunning) ||
+        flags.testFlag(QNetworkInterface::IsLoopBack) ||
+        entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
         entry.prefixLength() < 1 || entry.prefixLength() > 32 ||
         entry.ip().isLoopback() || entry.ip().isNull())
+        return false;
+
+    // Derive the mask from the validated prefix instead of trusting a possibly
+    // empty or inconsistent netmask supplied by the platform interface API.
+    const quint32 prefixMask = 0xffffffffU << (32 - entry.prefixLength());
+    if (entry.netmask().protocol() != QAbstractSocket::IPv4Protocol ||
+        entry.netmask().toIPv4Address() != prefixMask)
         return false;
 
     cancel();
@@ -35,7 +47,7 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     totalProbes_ = 0;
 
     const quint32 ip = entry.ip().toIPv4Address();
-    const quint32 mask = entry.netmask().toIPv4Address();
+    const quint32 mask = prefixMask;
     const quint32 network = ip & mask;
     const quint32 broadcast = network | ~mask;
     if (broadcast <= network + 1) return false;
