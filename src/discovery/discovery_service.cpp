@@ -355,6 +355,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *setReply = networkManager_.post(request, soap);
+    trackEnrichmentReply(setReply);
     const QString key = storageKeyForDevice(device);
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
@@ -393,6 +394,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
         QNetworkReply *verifyReply = networkManager_.post(verifyRequest, verifySoap);
+                trackEnrichmentReply(verifyReply);
         connect(verifyReply, &QNetworkReply::finished, this,
             [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl] {
                 const QByteArray payload = verifyReply->readAll();
@@ -450,6 +452,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                 gatewayRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                                             QNetworkRequest::ManualRedirectPolicy);
                 QNetworkReply *gatewayReply = networkManager_.post(gatewayRequest, gatewaySoap);
+                trackEnrichmentReply(gatewayReply);
                 connect(gatewayReply, &QNetworkReply::finished, this,
                     [this, gatewayReply, device, address, gateway, finishVerified] {
                         const QByteArray gatewayResponse = gatewayReply->readAll();
