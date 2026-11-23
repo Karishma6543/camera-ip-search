@@ -646,6 +646,8 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
         }
         if (!selected.gateway.isEmpty()) device.ipv4Gateway = selected.gateway;
     }
+    if (!device.ipv4ConfigurationKnown)
+        device.networkInterfaceToken.clear();
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces")))
         device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     emit deviceFound(device);
