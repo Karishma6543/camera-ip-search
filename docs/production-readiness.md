@@ -53,7 +53,7 @@ Not implemented:
 - [x] Add a user-confirmed diagnostics text export with OS/application/interface summary, recent operation history and redacted rotating logs; it excludes the inventory database and ONVIF interface tokens.
 - [x] Distinguish completed and cancelled discovery/subnet scan outcomes in the activity history.
 - [x] Request cancellation of discovery, subnet scanning and reachability work during MainWindow shutdown.
-- [ ] Add automated shutdown-under-load tests and verify no pending replies/sockets or worker activity remain.
+- [x] Add a window-shutdown regression test that closes an active ONVIF enrichment socket, plus a live subnet-scan cancellation test. [ ] Run under all CI platforms and verify no pending replies/sockets or worker activity remain.
 
 ### P2 — Distribution and maintainability
 
