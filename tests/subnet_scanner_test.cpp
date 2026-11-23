@@ -10,6 +10,7 @@ private slots:
     void rejectsNetmaskPrefixMismatch();
     void rejectsPointToPointAndHostOnlySubnets();
     void validatesSubnetBoundaryAddresses();
+    void cancelsAnActiveSubnetScan();
 };
 
 void SubnetScannerTest::rejectsInvalidInterface()
@@ -83,6 +84,37 @@ void SubnetScannerTest::validatesSubnetBoundaryAddresses()
         makeEntry(QStringLiteral("192.0.2.2"), QStringLiteral("255.255.255.252"), 30)));
     QVERIFY(!SubnetScanner::isUsableSubnet(
         makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.252"), 30)));
+}
+
+
+void SubnetScannerTest::cancelsAnActiveSubnetScan()
+{
+    SubnetScanner scanner;
+    QSignalSpy cancelled(&scanner, &SubnetScanner::cancelled);
+    bool started = false;
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack))
+            continue;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                !SubnetScanner::isUsableSubnet(entry))
+                continue;
+            if (scanner.start(interface, entry)) {
+                started = true;
+                break;
+            }
+        }
+        if (started) break;
+    }
+    if (!started) QSKIP("No eligible non-loopback IPv4 subnet is available on this runner.");
+
+    QVERIFY(scanner.isRunning());
+    scanner.cancel();
+    QVERIFY(!scanner.isRunning());
+    QCOMPARE(cancelled.count(), 1);
 }
 
 QTEST_GUILESS_MAIN(SubnetScannerTest)
