@@ -272,6 +272,8 @@ void MainWindow::buildUi()
     deviceCountValue_->setObjectName(QStringLiteral("metric"));
     filterRow->addWidget(searchEdit_, 2);
     filterRow->addWidget(interfaceSelector_);
+    connect(interfaceSelector_, &QComboBox::currentIndexChanged, this,
+            [this](int) { updateLocalNetworkSummary(); });
     filterRow->addWidget(vendorFilter);
     filterRow->addWidget(statusFilter);
     filterRow->addStretch();
