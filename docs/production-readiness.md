@@ -51,6 +51,7 @@ Not implemented:
 - [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
 - [x] Add rotating application log files and regression tests for common key/value, Bearer, URL user-info and XML secret redaction. Redaction remains best-effort and needs broader security review.
 - [x] Add a user-confirmed diagnostics text export with OS/application/interface summary, recent operation history and redacted rotating logs; it excludes the inventory database and ONVIF interface tokens.
+- [x] Distinguish completed and cancelled discovery/subnet scan outcomes in the activity history.
 - [x] Request cancellation of discovery, subnet scanning and reachability work during MainWindow shutdown.
 - [ ] Add automated shutdown-under-load tests and verify no pending replies/sockets or worker activity remain.
 
