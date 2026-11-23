@@ -211,6 +211,7 @@ void DeviceIdentityTest::revokesStaleOnvifInterfaceToken()
 
     DeviceRecord unmatched;
     unmatched.ipAddress = existing.ipAddress;
+    unmatched.networkInterfaceToken = QStringLiteral("incomplete-token");
     unmatched.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     unmatched.ipv4ConfigurationKnown = false;
 
