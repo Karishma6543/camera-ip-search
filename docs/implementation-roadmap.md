@@ -15,8 +15,9 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Require protocol evidence before promoting a TCP-only candidate.
 - [ ] Separate application coordinator and normalized observation/error models.
 - [ ] Move all persistence out of the UI layer into a testable repository.
-- [ ] Add structured, redacted rotating log files.
-- [x] Add user-confirmed diagnostic export with OS/application/interface details and recent operation history.
+- [x] Add rotating application logs with best-effort secret redaction and regression tests.
+- [x] Add user-confirmed diagnostic export with OS/application/interface details, recent operation history and recent logs.
+- [ ] Complete broader secret-redaction review and validate support-bundle privacy on each OS.
 - [ ] Move all potentially blocking work off the GUI thread and prove responsiveness under load.
 
 ## Milestone 2 — Discovery
