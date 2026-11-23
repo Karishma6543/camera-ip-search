@@ -38,10 +38,11 @@ void DiagnosticLogTest::redactsBearerAndUrlCredentials()
 
 void DiagnosticLogTest::redactsXmlSecretElements()
 {
-    const QString input = QStringLiteral("<Envelope><wsse:Password>top-secret</wsse:Password><wsse:Username>operator</wsse:Username></Envelope>");
+    const QString input = QStringLiteral("<Envelope><wsse:Password>top-secret</wsse:Password><wsse:Username>operator</wsse:Username><wsse:Nonce>nonce-value</wsse:Nonce></Envelope>");
     const QString output = DiagnosticLog::redactSensitiveData(input);
     QVERIFY(!output.contains(QStringLiteral("top-secret")));
     QVERIFY(!output.contains(QStringLiteral("operator")));
+    QVERIFY(!output.contains(QStringLiteral("nonce-value")));
     QVERIFY(output.contains(QStringLiteral("<REDACTED>")));
 }
 
@@ -50,8 +51,8 @@ void DiagnosticLogTest::redactsXmlSecretElements()
 void DiagnosticLogTest::redactsAuthorizationCookiesAndQuerySecrets()
 {
     const QString input = QStringLiteral(
-        "Authorization: Basic dXNlcjpwYXNz\\r\\n"
-        "Cookie: sessionid=private-value\\r\\n"
+        "Authorization: Basic dXNlcjpwYXNz\r\n"
+        "Cookie: sessionid=private-value\r\n"
         "GET /device?access_token=private-token&mode=read");
     const QString output = DiagnosticLog::redactSensitiveData(input);
     QVERIFY(!output.contains(QStringLiteral("dXNlcjpwYXNz")));
