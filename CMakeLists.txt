@@ -129,6 +129,15 @@ if(BUILD_TESTING)
     target_link_libraries(device-identity-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME device-identity-tests COMMAND device-identity-tests)
 
+    qt_add_executable(diagnostic-log-tests
+        tests/diagnostic_log_test.cpp
+        src/core/diagnostic_log.h
+        src/core/diagnostic_log.cpp
+    )
+    target_include_directories(diagnostic-log-tests PRIVATE src)
+    target_link_libraries(diagnostic-log-tests PRIVATE Qt6::Test)
+    add_test(NAME diagnostic-log-tests COMMAND diagnostic-log-tests)
+
     qt_add_executable(main-window-smoke-tests
         tests/main_window_smoke_test.cpp
         src/core/diagnostic_log.h
@@ -172,6 +181,7 @@ if(BUILD_TESTING)
         device-identity-tests
         reachability-checker-tests
         main-window-smoke-tests
+        diagnostic-log-tests
         PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()
