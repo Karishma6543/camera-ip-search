@@ -17,7 +17,8 @@ This is a review aid, not a security certification. Complete it against the exac
 ## Release blockers
 
 - [ ] Review every log call and network error path for passwords, Authorization headers, cookies, WS-Security UsernameToken material, tokens and full SOAP payloads.
-- [ ] Add automated tests for the logger's redaction patterns and rotation behavior.
+- [x] Add regression tests for common key/value, Bearer, URL user-info and XML secret redaction.
+- [ ] Add automated tests for log rotation, archive retention and redaction edge cases.
 - [ ] Perform a source-level threat review of XML entity handling, XML depth/size, JSON nesting, URL parsing, redirects, DNS rebinding and endpoint trust.
 - [ ] Verify TLS certificate validation and user-visible handling of invalid/self-signed certificates.
 - [ ] Implement OS credential-vault integration before offering persistent credential storage. Until then, credentials remain session-only and must not be cached in app settings or SQLite.
