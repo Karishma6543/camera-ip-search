@@ -1174,8 +1174,12 @@ void MainWindow::recordOperation(const QString &operation, const QString &target
     query.bindValue(":target", safe(target));
     query.bindValue(":outcome", safe(outcome));
     query.bindValue(":details", safe(details));
-    if (!query.exec())
+    if (!query.exec()) {
         updateStatus(tr("Could not record operation history: %1").arg(query.lastError().text()));
+        return;
+    }
+    QSqlQuery retention(inventoryDb_);
+    retention.exec(QStringLiteral("DELETE FROM operation_history WHERE id NOT IN (SELECT id FROM operation_history ORDER BY id DESC LIMIT 1000)"));
 }
 
 void MainWindow::refreshOperationHistory()
