@@ -38,7 +38,7 @@ QString redact(QString message)
         QRegularExpression::CaseInsensitiveOption);
     message.replace(basicUrl, QStringLiteral("\\1[REDACTED]@"));
     const QRegularExpression xmlSecret(
-        QStringLiteral(R"(<(Password|Username|Token)(\s[^>]*)?>.*?</\1>)"),
+        QStringLiteral(R"(<(?:[A-Za-z0-9_.-]+:)?(Password|Username|Token)(\s[^>]*)?>.*?</(?:[A-Za-z0-9_.-]+:)?\1>)"),
         QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
     message.replace(xmlSecret, QStringLiteral("<REDACTED>"));
     return message.left(8192);
