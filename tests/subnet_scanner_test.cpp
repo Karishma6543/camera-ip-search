@@ -9,6 +9,7 @@ private slots:
     void rejectsInvalidInterface();
     void rejectsNetmaskPrefixMismatch();
     void rejectsPointToPointAndHostOnlySubnets();
+    void validatesSubnetBoundaryAddresses();
 };
 
 void SubnetScannerTest::rejectsInvalidInterface()
@@ -59,6 +60,29 @@ void SubnetScannerTest::rejectsPointToPointAndHostOnlySubnets()
     validHost.setNetmask(QHostAddress(QStringLiteral("255.255.255.0")));
     validHost.setPrefixLength(24);
     QVERIFY(SubnetScanner::isUsableSubnet(validHost));
+}
+
+
+void SubnetScannerTest::validatesSubnetBoundaryAddresses()
+{
+    const auto makeEntry = [](const QString &ip, const QString &mask, int prefix) {
+        QNetworkAddressEntry entry;
+        entry.setIp(QHostAddress(ip));
+        entry.setNetmask(QHostAddress(mask));
+        entry.setPrefixLength(prefix);
+        return entry;
+    };
+
+    QVERIFY(!SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.0"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(!SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.255"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.2"), QStringLiteral("255.255.255.252"), 30)));
+    QVERIFY(!SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.252"), 30)));
 }
 
 QTEST_GUILESS_MAIN(SubnetScannerTest)
