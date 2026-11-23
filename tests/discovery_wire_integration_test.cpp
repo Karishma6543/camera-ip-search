@@ -6,7 +6,6 @@
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
 #include <QElapsedTimer>
-#include <QElapsedTimer>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QScopedPointer>
