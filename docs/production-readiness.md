@@ -82,6 +82,7 @@ Not implemented:
 - [x] Run simulator fixture tests in the Windows/macOS/Linux CI matrix before the Qt build.
 - [x] Add a Qt startup smoke-test target that checks the Operation History workspace and SQLite schema version are initialized.
 - [x] Add an in-flight ONVIF SOAP response limit (1 MiB) and a regression test using a 2 MiB local HTTP peer.
+- [x] Exercise `DiscoveryService` ONVIF device-information enrichment against a local HTTP peer, including manufacturer/model/firmware/serial parsing.
 - [x] Add an operation-history table and a bounded recent-activity view.
 - [x] Add user-confirmed diagnostic text export with OS/application/interface summary and recent operation records.
 - [x] Check SQLite integrity before schema changes and leave an invalid database untouched.
