@@ -1,4 +1,5 @@
 import importlib.util
+import http.client
 import pathlib
 import unittest
 from argparse import Namespace
@@ -81,6 +82,28 @@ class ContractBSimulatorTests(unittest.TestCase):
         })
         import json
         self.assertEqual(json.loads(payload)["device"]["ipv4"], "192.0.2.253")
+
+    def test_oversized_scenario_serves_more_than_one_mib_soap_body(self):
+        args = Namespace(
+            scenario="oversized", advertised_ip="127.0.0.1", http_port=0,
+            mac="02:00:00:00:00:01", bind="127.0.0.1", interface_ip="127.0.0.1"
+        )
+        simulator = simulator_module.Scenario(args)
+        try:
+            simulator.start_http()
+            port = simulator.http.server_address[1]
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+            connection.request(
+                "POST", "/onvif/device_service", body=b"<GetDeviceInformation/>",
+                headers={"Content-Type": "application/soap+xml"}
+            )
+            response = connection.getresponse()
+            body = response.read()
+            self.assertEqual(response.status, 200)
+            self.assertGreater(len(body), 1024 * 1024)
+            connection.close()
+        finally:
+            simulator.shutdown()
 
     def test_missing_mac_is_allowed_as_a_negative_fixture(self):
         payload = make_simulator("missing-mac").project_payload({
