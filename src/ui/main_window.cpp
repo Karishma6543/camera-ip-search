@@ -165,9 +165,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 break;
             }
         }
-        const int selectedRow = deviceTable_ ? deviceTable_->currentRow() : -1;
-        const QString target = selectedRow >= 0 && deviceTable_->item(selectedRow, 1) ? deviceTable_->item(selectedRow, 1)->text() : QString();
-        recordOperation(tr("Static IPv4"), target, verified ? tr("Verified") : tr("Not verified"), message);
+        recordOperation(tr("Static IPv4"), updatedDevice.ipAddress,
+                        verified ? tr("Verified") : tr("Not verified"), message);
         refreshOperationHistory();
         QMessageBox::information(this, verified ? tr("Network configuration verified")
                                                 : tr("Network configuration result"), message);
