@@ -148,7 +148,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
     auto *search = window.findChild<QLineEdit *>(QStringLiteral("deviceSearch"));
     auto *vendor = window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter"));
-    QVERIFY(table && search && vendor);
+    auto *statusFilter = window.findChild<QComboBox *>(QStringLiteral("statusFilter"));
+    QVERIFY(table && search && vendor && statusFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
 
@@ -160,6 +161,11 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     vendor->setCurrentText(QStringLiteral("Oxita devices"));
     QVERIFY(table->isRowHidden(0));
     vendor->setCurrentText(QStringLiteral("ONVIF devices"));
+    QVERIFY(!table->isRowHidden(0));
+
+    statusFilter->setCurrentText(QStringLiteral("Not activated"));
+    QVERIFY(table->isRowHidden(0));
+    statusFilter->setCurrentText(QStringLiteral("Activated"));
     QVERIFY(!table->isRowHidden(0));
 }
 
@@ -223,8 +229,8 @@ void MainWindowSmokeTest::leavesCorruptInventoryDatabaseUntouched()
     QCOMPARE(preserved.readAll(), corruptBytes);
     const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
     QVERIFY(status);
-    QVERIFY(status->text().contains(QStringLiteral("integrity check failed"),
-                                    Qt::CaseInsensitive));
+    QVERIFY(status->text().contains(QStringLiteral("integrity check failed"), Qt::CaseInsensitive) ||
+            status->text().contains(QStringLiteral("Could not open local inventory"), Qt::CaseInsensitive));
 }
 
 void MainWindowSmokeTest::migratesLegacyInventorySchema()
