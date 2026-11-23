@@ -1256,10 +1256,9 @@ void MainWindow::upsertDevice(DeviceRecord device)
             !manufacturerItem->text().trimmed().isEmpty() &&
             device.serialNumber.trimmed().compare(serialItem->text().trimmed(), Qt::CaseInsensitive) == 0 &&
             device.manufacturer.trimmed().compare(manufacturerItem->text().trimmed(), Qt::CaseInsensitive) == 0;
-        const bool sameIpWithoutIdentityConflict = !device.ipAddress.trimmed().isEmpty() &&
-            existingIp.compare(device.ipAddress.trimmed(), Qt::CaseInsensitive) == 0 &&
-            (existingMac.isEmpty() || incomingMac.isEmpty() ||
-             existingMac.compare(incomingMac, Qt::CaseInsensitive) == 0);
+        const bool sameIpWithoutIdentityConflict = compatibleMac &&
+            !device.ipAddress.trimmed().isEmpty() &&
+            existingIp.compare(device.ipAddress.trimmed(), Qt::CaseInsensitive) == 0;
         if (sameMac || sameEndpoint || sameSerial || sameIpWithoutIdentityConflict) {
             row = i;
             break;
