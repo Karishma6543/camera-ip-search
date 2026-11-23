@@ -258,6 +258,14 @@ void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
             reply->abort();
         }
     });
+    // Qt validates TLS certificates by default. Never override/ignore certificate
+    // errors: abort explicitly and surface a safe diagnostic for the operator.
+    connect(reply, &QNetworkReply::sslErrors, this,
+            [this, reply](const QList<QSslError> &errors) {
+        emit statusChanged(tr("TLS certificate validation failed for %1 (%2 error(s)); the ONVIF request was stopped.")
+                               .arg(reply->url().host()).arg(errors.size()));
+        reply->abort();
+    });
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         for (int index = enrichmentReplies_.size() - 1; index >= 0; --index) {
             if (enrichmentReplies_.at(index).isNull() ||
