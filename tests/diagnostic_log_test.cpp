@@ -1,6 +1,10 @@
 #include "core/diagnostic_log.h"
 
 #include <QtTest>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QStandardPaths>
 
 class DiagnosticLogTest final : public QObject
 {
@@ -9,6 +13,7 @@ private slots:
     void redactsKeyValueSecrets();
     void redactsBearerAndUrlCredentials();
     void redactsXmlSecretElements();
+    void rotatesLogsAndRetainsOnlyThreeArchives();
 };
 
 void DiagnosticLogTest::redactsKeyValueSecrets()
@@ -37,6 +42,38 @@ void DiagnosticLogTest::redactsXmlSecretElements()
     QVERIFY(!output.contains(QStringLiteral("top-secret")));
     QVERIFY(!output.contains(QStringLiteral("operator")));
     QVERIFY(output.contains(QStringLiteral("<REDACTED>")));
+}
+
+
+void DiagnosticLogTest::rotatesLogsAndRetainsOnlyThreeArchives()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setOrganizationName(QStringLiteral("OxitaTestSuite"));
+    QCoreApplication::setApplicationName(QStringLiteral("DiagnosticLogRotation"));
+    const QString directory = DiagnosticLog::directoryPath();
+    QVERIFY(QDir(directory).removeRecursively() || !QFileInfo::exists(directory));
+
+    const QtMessageHandler previousHandler = qInstallMessageHandler(nullptr);
+    qInstallMessageHandler(previousHandler);
+    DiagnosticLog::install();
+
+    // Each message is capped at 8 KiB by the logger. Repeated writes cross the
+    // 2 MiB threshold several times and exercise the three-archive retention.
+    const QString payload(8192, QLatin1Char('x'));
+    for (int index = 0; index < 1200; ++index)
+        qInfo().noquote() << payload;
+
+    qInstallMessageHandler(previousHandler);
+    const QString active = directory + QStringLiteral("/application.log");
+    QVERIFY(QFileInfo::exists(active));
+    QVERIFY(QFileInfo(active).size() <= 2 * 1024 * 1024);
+    for (int index = 1; index <= 3; ++index) {
+        const QString archive = active + QStringLiteral(".") + QString::number(index);
+        QVERIFY2(QFileInfo::exists(archive), qPrintable(archive));
+        QVERIFY(QFileInfo(archive).size() > 0);
+        QVERIFY(QFileInfo(archive).size() <= 2 * 1024 * 1024);
+    }
+    QVERIFY(!QFileInfo::exists(active + QStringLiteral(".4")));
 }
 
 QTEST_GUILESS_MAIN(DiagnosticLogTest)
