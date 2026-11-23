@@ -1,6 +1,5 @@
 #include "device_identity.h"
 
-#include <QSet>
 
 namespace {
 QString normalizedMac(const QString &value)
@@ -14,6 +13,15 @@ bool sameNonEmpty(const QString &left, const QString &right)
 {
     return !left.trimmed().isEmpty() &&
            left.trimmed().compare(right.trimmed(), Qt::CaseInsensitive) == 0;
+}
+
+
+bool conflictingMacs(const QString &left, const QString &right)
+{
+    const QString normalizedLeft = normalizedMac(left);
+    const QString normalizedRight = normalizedMac(right);
+    return !normalizedLeft.isEmpty() && !normalizedRight.isEmpty() &&
+           normalizedLeft != normalizedRight;
 }
 
 bool isKnownValue(const QString &value)
@@ -53,14 +61,16 @@ QString findMatchingKey(const QHash<QString, DeviceRecord> &devices,
     }
     if (!endpoint.isEmpty()) {
         for (auto it = devices.cbegin(); it != devices.cend(); ++it)
-            if (sameNonEmpty(endpoint, it.value().onvifEndpoint))
+            if (sameNonEmpty(endpoint, it.value().onvifEndpoint) &&
+                !conflictingMacs(mac, it.value().macAddress))
                 return it.key();
     }
     if (!serial.isEmpty() && isKnownValue(manufacturer)) {
         for (auto it = devices.cbegin(); it != devices.cend(); ++it) {
             const DeviceRecord &known = it.value();
             if (sameNonEmpty(serial, known.serialNumber) &&
-                sameNonEmpty(manufacturer, known.manufacturer))
+                sameNonEmpty(manufacturer, known.manufacturer) &&
+                !conflictingMacs(mac, known.macAddress))
                 return it.key();
         }
     }
@@ -100,22 +110,45 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
         merged.manufacturer = observation.manufacturer;
     if (!isKnownValue(merged.model) && isKnownValue(observation.model))
         merged.model = observation.model;
-    if (merged.firmwareVersion.isEmpty()) merged.firmwareVersion = observation.firmwareVersion;
+    if (verifiedObservation && !observation.firmwareVersion.isEmpty())
+        merged.firmwareVersion = observation.firmwareVersion;
     if (merged.hardwareId.isEmpty()) merged.hardwareId = observation.hardwareId;
     if (merged.serialNumber.isEmpty()) merged.serialNumber = observation.serialNumber;
-    if (merged.deviceServiceUrl.isEmpty()) merged.deviceServiceUrl = observation.deviceServiceUrl;
-    if (merged.networkSummary.isEmpty()) merged.networkSummary = observation.networkSummary;
-    if (merged.networkInterfaceToken.isEmpty()) merged.networkInterfaceToken = observation.networkInterfaceToken;
-    if (merged.ipv4Address.isEmpty()) merged.ipv4Address = observation.ipv4Address;
-    if (merged.ipv4SubnetMask.isEmpty()) merged.ipv4SubnetMask = observation.ipv4SubnetMask;
-    if (merged.ipv4Gateway.isEmpty()) merged.ipv4Gateway = observation.ipv4Gateway;
-    if (merged.ipv4DnsServer.isEmpty()) merged.ipv4DnsServer = observation.ipv4DnsServer;
-    if (!merged.ipv4ConfigurationKnown && observation.ipv4ConfigurationKnown) {
-        merged.ipv4ConfigurationKnown = true;
-        merged.ipv4DhcpEnabled = observation.ipv4DhcpEnabled;
+    if (verifiedObservation && !observation.deviceServiceUrl.isEmpty())
+        merged.deviceServiceUrl = observation.deviceServiceUrl;
+    const bool networkInterfacesUpdated =
+        observation.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces"));
+    if (networkInterfacesUpdated) {
+        merged.networkSummary = observation.networkSummary;
+        // An empty token is meaningful: the ONVIF response did not identify
+        // the interface owning the discovered IP, so stale write access must
+        // be revoked rather than retained from an earlier observation.
+        merged.networkInterfaceToken = observation.networkInterfaceToken;
+        merged.ipv4ConfigurationKnown = observation.ipv4ConfigurationKnown;
+        if (observation.ipv4ConfigurationKnown) {
+            merged.ipv4Address = observation.ipv4Address;
+            merged.ipv4SubnetMask = observation.ipv4SubnetMask;
+            merged.ipv4Gateway = observation.ipv4Gateway;
+            merged.ipv4DhcpEnabled = observation.ipv4DhcpEnabled;
+        }
+    } else if (observation.discoverySources.contains(QStringLiteral("ONVIF GetDNS"))) {
+        merged.ipv4DnsServer = observation.ipv4DnsServer;
+    } else {
+        if (merged.networkSummary.isEmpty()) merged.networkSummary = observation.networkSummary;
+        if (merged.networkInterfaceToken.isEmpty()) merged.networkInterfaceToken = observation.networkInterfaceToken;
+        if (merged.ipv4Address.isEmpty()) merged.ipv4Address = observation.ipv4Address;
+        if (merged.ipv4SubnetMask.isEmpty()) merged.ipv4SubnetMask = observation.ipv4SubnetMask;
+        if (merged.ipv4Gateway.isEmpty()) merged.ipv4Gateway = observation.ipv4Gateway;
+        if (merged.ipv4DnsServer.isEmpty()) merged.ipv4DnsServer = observation.ipv4DnsServer;
+        if (!merged.ipv4ConfigurationKnown && observation.ipv4ConfigurationKnown) {
+            merged.ipv4ConfigurationKnown = true;
+            merged.ipv4DhcpEnabled = observation.ipv4DhcpEnabled;
+        }
     }
-    if (merged.onvifEndpoint.isEmpty()) merged.onvifEndpoint = observation.onvifEndpoint;
-    if (merged.interfaceName.isEmpty()) merged.interfaceName = observation.interfaceName;
+    if (verifiedObservation && !observation.onvifEndpoint.isEmpty())
+        merged.onvifEndpoint = observation.onvifEndpoint;
+    if (verifiedObservation && !observation.interfaceName.isEmpty())
+        merged.interfaceName = observation.interfaceName;
     if (merged.reachabilityStatus == QStringLiteral("Not checked") &&
         observation.reachabilityStatus != QStringLiteral("Not checked"))
         merged.reachabilityStatus = observation.reachabilityStatus;
