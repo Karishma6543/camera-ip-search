@@ -1672,23 +1672,30 @@ void MainWindow::initializeInventory()
         return;
     }
 
-    QSqlQuery integrityQuery(inventoryDb_);
-    if (!integrityQuery.exec(QStringLiteral("PRAGMA quick_check")) ||
-        !integrityQuery.next() ||
-        integrityQuery.value(0).toString().compare(QStringLiteral("ok"), Qt::CaseInsensitive) != 0) {
+    bool integrityOk = false;
+    {
+        QSqlQuery integrityQuery(inventoryDb_);
+        integrityOk = integrityQuery.exec(QStringLiteral("PRAGMA quick_check")) &&
+                      integrityQuery.next() &&
+                      integrityQuery.value(0).toString().compare(
+                          QStringLiteral("ok"), Qt::CaseInsensitive) == 0;
+    }
+    if (!integrityOk) {
         updateStatus(tr("Inventory database integrity check failed. The database was left untouched; close the app and preserve a copy before attempting recovery."));
         inventoryDb_.close();
         return;
     }
 
     int schemaVersion = 0;
-    QSqlQuery versionQuery(inventoryDb_);
-    if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next()) {
-        updateStatus(tr("Could not read inventory schema version: %1").arg(versionQuery.lastError().text()));
-        inventoryDb_.close();
-        return;
+    {
+        QSqlQuery versionQuery(inventoryDb_);
+        if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next()) {
+            updateStatus(tr("Could not read inventory schema version: %1").arg(versionQuery.lastError().text()));
+            inventoryDb_.close();
+            return;
+        }
+        schemaVersion = versionQuery.value(0).toInt();
     }
-    schemaVersion = versionQuery.value(0).toInt();
     if (schemaVersion > 1) {
         updateStatus(tr("Inventory schema version %1 is newer than this application supports. The database was not modified.")
                          .arg(schemaVersion));
