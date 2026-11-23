@@ -92,3 +92,9 @@ The CTest target `discovery-wire-integration-tests` exercises actual Qt UDP and 
 These tests require no camera, external network, multicast route or privileged port. They validate the socket transport and parser boundary deterministically.
 
 **Scope limitation:** this is not yet a full `DiscoveryService` integration test. It does not exercise OS multicast group delivery, broadcast delivery on multiple physical NICs, the service's interface binding/selection, in-flight ONVIF HTTP enrichment, cancellation races or real camera behavior. Those remain separate CI/manual and hardware acceptance gates. A passing loopback test must not be described as proof of end-to-end camera discovery.
+
+## ONVIF response resource limit
+
+The desktop client now monitors each ONVIF enrichment reply as it arrives and aborts a response when more than 1 MiB is buffered. This prevents an untrusted camera from making the client buffer an arbitrarily large SOAP response before checking its size. A local HTTP peer regression test sends a 2 MiB SOAP body and expects the service to report the 1 MiB rejection.
+
+The existing post-read size checks remain as defense in depth. This guard is not a substitute for testing fragmented delivery, slow-drip responses, TLS behavior and all supported Qt/OS combinations.
