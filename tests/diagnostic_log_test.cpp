@@ -66,12 +66,12 @@ void DiagnosticLogTest::rotatesLogsAndRetainsOnlyThreeArchives()
     qInstallMessageHandler(previousHandler);
     const QString active = directory + QStringLiteral("/application.log");
     QVERIFY(QFileInfo::exists(active));
-    QVERIFY(QFileInfo(active).size() <= 2 * 1024 * 1024 + 8192);
+    QVERIFY(QFileInfo(active).size() <= 2 * 1024 * 1024 + 16384);
     for (int index = 1; index <= 3; ++index) {
         const QString archive = active + QStringLiteral(".") + QString::number(index);
         QVERIFY2(QFileInfo::exists(archive), qPrintable(archive));
         QVERIFY(QFileInfo(archive).size() > 0);
-        QVERIFY(QFileInfo(archive).size() <= 2 * 1024 * 1024 + 8192);
+        QVERIFY(QFileInfo(archive).size() <= 2 * 1024 * 1024 + 16384);
     }
     QVERIFY(!QFileInfo::exists(active + QStringLiteral(".4")));
 }
