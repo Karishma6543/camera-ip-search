@@ -197,6 +197,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             updateStatus(tr("Subnet scan: %1 / %2 connection checks completed; %3 unverified candidate(s) found.")
                              .arg(completed).arg(total).arg(candidates));
     });
+    connect(subnetScanner_, &SubnetScanner::cancelled, this, [this](int count) {
+        subnetScanButton_->setText(tr("Scan selected subnet"));
+        subnetScanButton_->setEnabled(true);
+        recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
+                        tr("Cancelled"), tr("%1 unverified candidate(s) found before cancellation").arg(count));
+        refreshOperationHistory();
+        updateStatus(tr("Subnet scan cancelled — %1 unverified candidate(s) retained.").arg(count));
+    });
     connect(subnetScanner_, &SubnetScanner::finished, this, [this](int count) {
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
