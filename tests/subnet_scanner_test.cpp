@@ -27,8 +27,8 @@ void SubnetScannerTest::rejectsNetmaskPrefixMismatch()
 {
     QNetworkAddressEntry entry;
     entry.setIp(QHostAddress(QStringLiteral("192.0.2.10")));
-    entry.setNetmask(QHostAddress(QStringLiteral("255.0.255.0")));
     entry.setPrefixLength(24);
+    entry.setNetmask(QHostAddress(QStringLiteral("255.0.255.0")));
     QVERIFY(!SubnetScanner::isUsableSubnet(entry));
 }
 
