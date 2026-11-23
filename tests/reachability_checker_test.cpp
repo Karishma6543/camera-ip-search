@@ -1,6 +1,7 @@
 #include "discovery/reachability_checker.h"
 
 #include <QSignalSpy>
+#include <QTcpServer>
 #include <QtTest>
 
 class ReachabilityCheckerTest final : public QObject
@@ -10,6 +11,7 @@ private slots:
     void completesEmptyInput();
     void reportsMissingAddressAsNotChecked();
     void cancelsAnActiveCheck();
+    void ignoresOverlappingStartAndChecksOriginalDevice();
 };
 
 void ReachabilityCheckerTest::completesEmptyInput()
@@ -53,6 +55,30 @@ void ReachabilityCheckerTest::cancelsAnActiveCheck()
     QVERIFY(!checker.isRunning());
     QCOMPARE(cancelled.count(), 1);
     QCOMPARE(cancelled.first().at(0).toInt(), 0);
+}
+
+
+void ReachabilityCheckerTest::ignoresOverlappingStartAndChecksOriginalDevice()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost, quint16(0)));
+
+    ReachabilityChecker checker;
+    QSignalSpy checked(&checker, &ReachabilityChecker::deviceChecked);
+    DeviceRecord first;
+    first.ipAddress = QStringLiteral("127.0.0.1");
+    first.openPorts << QString::number(server.serverPort());
+    DeviceRecord second;
+    second.ipAddress = QStringLiteral("192.0.2.77");
+
+    checker.start(QVector<DeviceRecord>{first});
+    QVERIFY(checker.isRunning());
+    checker.start(QVector<DeviceRecord>{second});
+
+    QTRY_COMPARE_WITH_TIMEOUT(checked.count(), 1, 3000);
+    QCOMPARE(checked.first().at(0).toString(), QStringLiteral("127.0.0.1"));
+    QCOMPARE(checked.first().at(1).toString(), QStringLiteral("Reachable"));
+    QVERIFY(!checker.isRunning());
 }
 
 QTEST_GUILESS_MAIN(ReachabilityCheckerTest)
