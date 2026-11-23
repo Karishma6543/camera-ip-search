@@ -11,6 +11,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 ## Milestone 1 — Application foundations
 - [x] Qt desktop shell and active IPv4 interface enumeration/selection.
 - [x] Basic device record and adapter registry.
+- [x] Stable device identity matching across MAC, ONVIF endpoint, serial/manufacturer and guarded IP fallback.
+- [x] Require protocol evidence before promoting a TCP-only candidate.
 - [ ] Separate application coordinator and normalized observation/error models.
 - [ ] Move all persistence out of the UI layer into a testable repository.
 - [ ] Add structured, redacted logging and diagnostic export.
@@ -22,6 +24,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Bounded opt-in IPv4 TCP candidate scanner (maximum 256 host addresses).
 - [x] Basic duplicate merging and discovery provenance.
 - [x] Add unit tests for invalid interfaces, IPv4 mask/prefix mismatch and unusable /31-/32 scan ranges.
+- [x] Add cancellation for in-flight ONVIF enrichment and reject stale replies after cancellation/restart.
 - [ ] Add integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts.
 - [ ] Verify broadcast/multicast behavior on Windows, macOS and Linux.
 - [ ] Test VLAN, multiple NIC, Wi-Fi/Ethernet, firewall and routed-network limitations.
@@ -47,6 +50,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 ## Milestone 5 — Safe provisioning
 - [x] Implement guarded ONVIF static IPv4 request with local validation, confirmation and post-change verification path.
 - [x] Gate ONVIF network writes through the adapter's implemented-operation list.
+- [x] Persist a verified new IP and report partial failure when a subsequent gateway update fails.
+- [ ] Add guided recovery/reconnect instructions for partial network-configuration failures.
 - [ ] Verify ONVIF write behavior, authentication and recovery on supported physical models.
 - [ ] Add robust partial-failure/recovery handling when IP changes succeed but gateway or verification fails.
 - [ ] Define and version the project's activation/network-configuration contract before implementation.
@@ -61,7 +66,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 
 ## Milestone 7 — Production release
 - [ ] Fix and pass CI on Windows, macOS and Linux.
-- [ ] Add unit, integration, UI and network simulation coverage.
+- [ ] Complete unit, integration, UI and network simulation coverage (unit tests exist; service/UI/network integration coverage remains).
 - [ ] Complete model/firmware hardware validation matrix.
 - [ ] Package installers and portable builds; test install, upgrade and uninstall.
 - [ ] Sign/notarize releases where applicable and define update distribution.
