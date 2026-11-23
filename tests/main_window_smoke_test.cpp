@@ -7,6 +7,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
+#include <QRegularExpression>
 #include "discovery/discovery_service.h"
 #include <QtTest>
 
