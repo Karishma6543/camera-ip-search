@@ -56,10 +56,10 @@ void MainWindowSmokeTest::rejectsOversizedOnvifResponseDuringReceive()
             connect(peer, &QTcpSocket::readyRead, peer, [peer] { peer->readAll(); });
             QTimer::singleShot(50, peer, [peer] {
                 const QByteArray body(2 * 1024 * 1024, 'x');
-                QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\n")
-                    + QByteArrayLiteral("Content-Type: application/soap+xml\\r\\n")
+                QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\\n")
+                    + QByteArrayLiteral("Content-Type: application/soap+xml\r\\n")
                     + QByteArrayLiteral("Content-Length: ") + QByteArray::number(body.size())
-                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n");
+                    + QByteArrayLiteral("\r\\nConnection: close\r\\n\r\\n");
                 peer->write(response);
                 peer->write(body);
                 peer->flush();
@@ -98,11 +98,11 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
                 QByteArray request = peer->property("requestBuffer").toByteArray();
                 request.append(peer->readAll());
                 peer->setProperty("requestBuffer", request);
-                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\\n\r\\n"));
                 if (headerEnd < 0) return;
                 const QByteArray headers = request.left(headerEnd);
                 const QRegularExpression lengthPattern(
-                    QStringLiteral("Content-Length\\\\s*:\\\\s*(\\\\d+)"),
+                    QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
                     QRegularExpression::CaseInsensitiveOption);
                 const auto match = lengthPattern.match(QString::fromLatin1(headers));
                 const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
@@ -118,10 +118,10 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
                     "<tds:SerialNumber>LOOP-001</tds:SerialNumber>"
                     "<tds:HardwareId>HW-001</tds:HardwareId>"
                     "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
-                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\n")
-                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\\r\\n")
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\\n")
+                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\r\\n")
                     + QByteArrayLiteral("Content-Length: ") + QByteArray::number(body.size())
-                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + body;
+                    + QByteArrayLiteral("\r\\nConnection: close\r\\n\r\\n") + body;
                 peer->write(response);
                 peer->disconnectFromHost();
             });
