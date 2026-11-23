@@ -99,3 +99,36 @@ These tests require no camera, external network, multicast route or privileged p
 The desktop client now monitors ONVIF SOAP replies, including enrichment and static-IPv4 configuration stages, as data arrives and aborts a response when more than 1 MiB is buffered. This prevents an untrusted camera from making the client buffer an arbitrarily large SOAP response before checking its size. A local HTTP peer regression test sends a 2 MiB SOAP body and expects the service to report the 1 MiB rejection.
 
 The existing post-read size checks remain as defense in depth. This guard is not a substitute for testing fragmented delivery, slow-drip responses, TLS behavior and all supported Qt/OS combinations.
+
+
+## Physical-interface discovery acceptance
+
+The Qt service lifecycle regression test now starts discovery on an available non-loopback IPv4 interface, confirms the service enters its active state after socket setup/probe submission, and cancels it. This validates the service's interface-selection and lifecycle path on CI hosts that expose a usable NIC; it does not prove a camera received either datagram.
+
+For a physical acceptance run, use a dedicated isolated Ethernet segment with one test camera and one application host. Capture traffic on the selected adapter and verify:
+- ONVIF Probe leaves the selected NIC for 239.255.255.250:3702.
+- Contract B probe leaves the selected NIC as IPv4 limited broadcast to UDP 9988.
+- Replies arrive on the same selected NIC and are associated with the actual UDP sender address.
+- A second active NIC does not receive or contribute replies when a specific interface is selected.
+- Duplicate replies are merged without duplicate inventory rows.
+- Cancellation closes discovery sockets and stops subsequent UI updates.
+- No response after the configured timeout produces a clean zero/partial result, not a stuck scanning state.
+
+Record the OS, adapter name, IPv4/prefix, camera model/firmware, packet capture and sanitized application diagnostics. Multicast/broadcast are link-local; repeat this test on every supported network topology.
+
+## Static IPv4 hardware acceptance — mandatory before enabling a model
+
+Use a camera on an isolated bench network, with a documented recovery path and a second way to reach the device (vendor reset procedure or direct local access). Never test first on a production camera or a remote camera.
+
+For each exact model, hardware revision and firmware:
+1. Record the current DHCP/static mode, address, subnet mask, gateway and DNS.
+2. Confirm the app discovered the same camera interface address and that the ONVIF interface token belongs to that interface.
+3. Preview and validate a new address/mask/gateway in the same isolated subnet. Verify invalid network/broadcast addresses and mismatched gateway subnets are rejected.
+4. Apply a reserved, unused static address. Capture each ONVIF SetNetworkInterfaces response and subsequent GetNetworkInterfaces verification.
+5. Reconnect using the new address and verify mask, gateway and DNS independently; do not treat an HTTP success response alone as proof.
+6. Repeat with a deliberately unreachable gateway or rejected write and verify the UI reports partial failure without claiming success.
+7. Power-cycle the camera and confirm the setting persists.
+8. Test a multi-interface camera and verify no other interface is modified.
+9. Record authentication mode, operator role, firmware response, elapsed time and sanitized logs.
+
+The application does not automatically roll back a verified IP change. If a test fails, use the camera's documented local recovery process. A model remains unsupported until the full matrix passes on its actual hardware.
