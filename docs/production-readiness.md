@@ -48,7 +48,7 @@ Not implemented:
 - [x] Add per-device progress and user-visible cancellation for reachability checks.
 - [ ] Add automated tests for reachability timeout and cancellation. [x] Test cancellation and ensure a second start cannot replace an active reachability batch.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.
-- [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
+- [x] Add guided operator recovery/reconnect instructions when the new IP is verified but a subsequent gateway update is not confirmed.
 - [x] Add rotating application log files and regression tests for common key/value, Bearer, URL user-info and XML secret redaction. [x] Add an archive-rotation/three-file-retention regression test. Redaction remains best-effort and needs broader security review.
 - [x] Add a user-confirmed diagnostics text export with OS/application/interface summary, recent operation history and redacted rotating logs; it excludes the inventory database and ONVIF interface tokens.
 - [x] Distinguish completed and cancelled discovery/subnet scan outcomes in the activity history.
