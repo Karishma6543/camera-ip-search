@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "core/diagnostic_log.h"
 #include "core/device_identity.h"
 
 #include "discovery/discovery_service.h"
@@ -1235,7 +1236,18 @@ void MainWindow::exportDiagnosticBundle()
     stream << "OS: " << QSysInfo::prettyProductName() << " ("
            << QSysInfo::kernelType() << " " << QSysInfo::kernelVersion() << ")\n";
     stream << "Architecture: " << QSysInfo::currentCpuArchitecture() << "\n\n";
-    stream << "NETWORK INTERFACES (IPv4 ONLY)\n";
+    stream << "RECENT REDACTED APPLICATION LOGS\n";
+    const QString logDirectory = DiagnosticLog::directoryPath();
+    for (const QString &logName : {QStringLiteral("application.log"), QStringLiteral("application.log.1"),
+                                   QStringLiteral("application.log.2"), QStringLiteral("application.log.3")}) {
+        QFile logFile(logDirectory + QLatin1Char('/') + logName);
+        if (!logFile.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\\n'), Qt::SkipEmptyParts);
+        stream << "--- " << logName << " ---\n";
+        const int first = qMax(0, lines.size() - 250);
+        for (int index = first; index < lines.size(); ++index) stream << lines.at(index) << "\n";
+    }
+    stream << "\nNETWORK INTERFACES (IPv4 ONLY)\n";
     for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
         if (!(interface.flags() & QNetworkInterface::IsUp) ||
             (interface.flags() & QNetworkInterface::IsLoopBack)) continue;
