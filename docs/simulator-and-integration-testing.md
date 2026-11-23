@@ -47,7 +47,7 @@ Pass one of the following values with `--scenario`:
 | `wrong-sequence` | Stale/mismatched request sequence |
 | `missing-mac` | Missing optional identity field |
 | `invalid-port` | Port range validation |
-| `unconfigured` | Explicit unconfigured-camera fallback fixture |
+| `advertised-mismatch` | Advertised address differs from UDP source; must be rejected |
 | `dhcp` | DHCP field handling |
 | `unsafe-xaddr` | XAddr with credentials/query; must be rejected |
 | `multiple-xaddrs` | First unsafe/wrong-host XAddr followed by a same-host endpoint |
