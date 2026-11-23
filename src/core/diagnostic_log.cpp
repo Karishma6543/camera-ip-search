@@ -78,7 +78,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     }
     QTextStream stream(&file);
     stream << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
-           << " [" << level << "] " << redact(message) << '\n';
+           << " [" << level << "] " << DiagnosticLog::redactSensitiveData(message) << '\n';
     stream.flush();
 }
 }
@@ -92,5 +92,10 @@ void install()
 QString directoryPath()
 {
     return logDirectory();
+}
+
+QString redactSensitiveData(const QString &message)
+{
+    return redact(message);
 }
 }
