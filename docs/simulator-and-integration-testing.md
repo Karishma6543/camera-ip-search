@@ -80,3 +80,15 @@ For each scenario, record:
 - Sanitized logs (never include credentials, authorization headers or tokens).
 
 Do not mark a physical camera model as supported based on simulator results.
+
+## C++ loopback wire integration tests
+
+The CTest target `discovery-wire-integration-tests` exercises actual Qt UDP and TCP sockets on the loopback interface:
+
+- A Contract B request/response datagram round trip, including response sequence validation and source-address parsing.
+- An ONVIF Probe/ProbeMatch datagram round trip and same-host device-service XAddr parsing.
+- A TCP connection to a local listening service, matching the basic connectability primitive used by subnet scanning.
+
+These tests require no camera, external network, multicast route or privileged port. They validate the socket transport and parser boundary deterministically.
+
+**Scope limitation:** this is not yet a full `DiscoveryService` integration test. It does not exercise OS multicast group delivery, broadcast delivery on multiple physical NICs, the service's interface binding/selection, in-flight ONVIF HTTP enrichment, cancellation races or real camera behavior. Those remain separate CI/manual and hardware acceptance gates. A passing loopback test must not be described as proof of end-to-end camera discovery.
