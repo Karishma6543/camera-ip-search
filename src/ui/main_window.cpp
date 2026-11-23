@@ -173,6 +173,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                                                 : tr("Network configuration result"), message);
         updateStatus(message);
     });
+    connect(discovery_, &DiscoveryService::cancelled, this, [this](int count) {
+        scanButton_->setText(tr("Discover devices"));
+        scanButton_->setEnabled(true);
+        recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
+                        tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
+        refreshOperationHistory();
+        updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
+    });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover devices"));
         scanButton_->setEnabled(true);
@@ -197,6 +205,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         refreshOperationHistory();
         updateStatus(tr("Subnet scan finished — %1 unverified candidate(s).").arg(count));
     });
+}
+
+MainWindow::~MainWindow()
+{
+    if (discovery_) discovery_->cancel();
+    if (subnetScanner_) subnetScanner_->cancel();
+    if (reachabilityChecker_) reachabilityChecker_->cancel();
 }
 
 void MainWindow::populateInterfaces()
