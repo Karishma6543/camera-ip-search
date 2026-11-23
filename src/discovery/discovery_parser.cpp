@@ -95,6 +95,7 @@ bool parseProjectResponse(const QByteArray &payload, quint32 expectedSequence,
     QHostAddress resolvedAddress;
     if (!resolvedAddress.setAddress(advertisedIp) ||
         resolvedAddress.protocol() != QAbstractSocket::IPv4Protocol ||
+        resolvedAddress.isLoopback() || resolvedAddress.isMulticast() ||
         resolvedAddress.toIPv4Address() == 0U ||
         resolvedAddress.toIPv4Address() == 0xffffffffU)
         return false;
