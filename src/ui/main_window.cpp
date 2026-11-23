@@ -417,7 +417,7 @@ void MainWindow::buildUi()
             deviceTable_->setRowCount(0);
             updateDeviceSummary();
             scanButton_->setText(tr("Cancel discovery"));
-            discovery_->start();
+            discovery_->start(interfaceSelector_->currentData().toString());
         }
     });
     connect(subnetScanButton_, &QPushButton::clicked, this, [this] {
