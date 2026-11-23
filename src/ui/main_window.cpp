@@ -1207,22 +1207,33 @@ void MainWindow::updateDeviceSummary()
     const int count = deviceTable_ ? deviceTable_->rowCount() : 0;
     int reachable = 0;
     int verified = 0;
+    int needsReview = 0;
     for (int row = 0; row < count; ++row) {
         const auto *reachability = deviceTable_->item(row, 11);
         if (reachability && reachability->text() == QStringLiteral("Reachable"))
             ++reachable;
         const auto *ipItem = deviceTable_->item(row, 1);
-        // A device is counted as ONVIF-verified only when discovery has retained
-        // an ONVIF endpoint or device-service URL, not merely because TCP responds.
+        const auto *sourceItem = deviceTable_->item(row, 8);
+        const QStringList sources = sourceItem
+            ? sourceItem->text().split(QStringLiteral(", "), Qt::SkipEmptyParts)
+            : QStringList{};
+        // The ONVIF card counts only devices with an ONVIF endpoint. Project
+        // firmware discovery is also valid protocol evidence and should not be
+        // mislabeled as an unverified candidate.
         if (ipItem && (!ipItem->data(Qt::UserRole + 2).toString().isEmpty() ||
                        !ipItem->data(Qt::UserRole + 3).toString().isEmpty()))
             ++verified;
+        const bool protocolVerified =
+            sources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
+            sources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
+            sources.contains(QStringLiteral("Project UDP 9988"));
+        if (!protocolVerified) ++needsReview;
     }
     if (deviceCountValue_) deviceCountValue_->setText(tr("%1 devices").arg(count));
     if (discoveredMetric_) discoveredMetric_->setText(QString::number(count));
     if (reachableMetric_) reachableMetric_->setText(QString::number(reachable));
     if (verifiedMetric_) verifiedMetric_->setText(QString::number(verified));
-    if (unverifiedMetric_) unverifiedMetric_->setText(QString::number(count - verified));
+    if (unverifiedMetric_) unverifiedMetric_->setText(QString::number(needsReview));
     if (summaryLabel_) {
         int checked = 0;
         for (int row = 0; row < count; ++row) {
