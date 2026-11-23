@@ -130,6 +130,11 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
             merged.ipv4SubnetMask = observation.ipv4SubnetMask;
             merged.ipv4Gateway = observation.ipv4Gateway;
             merged.ipv4DhcpEnabled = observation.ipv4DhcpEnabled;
+        } else {
+            merged.ipv4Address.clear();
+            merged.ipv4SubnetMask.clear();
+            merged.ipv4Gateway.clear();
+            merged.ipv4DhcpEnabled = false;
         }
     } else if (observation.discoverySources.contains(QStringLiteral("ONVIF GetDNS"))) {
         merged.ipv4DnsServer = observation.ipv4DnsServer;
