@@ -18,6 +18,7 @@ class SubnetScanner final : public QObject
 public:
     explicit SubnetScanner(QObject *parent = nullptr);
     bool start(const QNetworkInterface &interface, const QNetworkAddressEntry &entry);
+    static bool isUsableSubnet(const QNetworkAddressEntry &entry);
     void cancel();
     bool isRunning() const;
 
