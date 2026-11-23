@@ -6,7 +6,7 @@ This is a review aid, not a security certification. Complete it against the exac
 
 - Discovery parses bounded UDP payloads and validates the documented Contract B magic, version, command, sequence and field types.
 - ONVIF XAddrs are restricted to same-host HTTP(S) URLs and reject user information, query strings and fragments.
-- Device-service redirects are disabled for ONVIF writes; request timeouts and response size checks are applied in the inspected network paths.
+- Device-service redirects are disabled for ONVIF requests; request timeouts are applied and incoming SOAP responses are aborted once more than 1 MiB is buffered.
 - Device identity merging avoids merging conflicting MAC addresses.
 - Network writes require a matching ONVIF interface token and adapter-declared implemented operations.
 - No default camera credentials or credential guessing are included.
@@ -28,6 +28,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Run dependency/SBOM and license review for the exact release build.
 - [ ] Run static analysis and compiler sanitizers where supported.
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
+- [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard (execution still awaits a functioning CI runner).
 - [ ] Verify that cancellation and shutdown abort pending sockets/replies and do not leave worker threads running.
 
 ## Credential-vault policy
