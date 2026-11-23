@@ -49,8 +49,10 @@ Not implemented:
 - [ ] Add automated tests for reachability timeout, cancellation and overlapping operations.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.
 - [ ] Add guided operator recovery/reconnect instructions for partial network-configuration failures.
-- [ ] Add structured application log files with rotation and comprehensive redaction. A user-confirmed diagnostics text export now includes OS/application/interface summary and recent operation history; it excludes the inventory database and ONVIF interface tokens.
-- [ ] Verify application shutdown while network requests/scans are active.
+- [x] Add rotating application log files and regression tests for common key/value, Bearer, URL user-info and XML secret redaction. Redaction remains best-effort and needs broader security review.
+- [x] Add a user-confirmed diagnostics text export with OS/application/interface summary, recent operation history and redacted rotating logs; it excludes the inventory database and ONVIF interface tokens.
+- [x] Request cancellation of discovery, subnet scanning and reachability work during MainWindow shutdown.
+- [ ] Add automated shutdown-under-load tests and verify no pending replies/sockets or worker activity remain.
 
 ### P2 — Distribution and maintainability
 
