@@ -18,6 +18,7 @@
 namespace {
 constexpr quint16 kProjectPort = 9988;
 constexpr quint16 kOnvifPort = 3702;
+constexpr qint64 kMaxOnvifResponseBytes = 1024 * 1024;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
 
 bool isSafeDeviceServiceUrl(const QUrl &url, const QString &deviceIp)
@@ -248,6 +249,15 @@ void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
 {
     if (!reply) return;
     enrichmentReplies_.append(QPointer<QNetworkReply>(reply));
+    // Enforce the response limit while data is arriving. Checking readAll().size()
+    // only after finished() is too late: an untrusted camera could otherwise make
+    // QNetworkReply buffer an arbitrarily large SOAP response in memory.
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply] {
+        if (reply->bytesAvailable() > kMaxOnvifResponseBytes) {
+            emit statusChanged(tr("Rejected ONVIF response larger than the 1 MiB safety limit."));
+            reply->abort();
+        }
+    });
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         for (int index = enrichmentReplies_.size() - 1; index >= 0; --index) {
             if (enrichmentReplies_.at(index).isNull() ||
