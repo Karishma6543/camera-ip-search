@@ -10,6 +10,7 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include <QRegularExpression>
+#include <QPointer>
 #include "discovery/discovery_service.h"
 #include <QtTest>
 
@@ -22,6 +23,7 @@ private slots:
     void rollsBackFailedInventoryMigration();
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
+    void shutdownAbortsActiveOnvifEnrichment();
 };
 
 void MainWindowSmokeTest::startupShowsOperationHistory()
@@ -235,6 +237,35 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
     QCOMPARE(enriched.firmwareVersion, QStringLiteral("test-1"));
     QCOMPARE(enriched.serialNumber, QStringLiteral("LOOP-001"));
     QCOMPARE(enriched.hardwareId, QStringLiteral("HW-001"));
+}
+
+
+void MainWindowSmokeTest::shutdownAbortsActiveOnvifEnrichment()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    QPointer<QTcpSocket> acceptedPeer;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &acceptedPeer] {
+        while (camera.hasPendingConnections())
+            acceptedPeer = camera.nextPendingConnection();
+    });
+
+    auto *window = new MainWindow;
+    auto *discovery = window->findChild<DiscoveryService *>();
+    QVERIFY(discovery);
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("127.0.0.1");
+    device.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                  .arg(camera.serverPort());
+    device.onvifEndpoint = QStringLiteral("urn:uuid:shutdown-cancel-test");
+    device.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery->refreshDeviceInfo(device);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!acceptedPeer.isNull(), 3000);
+    delete window;
+    QTRY_VERIFY_WITH_TIMEOUT(acceptedPeer.isNull() ||
+                             acceptedPeer->state() == QAbstractSocket::UnconnectedState, 3000);
 }
 
 QTEST_MAIN(MainWindowSmokeTest)
