@@ -12,11 +12,8 @@ import json
 import logging
 import signal
 import socket
-import struct
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
 
 LOG = logging.getLogger("oxita-camera-simulator")
 MAX_DATAGRAM = 65507
@@ -45,7 +42,7 @@ class Scenario:
         if self.args.scenario == "wrong-sequence":
             seq += 1
         ip = self.args.advertised_ip
-        if self.args.scenario == "unconfigured":
+        if self.args.scenario == "advertised-mismatch":
             ip = "192.0.2.253"
         device = {
             "mac": self.args.mac,
@@ -236,7 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-onvif", action="store_true", help="Run only the Contract B UDP simulator")
     parser.add_argument("--scenario", choices=[
         "normal", "silent", "malformed-json", "wrong-sequence", "missing-mac",
-        "invalid-port", "unconfigured", "dhcp", "unsafe-xaddr",
+        "invalid-port", "advertised-mismatch", "dhcp", "unsafe-xaddr",
         "multiple-xaddrs", "oversized", "auth-required", "soap-fault",
     ], default="normal")
     args = parser.parse_args()
