@@ -7,7 +7,7 @@
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
 #include <QPointer>
-#include <QSet>
+#include <QHash>
 #include <QTimer>
 #include <QTcpSocket>
 #include <QVector>
@@ -41,7 +41,7 @@ private:
 
     QVector<Probe> active_;
     QVector<QPair<QString, quint16>> pending_;
-    QSet<QString> emitted_;
+    QHash<QString, DeviceRecord> discoveredCandidates_;
     QTimer scheduler_;
     bool running_{false};
     int candidates_{0};

@@ -6,9 +6,10 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    QCoreApplication::setApplicationName("Camera IP Search");
-    QCoreApplication::setApplicationVersion("0.1.0");
-    QCoreApplication::setOrganizationName("Camera Tools");
+    app.setStyle("Fusion");
+    QCoreApplication::setApplicationName("Oxita Camera Device Manager");
+    QCoreApplication::setApplicationVersion("0.2.0");
+    QCoreApplication::setOrganizationName("Oxita");
 
     MainWindow window;
     window.show();

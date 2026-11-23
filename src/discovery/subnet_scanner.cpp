@@ -21,43 +21,77 @@ bool SubnetScanner::isRunning() const { return running_; }
 bool SubnetScanner::start(const QNetworkInterface &interface,
                           const QNetworkAddressEntry &entry)
 {
-    if (running_ || entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+    const auto flags = interface.flags();
+    if (running_ || !interface.isValid() ||
+        !flags.testFlag(QNetworkInterface::IsUp) ||
+        !flags.testFlag(QNetworkInterface::IsRunning) ||
+        flags.testFlag(QNetworkInterface::IsLoopBack) ||
+        entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
         entry.prefixLength() < 1 || entry.prefixLength() > 32 ||
         entry.ip().isLoopback() || entry.ip().isNull())
+        return false;
+
+    bool belongsToInterface = false;
+    for (const QNetworkAddressEntry &configured : interface.addressEntries()) {
+        if (configured.ip() == entry.ip() &&
+            configured.prefixLength() == entry.prefixLength()) {
+            belongsToInterface = true;
+            break;
+        }
+    }
+    if (!belongsToInterface) return false;
+
+    // Derive the mask from the validated prefix instead of trusting a possibly
+    // empty or inconsistent netmask supplied by the platform interface API.
+    const quint32 prefixMask = 0xffffffffU << (32 - entry.prefixLength());
+    if (entry.netmask().protocol() != QAbstractSocket::IPv4Protocol ||
+        entry.netmask().toIPv4Address() != prefixMask)
         return false;
 
     cancel();
     pending_.clear();
     active_.clear();
-    emitted_.clear();
+    discoveredCandidates_.clear();
     candidates_ = 0;
     completedProbes_ = 0;
     totalProbes_ = 0;
 
     const quint32 ip = entry.ip().toIPv4Address();
-    const quint32 mask = entry.netmask().toIPv4Address();
+    const quint32 mask = prefixMask;
     const quint32 network = ip & mask;
     const quint32 broadcast = network | ~mask;
-    if (broadcast <= network + 1) return false;
+    if (broadcast <= network || (broadcast - network) <= 1U) return false;
+    if (ip <= network || ip >= broadcast) return false;
 
-    quint32 first = network + 1;
+    const quint32 first = network + 1;
     const quint32 last = broadcast - 1;
     const quint32 hostCount = last - first + 1;
+    quint32 scanFirst = first;
+    quint32 scanLast = last;
     if (hostCount > kMaxHosts) {
-        const quint32 cappedLast = qMin(last, first + static_cast<quint32>(kMaxHosts) - 1);
-        emit statusChanged(tr("Subnet contains %1 hosts; scanning a bounded first %2 addresses.")
-                               .arg(hostCount).arg(cappedLast - first + 1));
+        // Keep the bounded scan useful on larger subnets by centering the
+        // address window around the selected interface's own IPv4 address.
+        const quint32 halfWindow = static_cast<quint32>(kMaxHosts / 2);
+        if (ip > first + halfWindow)
+            scanFirst = ip - halfWindow;
+        if (scanFirst > last - static_cast<quint32>(kMaxHosts) + 1)
+            scanFirst = last - static_cast<quint32>(kMaxHosts) + 1;
+        scanLast = scanFirst + static_cast<quint32>(kMaxHosts) - 1;
+        emit statusChanged(tr("Subnet contains %1 hosts; scanning a bounded %2-address window around %3.")
+                               .arg(hostCount).arg(kMaxHosts).arg(entry.ip().toString()));
     } else {
         emit statusChanged(tr("Scanning %1 local IPv4 host(s) on %2.")
                                .arg(hostCount).arg(interface.humanReadableName()));
     }
 
-    const quint32 cappedLast = qMin(last, first + static_cast<quint32>(kMaxHosts) - 1);
-    for (quint32 host = first; host <= cappedLast; ++host) {
-        if (host == ip) continue;
-        const QString address = QHostAddress(host).toString();
-        for (quint16 port : kCameraPorts)
-            pending_.append(qMakePair(address, port));
+    for (quint32 host = scanFirst;; ++host) {
+        if (host != ip) {
+            const QString address = QHostAddress(host).toString();
+            for (quint16 port : kCameraPorts)
+                pending_.append(qMakePair(address, port));
+        }
+        // Avoid unsigned wraparound when a bounded window ends at 255.255.255.255.
+        if (host == scanLast) break;
     }
 
     if (pending_.isEmpty()) return false;
@@ -140,9 +174,8 @@ void SubnetScanner::completeProbe(QTcpSocket *socket, bool connected)
     emit progressChanged(completedProbes_, totalProbes_, candidates_);
 
     if (connected) {
-        if (!emitted_.contains(ip)) {
-            emitted_.insert(ip);
-            ++candidates_;
+        auto it = discoveredCandidates_.find(ip);
+        if (it == discoveredCandidates_.end()) {
             DeviceRecord candidate;
             candidate.id = ip;
             candidate.ipAddress = ip;
@@ -152,9 +185,12 @@ void SubnetScanner::completeProbe(QTcpSocket *socket, bool connected)
             candidate.discoverySources << QStringLiteral("Local subnet TCP scan");
             candidate.openPorts << QString::number(port);
             candidate.isCandidate = true;
-            emit candidateFound(candidate);
-        } else {
-            emit statusChanged(tr("Additional open service found at %1:%2").arg(ip).arg(port));
+            it = discoveredCandidates_.insert(ip, candidate);
+            ++candidates_;
+            emit candidateFound(it.value());
+        } else if (!it->openPorts.contains(QString::number(port))) {
+            it->openPorts << QString::number(port);
+            emit candidateFound(it.value());
         }
     }
 

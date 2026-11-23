@@ -1,52 +1,65 @@
-# Camera IP Search
+# Oxita Camera Device Manager
 
-A cross-platform desktop utility for discovering IP cameras from multiple manufacturers and provisioning only the capabilities verified for each device.
+A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing device/network information and performing a limited set of explicitly supported operations.
 
-**Status:** Early implementation. The Qt desktop shell now runs active-interface discovery using ONVIF WS-Discovery (UDP 3702) and the project's own Contract B protocol (UDP 9988). Vendor-specific discovery and fallback subnet scanning are next.
+**Release status:** Pre-production. The current branch contains implemented discovery, candidate scanning, ONVIF read/enrichment, local inventory and a guarded ONVIF static-IPv4 workflow. The application has not yet passed a complete cross-platform build/test run or model-level hardware validation. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
 
-## Compatibility objective
+## Implemented in this build
 
-Target devices include CP Plus, Hikvision, Prama, the project's own camera firmware, generic ONVIF cameras and other manufacturers. Compatibility is model- and firmware-specific: discovery does not guarantee activation, network configuration or firmware-upgrade support.
+- Enumerates active, non-loopback IPv4 network interfaces and lets the user choose the interface for discovery.
+- Sends ONVIF WS-Discovery probes (UDP 3702).
+- Sends the project's Contract B discovery probe (UDP 9988) for Oxita firmware only.
+- Parses bounded ONVIF ProbeMatch XML and project JSON responses, including sequence/type checks, same-host endpoint validation and source-IP consistency checks.
+- Enriches compatible ONVIF devices using GetDeviceInformation, GetCapabilities, GetNetworkInterfaces and GetDNS where the device responds and authentication succeeds.
+- Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded maximum of 256 host addresses; on larger subnets the window is centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
+- Checks reachability using known/common TCP ports.
+- Supports manual device entry, device labels, CSV export and local SQLite inventory persistence.
+- Offers a guarded ONVIF static IPv4 workflow when a matching ONVIF interface token and current device-service endpoint have been obtained. It validates input, asks for confirmation and attempts to verify the new address. There is no automatic rollback.
+- Keeps activation, firmware flashing, reboot, NVR, bulk provisioning and unsupported vendor operations unavailable rather than simulating success.
 
-Discovery strategy:
-- ONVIF WS-Discovery (UDP 3702) for standards-based devices.
-- Project firmware discovery (UDP 9988) only for our own firmware.
-- Verified vendor adapters when official protocol/SDK details and licensing permit.
-- Bounded, opt-in local network scanning to find additional candidate endpoints.
-- Manual device entry for devices that cannot be discovered automatically.
+## Compatibility boundaries
+
+The current code contains an ONVIF adapter and the project's own discovery codec. It does **not** contain verified CP Plus, Hikvision or Prama vendor adapters. ONVIF support varies by model, firmware, authentication configuration and enabled services. Static IP configuration may be rejected by a camera or its user permissions.
+
+The compatibility matrix is the source of truth for model-specific test evidence:
+[docs/compatibility-matrix.md](docs/compatibility-matrix.md).
 
 ## Build
 
-Install CMake 3.21+, a C++20 compiler, and Qt 6.5+ with Widgets, Network, Sql and Xml modules.
+Requirements: CMake 3.21+, a C++20 compiler and Qt 6.5+ with Widgets, Network, Sql and Xml. Qt Test is required only when tests are enabled.
+
+Production-style build without test dependencies:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 cmake --build build --config Release
 ```
 
-## Developer documentation
+Developer build and tests:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+cmake --build build --config Debug
+ctest --test-dir build --build-config Debug --output-on-failure
+```
+
+## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Universal compatibility strategy](docs/universal-compatibility.md)
 - [Adapter development guide](docs/adapter-development.md)
 - [Implementation roadmap](docs/implementation-roadmap.md)
+- [Production-readiness checklist](docs/production-readiness.md)
 - [Compatibility and hardware test matrix](docs/compatibility-matrix.md)
 - [Firmware communication contracts](docs/protocol-contract.md)
 - [Development setup](docs/development.md)
 - [Contributing](CONTRIBUTING.md)
 
-## Current implementation
+## Safety and known limitations
 
-- [x] Qt desktop shell
-- [x] Active IPv4 interface enumeration
-- [x] ONVIF WS-Discovery probe and basic ProbeMatch parsing
-- [x] Project firmware UDP 9988 probe and Contract B response parsing
-- [x] Basic device inventory population
-- [ ] Vendor-specific adapters
-- [ ] Bounded fallback subnet scanning
-- [ ] ONVIF device-information and capability queries
-- [ ] SQLite history, credentials integration and provisioning
-
-## Safety and limitations
-
-The tool will not guess passwords, bypass authentication or send undocumented configuration/activation commands. It shows unknown capabilities honestly. Firmware upgrades require verified model compatibility and integrity checks. Discovery is limited to active local IPv4 interfaces; it does not scan remote routed subnets.
+- Discovery is local-link IPv4 only; limited broadcast and link-local multicast do not cross routers.
+- The fallback scanner is bounded and user initiated. It does not identify a camera by itself.
+- Camera credentials are requested interactively when challenged and are not intentionally written to the inventory database. OS-backed credential storage is not implemented.
+- ONVIF write operations can disconnect a camera. Confirm reachability and network topology before changing its address; this build has no automatic rollback.
+- No activation or firmware-upgrade command is defined for the project's Contract B protocol. Do not invent one.
+- Cross-platform packaging, signing, security review and real-device compatibility evidence remain release gates.

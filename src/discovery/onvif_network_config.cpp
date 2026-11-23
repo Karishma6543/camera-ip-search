@@ -2,12 +2,159 @@
 
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <QHostAddress>
+#include <QAbstractSocket>
+#include <QVector>
 
 namespace {
 void setError(QString *error, const QString &message)
 {
     if (error) *error = message;
 }
+}
+
+
+bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
+                                                 const QString &preferredIpv4,
+                                                 InterfaceIpv4Info *selected,
+                                                 QStringList *summaries,
+                                                 QString *error)
+{
+    if (selected) *selected = InterfaceIpv4Info{};
+    if (summaries) summaries->clear();
+    if (!selected || !summaries || payload.isEmpty() || payload.size() > 1024 * 1024 ||
+        preferredIpv4.isEmpty()) {
+        setError(error, QStringLiteral("Invalid or oversized GetNetworkInterfaces response input."));
+        return false;
+    }
+
+    struct ParsedInterface {
+        InterfaceIpv4Info info;
+        QString manualAddress;
+        QString manualPrefix;
+        QString dhcpAddress;
+        QString dhcpPrefix;
+        QString linkLocalAddress;
+        QString linkLocalPrefix;
+    };
+    QVector<ParsedInterface> interfaces;
+    QXmlStreamReader xml(payload);
+    QStringList path;
+    ParsedInterface current;
+    bool inInterface = false;
+    bool responseSeen = false;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isStartElement()) {
+            const QString name = xml.name().toString();
+            path.append(name);
+            if (name == QStringLiteral("Fault")) {
+                setError(error, QStringLiteral("Camera returned a SOAP fault."));
+                return false;
+            }
+            if (name == QStringLiteral("GetNetworkInterfacesResponse"))
+                responseSeen = true;
+            if (name == QStringLiteral("NetworkInterface")) {
+                inInterface = true;
+                current = ParsedInterface{};
+                current.info.token = xml.attributes().value(QStringLiteral("token")).toString();
+                continue;
+            }
+            if (!inInterface) continue;
+
+            const QString joined = path.join(QLatin1Char('/'));
+            const bool isAddress =
+                joined.endsWith(QStringLiteral("/IPv4/Config/Manual/Address")) ||
+                joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/Address")) ||
+                joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/Address"));
+            const bool isPrefix =
+                joined.endsWith(QStringLiteral("/IPv4/Config/Manual/PrefixLength")) ||
+                joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/PrefixLength")) ||
+                joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/PrefixLength"));
+            bool consumed = false;
+            if (name == QStringLiteral("Name")) {
+                current.info.name = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                consumed = true;
+            } else if (name == QStringLiteral("HwAddress")) {
+                current.info.mac = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                consumed = true;
+            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP"))) {
+                current.info.dhcp = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                consumed = true;
+            } else if (isAddress) {
+                const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                if (joined.endsWith(QStringLiteral("/Manual/Address")))
+                    current.manualAddress = value;
+                else if (joined.endsWith(QStringLiteral("/FromDHCP/Address")))
+                    current.dhcpAddress = value;
+                else if (joined.endsWith(QStringLiteral("/LinkLocal/Address")))
+                    current.linkLocalAddress = value;
+                consumed = true;
+            } else if (isPrefix) {
+                const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                if (joined.endsWith(QStringLiteral("/Manual/PrefixLength")))
+                    current.manualPrefix = value;
+                else if (joined.endsWith(QStringLiteral("/FromDHCP/PrefixLength")))
+                    current.dhcpPrefix = value;
+                else if (joined.endsWith(QStringLiteral("/LinkLocal/PrefixLength")))
+                    current.linkLocalPrefix = value;
+                consumed = true;
+            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/Gateway/IPv4Address"))) {
+                current.info.gateway = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                consumed = true;
+            }
+            if (consumed) path.removeLast();
+        } else if (xml.isEndElement()) {
+            if (xml.name() == QStringLiteral("NetworkInterface") && inInterface) {
+                const bool dhcpEnabled =
+                    current.info.dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
+                    current.info.dhcp == QStringLiteral("1");
+                if (dhcpEnabled) {
+                    current.info.address = !current.dhcpAddress.isEmpty() ? current.dhcpAddress
+                        : (!current.linkLocalAddress.isEmpty() ? current.linkLocalAddress : current.manualAddress);
+                    current.info.prefix = !current.dhcpPrefix.isEmpty() ? current.dhcpPrefix
+                        : (!current.linkLocalPrefix.isEmpty() ? current.linkLocalPrefix : current.manualPrefix);
+                } else {
+                    current.info.address = !current.manualAddress.isEmpty() ? current.manualAddress
+                        : (!current.linkLocalAddress.isEmpty() ? current.linkLocalAddress : current.dhcpAddress);
+                    current.info.prefix = !current.manualPrefix.isEmpty() ? current.manualPrefix
+                        : (!current.linkLocalPrefix.isEmpty() ? current.linkLocalPrefix : current.dhcpPrefix);
+                }
+                interfaces.append(current);
+                inInterface = false;
+            }
+            if (!path.isEmpty()) path.removeLast();
+        }
+    }
+
+    if (xml.hasError() || !responseSeen) {
+        setError(error, QStringLiteral("Malformed or incomplete GetNetworkInterfaces response."));
+        return false;
+    }
+
+    QHostAddress preferred;
+    if (!preferred.setAddress(preferredIpv4) ||
+        preferred.protocol() != QAbstractSocket::IPv4Protocol) {
+        setError(error, QStringLiteral("The discovered device address is not a valid IPv4 address."));
+        return false;
+    }
+
+    for (const ParsedInterface &entry : interfaces) {
+        QStringList fields;
+        if (!entry.info.name.isEmpty()) fields << entry.info.name;
+        if (!entry.info.address.isEmpty()) fields << entry.info.address;
+        if (!entry.info.mac.isEmpty()) fields << entry.info.mac;
+        if (!fields.isEmpty()) summaries->append(fields.join(QStringLiteral(" | ")));
+
+        QHostAddress reported;
+        if (selected->token.isEmpty() && !entry.info.token.isEmpty() &&
+            reported.setAddress(entry.info.address) &&
+            reported.protocol() == QAbstractSocket::IPv4Protocol &&
+            reported == preferred)
+            *selected = entry.info;
+    }
+    if (error) error->clear();
+    return true;
 }
 
 bool OnvifNetworkConfig::parseSetNetworkInterfacesResponse(const QByteArray &payload,

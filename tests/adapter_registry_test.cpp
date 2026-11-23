@@ -9,7 +9,9 @@ class AdapterRegistryTest final : public QObject
 private slots:
     void recognizesOnvifDeviceService();
     void rejectsEndpointForDifferentHost();
+    void rejectsEndpointWithEmbeddedCredentials();
     void exposesOnlyImplementedReadOperations();
+    void exposesImplementedOnvifWriteOperations();
 };
 
 void AdapterRegistryTest::recognizesOnvifDeviceService()
@@ -34,6 +36,17 @@ void AdapterRegistryTest::rejectsEndpointForDifferentHost()
     QVERIFY(!registry.adapterFor(device));
 }
 
+
+void AdapterRegistryTest::rejectsEndpointWithEmbeddedCredentials()
+{
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("192.168.1.20");
+    device.deviceServiceUrl = QStringLiteral("http://operator:secret@192.168.1.20/onvif/device_service");
+    device.discoverySources << QStringLiteral("ONVIF");
+    AdapterRegistry registry;
+    QVERIFY(!registry.adapterFor(device));
+}
+
 void AdapterRegistryTest::exposesOnlyImplementedReadOperations()
 {
     DeviceRecord device;
@@ -47,6 +60,19 @@ void AdapterRegistryTest::exposesOnlyImplementedReadOperations()
     QVERIFY(operations.contains(QStringLiteral("GetCapabilities")));
     QVERIFY(operations.contains(QStringLiteral("GetNetworkInterfaces")));
     QVERIFY(!operations.contains(QStringLiteral("SetNetworkInterfaces")));
+}
+
+
+void AdapterRegistryTest::exposesImplementedOnvifWriteOperations()
+{
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("192.168.1.20");
+    device.deviceServiceUrl = QStringLiteral("http://192.168.1.20/onvif/device_service");
+    device.discoverySources << QStringLiteral("ONVIF");
+    AdapterRegistry registry;
+    const QStringList operations = registry.implementedWriteOperations(device);
+    QVERIFY(operations.contains(QStringLiteral("SetNetworkInterfaces")));
+    QVERIFY(operations.contains(QStringLiteral("SetNetworkDefaultGateway")));
 }
 
 QTEST_MAIN(AdapterRegistryTest)

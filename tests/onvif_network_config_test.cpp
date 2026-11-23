@@ -14,6 +14,8 @@ private slots:
     void rejectsWrongAddressAndToken();
     void buildsEscapedGatewayRequest();
     void validatesGatewayOperationResponse();
+    void selectsInterfaceMatchingDiscoveredAddress();
+    void leavesInterfaceUnselectedWhenAddressDoesNotMatch();
 };
 
 void OnvifNetworkConfigTest::parsesSuccessfulSetResponse()
@@ -79,6 +81,52 @@ void OnvifNetworkConfigTest::validatesGatewayOperationResponse()
         R"(<Envelope><Fault/></Envelope>)", "SetNetworkDefaultGatewayResponse"));
     QVERIFY(!OnvifNetworkConfig::parseSoapOperationResponse(
         R"(<Envelope><OtherResponse/></Envelope>)", "SetNetworkDefaultGatewayResponse"));
+}
+
+
+void OnvifNetworkConfigTest::selectsInterfaceMatchingDiscoveredAddress()
+{
+    const QByteArray xml = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterface token="management">
+        <Name>Management</Name><HwAddress>00:11:22:33:44:55</HwAddress>
+        <IPv4><Config><DHCP>false</DHCP><Manual>
+          <Address>192.168.1.10</Address><PrefixLength>24</PrefixLength>
+        </Manual><Gateway><IPv4Address>192.168.1.1</IPv4Address></Gateway></Config></IPv4>
+      </NetworkInterface>
+      <NetworkInterface token="camera">
+        <Name>Camera LAN</Name><HwAddress>00:11:22:33:44:66</HwAddress>
+        <IPv4><Config><DHCP>true</DHCP>
+          <Manual><Address>192.168.1.99</Address><PrefixLength>24</PrefixLength></Manual>
+          <FromDHCP><Address>192.168.1.20</Address><PrefixLength>24</PrefixLength></FromDHCP>
+        </Config></IPv4>
+      </NetworkInterface>
+    </GetNetworkInterfacesResponse></Envelope>)";
+
+    OnvifNetworkConfig::InterfaceIpv4Info selected;
+    QStringList summaries;
+    QVERIFY(OnvifNetworkConfig::parseNetworkInterfaces(
+        xml, QStringLiteral("192.168.1.20"), &selected, &summaries));
+    QCOMPARE(selected.token, QStringLiteral("camera"));
+    QCOMPARE(selected.address, QStringLiteral("192.168.1.20"));
+    QCOMPARE(selected.prefix, QStringLiteral("24"));
+    QCOMPARE(selected.dhcp, QStringLiteral("true"));
+    QCOMPARE(summaries.size(), 2);
+}
+
+void OnvifNetworkConfigTest::leavesInterfaceUnselectedWhenAddressDoesNotMatch()
+{
+    const QByteArray xml = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterface token="management"><IPv4><Config><Manual>
+        <Address>192.168.1.10</Address><PrefixLength>24</PrefixLength>
+      </Manual></Config></IPv4></NetworkInterface>
+    </GetNetworkInterfacesResponse></Envelope>)";
+
+    OnvifNetworkConfig::InterfaceIpv4Info selected;
+    QStringList summaries;
+    QVERIFY(OnvifNetworkConfig::parseNetworkInterfaces(
+        xml, QStringLiteral("192.168.1.20"), &selected, &summaries));
+    QVERIFY(selected.token.isEmpty());
+    QCOMPARE(summaries.size(), 1);
 }
 
 QTEST_GUILESS_MAIN(OnvifNetworkConfigTest)

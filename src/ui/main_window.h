@@ -43,6 +43,10 @@ private:
     QLabel *statusLabel_{nullptr};
     QLabel *summaryLabel_{nullptr};
     QLabel *deviceCountValue_{nullptr};
+    QLabel *discoveredMetric_{nullptr};
+    QLabel *reachableMetric_{nullptr};
+    QLabel *verifiedMetric_{nullptr};
+    QLabel *unverifiedMetric_{nullptr};
     QPushButton *scanButton_{nullptr};
     QPushButton *subnetScanButton_{nullptr};
     QPushButton *reachabilityButton_{nullptr};
@@ -53,6 +57,12 @@ private:
     QComboBox *statusFilter_{nullptr};
     bool loadingInventory_{false};
     QLabel *deviceDetailsLabel_{nullptr};
+    QLabel *selectedDeviceSummary_{nullptr};
+    QLabel *selectedNetworkSummary_{nullptr};
+    QLabel *localNetworkSummary_{nullptr};
+    QLabel *firmwareStatusSummary_{nullptr};
+    void updateSelectedDevicePanel();
+    void updateLocalNetworkSummary();
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};

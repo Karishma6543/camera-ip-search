@@ -13,8 +13,12 @@ private slots:
     void rejectsWrongSequence();
     void rejectsMalformedProjectPayload();
     void rejectsInvalidFieldTypes();
+    void rejectsAdvertisedIpDifferentFromSender();
+    void acceptsConfiguredIpWhenUnconfiguredCameraUsesZeroSource();
     void parsesOnvifProbeMatch();
     void rejectsMalformedOnvifXml();
+    void selectsMatchingEndpointFromMultipleXAddrs();
+    void rejectsEndpointWithEmbeddedCredentials();
 };
 
 void DiscoveryParserTest::parsesProjectResponse()
@@ -64,6 +68,27 @@ void DiscoveryParserTest::rejectsInvalidFieldTypes()
         QHostAddress(QStringLiteral("192.168.1.2")), QString(), &device));
 }
 
+
+void DiscoveryParserTest::rejectsAdvertisedIpDifferentFromSender()
+{
+    const QByteArray payload = R"({"magic":"CAM_DISCOVER","version":1,"seq":7,
+      "cmd":"PROBE_RESPONSE","device":{"ipv4":"192.168.1.99"}})";
+    DeviceRecord device;
+    QVERIFY(!DiscoveryParser::parseProjectResponse(payload, 7,
+        QHostAddress(QStringLiteral("192.168.1.20")), QStringLiteral("Ethernet"), &device));
+}
+
+
+void DiscoveryParserTest::acceptsConfiguredIpWhenUnconfiguredCameraUsesZeroSource()
+{
+    const QByteArray payload = R"({"magic":"CAM_DISCOVER","version":1,"seq":8,
+      "cmd":"PROBE_RESPONSE","device":{"ipv4":"192.168.1.253"}})";
+    DeviceRecord device;
+    QVERIFY(DiscoveryParser::parseProjectResponse(payload, 8,
+        QHostAddress(QStringLiteral("0.0.0.0")), QStringLiteral("Ethernet"), &device));
+    QCOMPARE(device.ipAddress, QStringLiteral("192.168.1.253"));
+}
+
 void DiscoveryParserTest::parsesOnvifProbeMatch()
 {
     const QByteArray payload = R"(
@@ -87,6 +112,41 @@ void DiscoveryParserTest::rejectsMalformedOnvifXml()
     DeviceRecord device;
     QVERIFY(!DiscoveryParser::parseOnvifProbeMatch("<ProbeMatches>",
         QHostAddress(QStringLiteral("192.168.1.20")), QString(), &device));
+}
+
+
+void DiscoveryParserTest::selectsMatchingEndpointFromMultipleXAddrs()
+{
+    const QByteArray payload = R"(
+      <d:ProbeMatches xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+        xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing">
+        <d:ProbeMatch>
+          <a:EndpointReference><a:Address>urn:uuid:multi-endpoint</a:Address></a:EndpointReference>
+          <d:XAddrs>http://camera-host.invalid/onvif/device_service http://192.168.1.20/onvif/device_service</d:XAddrs>
+        </d:ProbeMatch>
+      </d:ProbeMatches>)";
+    DeviceRecord device;
+    QVERIFY(DiscoveryParser::parseOnvifProbeMatch(payload,
+        QHostAddress(QStringLiteral("192.168.1.20")), QStringLiteral("Ethernet"), &device));
+    QCOMPARE(device.deviceServiceUrl,
+             QStringLiteral("http://192.168.1.20/onvif/device_service"));
+}
+
+
+void DiscoveryParserTest::rejectsEndpointWithEmbeddedCredentials()
+{
+    const QByteArray payload = R"(
+      <d:ProbeMatches xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+        xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing">
+        <d:ProbeMatch>
+          <a:EndpointReference><a:Address>urn:uuid:credential-endpoint</a:Address></a:EndpointReference>
+          <d:XAddrs>http://operator:secret@192.168.1.20/onvif/device_service</d:XAddrs>
+        </d:ProbeMatch>
+      </d:ProbeMatches>)";
+    DeviceRecord device;
+    QVERIFY(DiscoveryParser::parseOnvifProbeMatch(payload,
+        QHostAddress(QStringLiteral("192.168.1.20")), QStringLiteral("Ethernet"), &device));
+    QVERIFY(device.deviceServiceUrl.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(DiscoveryParserTest)

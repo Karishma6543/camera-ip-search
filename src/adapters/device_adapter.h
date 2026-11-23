@@ -15,4 +15,5 @@ public:
     virtual QString displayName() const = 0;
     virtual bool canHandle(const DeviceRecord &device) const = 0;
     virtual QStringList verifiedReadOperations() const = 0;
+    virtual QStringList implementedWriteOperations() const = 0;
 };
