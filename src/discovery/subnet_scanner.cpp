@@ -18,6 +18,27 @@ SubnetScanner::SubnetScanner(QObject *parent) : QObject(parent)
 
 bool SubnetScanner::isRunning() const { return running_; }
 
+bool SubnetScanner::isUsableSubnet(const QNetworkAddressEntry &entry)
+{
+    if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+        entry.prefixLength() < 1 || entry.prefixLength() > 32 ||
+        entry.ip().isNull() || entry.ip().isLoopback() || entry.ip().isMulticast())
+        return false;
+
+    const quint32 ip = entry.ip().toIPv4Address();
+    if (ip == 0U || ip == 0xffffffffU) return false;
+    const quint32 prefixMask = 0xffffffffU << (32 - entry.prefixLength());
+    if (entry.netmask().protocol() != QAbstractSocket::IPv4Protocol ||
+        entry.netmask().toIPv4Address() != prefixMask)
+        return false;
+
+    const quint32 network = ip & prefixMask;
+    const quint32 broadcast = network | ~prefixMask;
+    return broadcast > network &&
+           (broadcast - network) > 1U &&
+           ip > network && ip < broadcast;
+}
+
 bool SubnetScanner::start(const QNetworkInterface &interface,
                           const QNetworkAddressEntry &entry)
 {
@@ -26,9 +47,7 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
         !flags.testFlag(QNetworkInterface::IsUp) ||
         !flags.testFlag(QNetworkInterface::IsRunning) ||
         flags.testFlag(QNetworkInterface::IsLoopBack) ||
-        entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
-        entry.prefixLength() < 1 || entry.prefixLength() > 32 ||
-        entry.ip().isLoopback() || entry.ip().isNull())
+        !isUsableSubnet(entry))
         return false;
 
     bool belongsToInterface = false;
@@ -41,12 +60,8 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     }
     if (!belongsToInterface) return false;
 
-    // Derive the mask from the validated prefix instead of trusting a possibly
-    // empty or inconsistent netmask supplied by the platform interface API.
+    // Derive the mask from the validated prefix.
     const quint32 prefixMask = 0xffffffffU << (32 - entry.prefixLength());
-    if (entry.netmask().protocol() != QAbstractSocket::IPv4Protocol ||
-        entry.netmask().toIPv4Address() != prefixMask)
-        return false;
 
     cancel();
     pending_.clear();
