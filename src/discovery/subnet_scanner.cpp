@@ -135,7 +135,7 @@ void SubnetScanner::cancel()
         if (probe.timeout) probe.timeout->deleteLater();
     }
     emit statusChanged(tr("Subnet scan cancelled."));
-    emit finished(candidates_);
+    emit cancelled(candidates_);
 }
 
 void SubnetScanner::schedule()
