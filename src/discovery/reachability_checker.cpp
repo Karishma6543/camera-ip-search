@@ -61,6 +61,7 @@ void ReachabilityChecker::checkNextDevice()
     ++deviceIndex_;
     if (deviceIndex_ >= devices_.size()) {
         running_ = false;
+        emit progressChanged(checkedCount_, devices_.size(), QString());
         emit finished(checkedCount_);
         return;
     }
@@ -78,12 +79,12 @@ void ReachabilityChecker::checkNextDevice()
             ports_.append(normalized);
         }
     }
+    emit progressChanged(checkedCount_, devices_.size(),
+                         devices_.at(deviceIndex_).ipAddress.trimmed());
     if (devices_.at(deviceIndex_).ipAddress.trimmed().isEmpty() || ports_.isEmpty()) {
         completeCurrent(QStringLiteral("Not checked"));
         return;
     }
-    emit progressChanged(checkedCount_, devices_.size(),
-                         devices_.at(deviceIndex_).ipAddress.trimmed());
     tryNextPort();
 }
 
