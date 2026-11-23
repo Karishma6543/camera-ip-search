@@ -1505,7 +1505,12 @@ void MainWindow::persistDevice(const DeviceRecord &device)
     identityQuery.bindValue(":mac_order", device.macAddress.trimmed());
     identityQuery.bindValue(":endpoint_order", device.onvifEndpoint.trimmed());
     identityQuery.bindValue(":serial_order", device.serialNumber.trimmed());
-    if (identityQuery.exec() && identityQuery.next())
+    if (!identityQuery.exec()) {
+        updateStatus(tr("Could not resolve the existing inventory identity: %1")
+                         .arg(identityQuery.lastError().text()));
+        return;
+    }
+    if (identityQuery.next())
         key = identityQuery.value(0).toString();
 
     QSqlQuery query(inventoryDb_);
