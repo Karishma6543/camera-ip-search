@@ -159,7 +159,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateStatus(tr("Credentials supplied for this application session; they are not saved in inventory or to disk."));
     });
     connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
-            [this](const DeviceRecord &, bool verified, const QString &message) {
+            [this](const DeviceRecord &updatedDevice, bool verified, const QString &message) {
         for (auto *button : findChildren<QPushButton *>()) {
             if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
                 button->setEnabled(true);
