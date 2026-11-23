@@ -27,6 +27,7 @@ signals:
     void statusChanged(const QString &message);
     void progressChanged(int completedProbes, int totalProbes, int candidateCount);
     void finished(int candidateCount);
+    void cancelled(int candidateCount);
 
 private:
     struct Probe {
