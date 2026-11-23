@@ -1687,14 +1687,18 @@ void MainWindow::initializeInventory()
     }
 
     int schemaVersion = 0;
+    QString versionError;
     {
         QSqlQuery versionQuery(inventoryDb_);
-        if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next()) {
-            updateStatus(tr("Could not read inventory schema version: %1").arg(versionQuery.lastError().text()));
-            inventoryDb_.close();
-            return;
-        }
-        schemaVersion = versionQuery.value(0).toInt();
+        if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next())
+            versionError = versionQuery.lastError().text();
+        else
+            schemaVersion = versionQuery.value(0).toInt();
+    }
+    if (!versionError.isEmpty()) {
+        updateStatus(tr("Could not read inventory schema version: %1").arg(versionError));
+        inventoryDb_.close();
+        return;
     }
     if (schemaVersion > 1) {
         updateStatus(tr("Inventory schema version %1 is newer than this application supports. The database was not modified.")
@@ -1734,14 +1738,19 @@ void MainWindow::initializeInventory()
     }
 
     QStringList existingColumns;
+    QString columnError;
     {
         QSqlQuery columnQuery(inventoryDb_);
         if (!columnQuery.exec(QStringLiteral("PRAGMA table_info(devices)"))) {
-            failMigration(tr("Could not inspect inventory schema: %1").arg(columnQuery.lastError().text()));
-            return;
+            columnError = columnQuery.lastError().text();
+        } else {
+            while (columnQuery.next())
+                existingColumns << columnQuery.value(1).toString();
         }
-        while (columnQuery.next())
-            existingColumns << columnQuery.value(1).toString();
+    }
+    if (!columnError.isEmpty()) {
+        failMigration(tr("Could not inspect inventory schema: %1").arg(columnError));
+        return;
     }
 
     // Version 1 upgrades legacy unversioned inventories idempotently. The
