@@ -26,17 +26,17 @@ QString logDirectory()
 QString redact(QString message)
 {
     const QRegularExpression headerSecret(
-        QStringLiteral(R"((authorization|proxy-authorization|cookie|set-cookie)\\s*:\\s*[^\\r\\n]*)"),
+        QStringLiteral(R"((authorization|proxy-authorization|cookie|set-cookie)\s*:\s*[^\r\n]*)"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(headerSecret, QStringLiteral("\\\\1: [REDACTED]"));
+    message.replace(headerSecret, QStringLiteral("\\1: [REDACTED]"));
     const QRegularExpression keyValue(
-        QStringLiteral(R"((password|passwd|authorization|token|credential|secret)\\s*[:=]\\s*("[^"]*"|'[^']*'|[^\\s,;]+))"),
+        QStringLiteral(R"((password|passwd|authorization|token|credential|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(keyValue, QStringLiteral("\\\\1=[REDACTED]"));
+    message.replace(keyValue, QStringLiteral("\\1=[REDACTED]"));
     const QRegularExpression querySecret(
-        QStringLiteral(R"(([?&](?:password|token|access_token|api_key|secret)=)[^&#\\s]*)"),
+        QStringLiteral(R"(([?&](?:password|token|access_token|api_key|secret)=)[^&#\s]*)"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(querySecret, QStringLiteral("\\\\1[REDACTED]"));
+    message.replace(querySecret, QStringLiteral("\\1[REDACTED]"));
     const QRegularExpression bearer(
         QStringLiteral(R"(Bearer\s+[A-Za-z0-9._~+/-]+=*)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -46,7 +46,7 @@ QString redact(QString message)
         QRegularExpression::CaseInsensitiveOption);
     message.replace(basicUrl, QStringLiteral("\\1[REDACTED]@"));
     const QRegularExpression xmlSecret(
-        QStringLiteral(R"(<(?:[A-Za-z0-9_.-]+:)?(Password|Username|Token)(\s[^>]*)?>.*?</(?:[A-Za-z0-9_.-]+:)?\1>)"),
+        QStringLiteral(R"(<(?:[A-Za-z0-9_.-]+:)?(Password|Username|Token|Nonce|BinarySecurityToken)(\s[^>]*)?>.*?</(?:[A-Za-z0-9_.-]+:)?\1>)"),
         QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
     message.replace(xmlSecret, QStringLiteral("<REDACTED>"));
     return message.left(8192);
