@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QNetworkDatagram>
 #include <QNetworkRequest>
+#include <QSslError>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QUrl>
