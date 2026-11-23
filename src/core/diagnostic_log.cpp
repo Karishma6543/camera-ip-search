@@ -25,10 +25,18 @@ QString logDirectory()
 
 QString redact(QString message)
 {
-    const QRegularExpression keyValue(
-        QStringLiteral(R"((password|passwd|authorization|token|credential|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
+    const QRegularExpression headerSecret(
+        QStringLiteral(R"((authorization|proxy-authorization|cookie|set-cookie)\\s*:\\s*[^\\r\\n]*)"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(keyValue, QStringLiteral("\\1=[REDACTED]"));
+    message.replace(headerSecret, QStringLiteral("\\\\1: [REDACTED]"));
+    const QRegularExpression keyValue(
+        QStringLiteral(R"((password|passwd|authorization|token|credential|secret)\\s*[:=]\\s*("[^"]*"|'[^']*'|[^\\s,;]+))"),
+        QRegularExpression::CaseInsensitiveOption);
+    message.replace(keyValue, QStringLiteral("\\\\1=[REDACTED]"));
+    const QRegularExpression querySecret(
+        QStringLiteral(R"(([?&](?:password|token|access_token|api_key|secret)=)[^&#\\s]*)"),
+        QRegularExpression::CaseInsensitiveOption);
+    message.replace(querySecret, QStringLiteral("\\\\1[REDACTED]"));
     const QRegularExpression bearer(
         QStringLiteral(R"(Bearer\s+[A-Za-z0-9._~+/-]+=*)"),
         QRegularExpression::CaseInsensitiveOption);
