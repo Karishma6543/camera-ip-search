@@ -536,6 +536,12 @@ void MainWindow::buildUi()
         reachabilityButton_->setText(tr("Check reachability"));
         updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
     });
+    connect(reachabilityChecker_, &ReachabilityChecker::progressChanged, this,
+            [this](int checked, int total, const QString &ip) {
+        if (total > 0 && !ip.isEmpty())
+            updateStatus(tr("Checking reachability: %1 / %2 — %3")
+                             .arg(checked + 1).arg(total).arg(ip));
+    });
     connect(reachabilityChecker_, &ReachabilityChecker::cancelled, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));

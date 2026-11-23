@@ -19,6 +19,7 @@ signals:
                        const QString &checkedAt, const QString &lastSuccessfulResponseAt);
     void finished(int checkedCount);
     void cancelled(int checkedCount);
+    void progressChanged(int checkedCount, int totalCount, const QString &currentIp);
 private:
     void checkNextDevice();
     void tryNextPort();
@@ -30,6 +31,7 @@ private:
     int checkedCount_{0};
     bool running_{false};
     bool completed_{false};
+    bool suppressSocketError_{false};
     QTcpSocket *socket_{nullptr};
     QTimer timeout_;
 };

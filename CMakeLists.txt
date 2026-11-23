@@ -105,6 +105,16 @@ if(BUILD_TESTING)
     target_link_libraries(subnet-scanner-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME subnet-scanner-tests COMMAND subnet-scanner-tests)
 
+    qt_add_executable(reachability-checker-tests
+        tests/reachability_checker_test.cpp
+        src/core/device_record.h
+        src/discovery/reachability_checker.h
+        src/discovery/reachability_checker.cpp
+    )
+    target_include_directories(reachability-checker-tests PRIVATE src)
+    target_link_libraries(reachability-checker-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME reachability-checker-tests COMMAND reachability-checker-tests)
+
     qt_add_executable(device-identity-tests
         tests/device_identity_test.cpp
         src/core/device_record.h
@@ -122,6 +132,7 @@ if(BUILD_TESTING)
         network-config-validator-tests
         subnet-scanner-tests
         device-identity-tests
+        reachability-checker-tests
         PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()
