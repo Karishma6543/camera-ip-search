@@ -19,6 +19,8 @@ public:
     explicit SubnetScanner(QObject *parent = nullptr);
     bool start(const QNetworkInterface &interface, const QNetworkAddressEntry &entry);
     static bool isUsableSubnet(const QNetworkAddressEntry &entry);
+    // Adds a discovered TCP port once; useful when several probes identify one host.
+    static bool appendOpenPort(DeviceRecord &device, quint16 port);
     void cancel();
     bool isRunning() const;
 
