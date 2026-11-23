@@ -31,6 +31,20 @@ ReachabilityChecker::ReachabilityChecker(QObject *parent) : QObject(parent)
 
 bool ReachabilityChecker::isRunning() const { return running_; }
 
+void ReachabilityChecker::cancel()
+{
+    if (!running_) return;
+    timeout_.stop();
+    completed_ = true;
+    running_ = false;
+    if (socket_) socket_->abort();
+    devices_.clear();
+    ports_.clear();
+    deviceIndex_ = -1;
+    portIndex_ = 0;
+    emit cancelled(checkedCount_);
+}
+
 void ReachabilityChecker::start(const QVector<DeviceRecord> &devices)
 {
     if (running_) return;
