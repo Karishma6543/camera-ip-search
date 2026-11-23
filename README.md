@@ -48,6 +48,7 @@ ctest --test-dir build --build-config Debug --output-on-failure
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Security and privacy review](docs/security-and-privacy-review.md)
 - [Universal compatibility strategy](docs/universal-compatibility.md)
 - [Adapter development guide](docs/adapter-development.md)
 - [Implementation roadmap](docs/implementation-roadmap.md)
