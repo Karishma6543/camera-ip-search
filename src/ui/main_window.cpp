@@ -1236,11 +1236,14 @@ void MainWindow::upsertDevice(DeviceRecord device)
             ? ipItem->data(Qt::UserRole + 2).toString().trimmed() : QString();
         const QString incomingMac = device.macAddress.trimmed();
         const QString incomingEndpoint = device.onvifEndpoint.trimmed();
+        const bool compatibleMac = existingMac.isEmpty() || incomingMac.isEmpty() ||
+            existingMac.compare(incomingMac, Qt::CaseInsensitive) == 0;
         const bool sameMac = !incomingMac.isEmpty() && !existingMac.isEmpty() &&
             incomingMac.compare(existingMac, Qt::CaseInsensitive) == 0;
-        const bool sameEndpoint = !incomingEndpoint.isEmpty() && !existingEndpoint.isEmpty() &&
+        const bool sameEndpoint = compatibleMac && !incomingEndpoint.isEmpty() &&
+            !existingEndpoint.isEmpty() &&
             incomingEndpoint.compare(existingEndpoint, Qt::CaseInsensitive) == 0;
-        const bool sameSerial = !device.serialNumber.trimmed().isEmpty() && serialItem &&
+        const bool sameSerial = compatibleMac && !device.serialNumber.trimmed().isEmpty() && serialItem &&
             !serialItem->text().trimmed().isEmpty() && manufacturerItem &&
             !manufacturerItem->text().trimmed().isEmpty() &&
             device.serialNumber.trimmed().compare(serialItem->text().trimmed(), Qt::CaseInsensitive) == 0 &&
@@ -1272,6 +1275,10 @@ void MainWindow::upsertDevice(DeviceRecord device)
         existing.serialNumber = cellText(9);
         existing.hardwareId = cellText(10);
         existing.reachabilityStatus = cellText(11);
+        if (existing.reachabilityStatus.isEmpty())
+            existing.reachabilityStatus = QStringLiteral("Not checked");
+        if (existing.activationState.isEmpty())
+            existing.activationState = QStringLiteral("Unknown");
         if (ipItem) {
             existing.interfaceName = ipItem->data(Qt::UserRole + 1).toString();
             existing.onvifEndpoint = ipItem->data(Qt::UserRole + 2).toString();
