@@ -322,15 +322,19 @@ void MainWindow::buildUi()
     auto *filterRow = new QHBoxLayout();
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
+    searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
     searchEdit_->setPlaceholderText(tr("Search by IP address, MAC, model or manufacturer"));
     searchEdit_->setMinimumWidth(250);
     searchEdit_->setClearButtonEnabled(true);
     interfaceSelector_ = new QComboBox(toolbar);
+    interfaceSelector_->setObjectName(QStringLiteral("interfaceSelector"));
     interfaceSelector_->setMinimumWidth(175);
     manufacturerFilter_ = new QComboBox(toolbar);
+    manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
     auto *vendorFilter = manufacturerFilter_;
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     statusFilter_ = new QComboBox(toolbar);
+    statusFilter_->setObjectName(QStringLiteral("statusFilter"));
     auto *statusFilter = statusFilter_;
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
@@ -348,17 +352,23 @@ void MainWindow::buildUi()
     auto *actionRow = new QHBoxLayout();
     actionRow->setSpacing(8);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
+    addDeviceButton_->setObjectName(QStringLiteral("addDeviceButton"));
     actionRow->addWidget(addDeviceButton_);
     auto *exportButton = actionButton(tr("Export CSV"), toolbar);
+    exportButton->setObjectName(QStringLiteral("exportCsvButton"));
     actionRow->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
+    renameButton->setObjectName(QStringLiteral("renameLabelButton"));
     actionRow->addWidget(renameButton);
     actionRow->addStretch();
     reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
+    reachabilityButton_->setObjectName(QStringLiteral("reachabilityButton"));
     actionRow->addWidget(reachabilityButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
+    subnetScanButton_->setObjectName(QStringLiteral("subnetScanButton"));
     actionRow->addWidget(subnetScanButton_);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
+    scanButton_->setObjectName(QStringLiteral("discoverButton"));
     actionRow->addWidget(scanButton_);
     tools->addLayout(actionRow);
     root->addWidget(toolbar);
@@ -410,6 +420,7 @@ void MainWindow::buildUi()
     leftLayout->addLayout(listHeading);
 
     deviceTable_ = new QTableWidget(0, 12, left);
+    deviceTable_->setObjectName(QStringLiteral("deviceTable"));
     deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
     auto *deviceHeader = deviceTable_->horizontalHeader();
     deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
@@ -443,6 +454,7 @@ void MainWindow::buildUi()
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
+    tabs->setObjectName(QStringLiteral("workspaceTabs"));
     tabs->setTabPosition(QTabWidget::North);
     tabs->addTab(makeInfoTab(tabs), tr("Device Info"));
     tabs->addTab(makeBulkTab(tabs), tr("Bulk Config"));
@@ -526,6 +538,7 @@ void MainWindow::buildUi()
     root->addWidget(footer);
     setCentralWidget(central);
     statusLabel_ = new QLabel(this);
+    statusLabel_->setObjectName(QStringLiteral("applicationStatus"));
     statusBar()->addWidget(statusLabel_, 1);
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
