@@ -53,6 +53,7 @@ Pass one of the following values with `--scenario`:
 | `multiple-xaddrs` | First unsafe/wrong-host XAddr followed by a same-host endpoint |
 | `auth-required` | HTTP Basic challenge path |
 | `soap-fault` | SOAP fault/error handling |
+| `oversized` | 2 MiB SOAP body; client must abort after the 1 MiB response budget |
 
 Example:
 
