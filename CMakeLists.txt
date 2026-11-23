@@ -131,6 +131,8 @@ if(BUILD_TESTING)
 
     qt_add_executable(main-window-smoke-tests
         tests/main_window_smoke_test.cpp
+        src/core/diagnostic_log.h
+        src/core/diagnostic_log.cpp
         src/core/device_record.h
         src/core/device_identity.h
         src/core/device_identity.cpp
