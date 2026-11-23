@@ -32,7 +32,7 @@ void DiagnosticLogTest::redactsBearerAndUrlCredentials()
 
 void DiagnosticLogTest::redactsXmlSecretElements()
 {
-    const QString input = QStringLiteral("<Envelope><Password>top-secret</Password><Username>operator</Username></Envelope>");
+    const QString input = QStringLiteral("<Envelope><wsse:Password>top-secret</wsse:Password><wsse:Username>operator</wsse:Username></Envelope>");
     const QString output = DiagnosticLog::redactSensitiveData(input);
     QVERIFY(!output.contains(QStringLiteral("top-secret")));
     QVERIFY(!output.contains(QStringLiteral("operator")));
