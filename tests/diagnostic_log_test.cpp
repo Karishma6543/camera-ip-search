@@ -13,6 +13,7 @@ private slots:
     void redactsKeyValueSecrets();
     void redactsBearerAndUrlCredentials();
     void redactsXmlSecretElements();
+    void redactsAuthorizationCookiesAndQuerySecrets();
     void rotatesLogsAndRetainsOnlyThreeArchives();
 };
 
@@ -44,6 +45,21 @@ void DiagnosticLogTest::redactsXmlSecretElements()
     QVERIFY(output.contains(QStringLiteral("<REDACTED>")));
 }
 
+
+
+void DiagnosticLogTest::redactsAuthorizationCookiesAndQuerySecrets()
+{
+    const QString input = QStringLiteral(
+        "Authorization: Basic dXNlcjpwYXNz\\r\\n"
+        "Cookie: sessionid=private-value\\r\\n"
+        "GET /device?access_token=private-token&mode=read");
+    const QString output = DiagnosticLog::redactSensitiveData(input);
+    QVERIFY(!output.contains(QStringLiteral("dXNlcjpwYXNz")));
+    QVERIFY(!output.contains(QStringLiteral("private-value")));
+    QVERIFY(!output.contains(QStringLiteral("private-token")));
+    QVERIFY(output.contains(QStringLiteral("Authorization: [REDACTED]")));
+    QVERIFY(output.contains(QStringLiteral("Cookie: [REDACTED]")));
+}
 
 void DiagnosticLogTest::rotatesLogsAndRetainsOnlyThreeArchives()
 {
