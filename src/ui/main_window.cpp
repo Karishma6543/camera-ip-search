@@ -1228,7 +1228,7 @@ void MainWindow::upsertDevice(DeviceRecord device)
     for (int i = 0; i < deviceTable_->rowCount(); ++i) {
         const auto *macItem = deviceTable_->item(i, 5);
         const auto *ipItem = deviceTable_->item(i, 1);
-        const auto *serialItem = deviceTable_->item(i, 8);
+        const auto *serialItem = deviceTable_->item(i, 9);
         const auto *manufacturerItem = deviceTable_->item(i, 3);
         const QString existingMac = macItem ? macItem->text().trimmed() : QString();
         const QString existingIp = ipItem ? ipItem->text().trimmed() : QString();
