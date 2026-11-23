@@ -125,7 +125,7 @@ void DiscoveryService::cancel()
         ? tr("Discovery and device enrichment cancelled.")
         : tr("Device enrichment cancelled."));
     if (wasRunning)
-        emit finished(devices_.size());
+        emit cancelled(devices_.size());
 }
 
 void DiscoveryService::addInterfaceSocket(const QNetworkInterface &interface,
