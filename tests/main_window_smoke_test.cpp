@@ -1,6 +1,8 @@
 #include "ui/main_window.h"
 
 #include <QStandardPaths>
+#include <QDir>
+#include <QFileInfo>
 #include <QTabWidget>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -16,6 +18,8 @@ class MainWindowSmokeTest final : public QObject
     Q_OBJECT
 private slots:
     void startupShowsOperationHistory();
+    void migratesLegacyInventorySchema();
+    void rollsBackFailedInventoryMigration();
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
 };
@@ -50,6 +54,80 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QCOMPARE(version.value(0).toInt(), 1);
 }
 
+
+
+void MainWindowSmokeTest::migratesLegacyInventorySchema()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+    QVERIFY(QDir().mkpath(appData));
+    const QString databasePath = appData + QStringLiteral("/inventory.sqlite");
+
+    {
+        QSqlDatabase seed = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                       QStringLiteral("legacy_seed"));
+        seed.setDatabaseName(databasePath);
+        QVERIFY(seed.open());
+        QSqlQuery create(seed);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, "
+            "manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, "
+            "activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT)")));
+        seed.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("legacy_seed"));
+
+    MainWindow window;
+    QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid() && database.isOpen());
+    QSqlQuery version(database);
+    QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(version.next());
+    QCOMPARE(version.value(0).toInt(), 1);
+
+    QSqlQuery columns(database);
+    QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(devices)")));
+    QStringList names;
+    while (columns.next()) names << columns.value(1).toString();
+    QVERIFY(names.contains(QStringLiteral("user_label")));
+    QVERIFY(names.contains(QStringLiteral("network_interface_token")));
+    QVERIFY(names.contains(QStringLiteral("ipv4_config_known")));
+}
+
+void MainWindowSmokeTest::rollsBackFailedInventoryMigration()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+    QVERIFY(QDir().mkpath(appData));
+    const QString databasePath = appData + QStringLiteral("/inventory.sqlite");
+
+    {
+        QSqlDatabase seed = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                       QStringLiteral("failed_migration_seed"));
+        seed.setDatabaseName(databasePath);
+        QVERIFY(seed.open());
+        QSqlQuery create(seed);
+        QVERIFY(create.exec(QStringLiteral("CREATE VIEW devices AS SELECT 1 AS device_key")));
+        seed.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("failed_migration_seed"));
+
+    MainWindow window;
+    QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid());
+    if (!database.isOpen()) QVERIFY(database.open());
+    QSqlQuery version(database);
+    QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(version.next());
+    QCOMPARE(version.value(0).toInt(), 0);
+
+    QSqlQuery history(database);
+    QVERIFY(history.exec(QStringLiteral(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='operation_history'")));
+    QVERIFY(!history.next());
+}
 
 void MainWindowSmokeTest::rejectsOversizedOnvifResponseDuringReceive()
 {
