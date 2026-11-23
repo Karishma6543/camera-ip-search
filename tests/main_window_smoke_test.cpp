@@ -4,6 +4,13 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTabWidget>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QPushButton>
+#include <QLabel>
+#include <QTableWidget>
+#include <QNetworkInterface>
+#include <QNetworkAddressEntry>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTcpServer>
@@ -20,6 +27,7 @@ class MainWindowSmokeTest final : public QObject
 private slots:
     void startupShowsOperationHistory();
     void exposesAllWorkspacesAndAutomationControls();
+    void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
     void migratesLegacyInventorySchema();
@@ -97,6 +105,62 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
     QVERIFY(status);
     QVERIFY(status->text().contains(QStringLiteral("Add or discover devices")));
+}
+
+void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+    QVERIFY(QDir().mkpath(appData));
+    const QString databasePath = appData + QStringLiteral("/inventory.sqlite");
+    {
+        QSqlDatabase seed = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                       QStringLiteral("filter_seed"));
+        seed.setDatabaseName(databasePath);
+        QVERIFY(seed.open());
+        QSqlQuery create(seed);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, "
+            "manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, "
+            "activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT)")));
+        QSqlQuery insert(seed);
+        insert.prepare(QStringLiteral(
+            "INSERT INTO devices(device_key,ip,mac,manufacturer,model,firmware,serial,hardware,"
+            "activation,source,is_candidate) VALUES(?,?,?,?,?,?,?,?,?,?,?)"));
+        insert.addBindValue(QStringLiteral("cam-a"));
+        insert.addBindValue(QStringLiteral("192.0.2.10"));
+        insert.addBindValue(QStringLiteral("02:00:00:00:00:10"));
+        insert.addBindValue(QStringLiteral("Acme"));
+        insert.addBindValue(QStringLiteral("A-100"));
+        insert.addBindValue(QStringLiteral("1.0"));
+        insert.addBindValue(QStringLiteral("A100"));
+        insert.addBindValue(QStringLiteral("HW-A"));
+        insert.addBindValue(QStringLiteral("Activated"));
+        insert.addBindValue(QStringLiteral("ONVIF WS-Discovery"));
+        insert.addBindValue(0);
+        QVERIFY(insert.exec());
+        seed.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("filter_seed"));
+
+    MainWindow window;
+    auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *search = window.findChild<QLineEdit *>(QStringLiteral("deviceSearch"));
+    auto *vendor = window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter"));
+    QVERIFY(table && search && vendor);
+    QCOMPARE(table->rowCount(), 1);
+    QVERIFY(!table->isRowHidden(0));
+
+    search->setText(QStringLiteral("does-not-exist"));
+    QVERIFY(table->isRowHidden(0));
+    search->clear();
+    QVERIFY(!table->isRowHidden(0));
+
+    vendor->setCurrentText(QStringLiteral("Oxita devices"));
+    QVERIFY(table->isRowHidden(0));
+    vendor->setCurrentText(QStringLiteral("ONVIF devices"));
+    QVERIFY(!table->isRowHidden(0));
 }
 
 void MainWindowSmokeTest::discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface()
