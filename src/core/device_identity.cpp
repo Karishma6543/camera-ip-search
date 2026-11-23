@@ -123,14 +123,15 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
         // An empty token is meaningful: the ONVIF response did not identify
         // the interface owning the discovered IP, so stale write access must
         // be revoked rather than retained from an earlier observation.
-        merged.networkInterfaceToken = observation.networkInterfaceToken;
         merged.ipv4ConfigurationKnown = observation.ipv4ConfigurationKnown;
         if (observation.ipv4ConfigurationKnown) {
+            merged.networkInterfaceToken = observation.networkInterfaceToken;
             merged.ipv4Address = observation.ipv4Address;
             merged.ipv4SubnetMask = observation.ipv4SubnetMask;
             merged.ipv4Gateway = observation.ipv4Gateway;
             merged.ipv4DhcpEnabled = observation.ipv4DhcpEnabled;
         } else {
+            merged.networkInterfaceToken.clear();
             merged.ipv4Address.clear();
             merged.ipv4SubnetMask.clear();
             merged.ipv4Gateway.clear();
