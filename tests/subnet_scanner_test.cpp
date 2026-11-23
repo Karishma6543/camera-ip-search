@@ -10,6 +10,7 @@ private slots:
     void rejectsNetmaskPrefixMismatch();
     void rejectsPointToPointAndHostOnlySubnets();
     void validatesSubnetBoundaryAddresses();
+    void aggregatesMultipleOpenPortsWithoutDuplicates();
     void cancelsAnActiveSubnetScan();
 };
 
@@ -86,6 +87,16 @@ void SubnetScannerTest::validatesSubnetBoundaryAddresses()
         makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.252"), 30)));
 }
 
+
+void SubnetScannerTest::aggregatesMultipleOpenPortsWithoutDuplicates()
+{
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("192.0.2.55");
+    QVERIFY(SubnetScanner::appendOpenPort(candidate, 80));
+    QVERIFY(SubnetScanner::appendOpenPort(candidate, 554));
+    QVERIFY(!SubnetScanner::appendOpenPort(candidate, 80));
+    QCOMPARE(candidate.openPorts, QStringList({QStringLiteral("80"), QStringLiteral("554")}));
+}
 
 void SubnetScannerTest::cancelsAnActiveSubnetScan()
 {
