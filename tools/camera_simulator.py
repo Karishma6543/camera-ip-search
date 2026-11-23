@@ -121,8 +121,6 @@ class Scenario:
                     if self.args.scenario == "silent":
                         continue
                     response = self.probe_match(peer[0])
-                    if self.args.scenario == "oversized":
-                        response = response + (b" " * (MAX_DATAGRAM + 1))
                     try:
                         sock.sendto(response, peer)
                     except OSError as exc:
