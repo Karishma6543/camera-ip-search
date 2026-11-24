@@ -14,14 +14,15 @@ A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing devi
 - Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded maximum of 256 host addresses; on larger subnets the window is centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
 - Checks reachability using known/common TCP ports.
 - Supports manual device entry, device labels, CSV export and local SQLite inventory persistence. SQLite integrity is checked on startup; invalid databases are not automatically overwritten.
-- Offers a guarded ONVIF static IPv4 workflow when a matching ONVIF interface token and current device-service endpoint have been obtained. It validates input, asks for confirmation and attempts to verify the new address. There is no automatic rollback.
+- Offers guarded single-camera and sequential bulk ONVIF static IPv4 workflows when matching ONVIF interface tokens and current device-service endpoints have been obtained. Bulk mode requires per-camera unique addresses, validates and confirms the full assignment list, applies changes one camera at a time and records each verification result. There is no automatic rollback.
+- Provides ONVIF factory reset through SetSystemFactoryDefault with explicit Soft/Hard selection and destructive-action confirmations when the camera exposes and authorizes that operation.
 - Provides a local Operation History workspace and user-confirmed diagnostics text export with recent activity and OS/application/network-interface summary.
 - Includes a local Contract B/limited ONVIF simulator for deterministic pre-production testing; see [simulator and integration testing](docs/simulator-and-integration-testing.md).
-- Keeps activation, firmware flashing, reboot, NVR, bulk provisioning and unsupported vendor operations unavailable rather than simulating success.
+- Keeps activation, firmware flashing, reboot, NVR, general-purpose bulk provisioning and unsupported vendor operations unavailable rather than simulating success. Bulk support is currently limited to static IPv4 network assignments.
 
 ## Compatibility boundaries
 
-The current code contains an ONVIF adapter and the project's own discovery codec. It does **not** contain verified CP Plus, Hikvision or Prama vendor adapters. ONVIF support varies by model, firmware, authentication configuration and enabled services. Static IP configuration may be rejected by a camera or its user permissions.
+The current code contains an ONVIF adapter and the project's own discovery codec. It does **not** contain verified CP Plus, Hikvision or Prama vendor adapters. ONVIF support varies by model, firmware, authentication configuration and enabled services. Static IP configuration and factory reset may be rejected by a camera, firmware variant or account permissions. Factory reset is only attempted through the ONVIF device service; vendor-specific reset paths are not implemented.
 
 The compatibility matrix is the source of truth for model-specific test evidence:
 [docs/compatibility-matrix.md](docs/compatibility-matrix.md).
