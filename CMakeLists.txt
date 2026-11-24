@@ -11,7 +11,7 @@ set(CMAKE_AUTORCC ON)
 
 include(CTest)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 endif()
@@ -20,6 +20,12 @@ qt_standard_project_setup()
 qt_add_executable(camera-ip-search
     src/main.cpp
     src/adapters/device_adapter.h
+    src/app/batch_operation_preflight.h
+    src/app/batch_operation_preflight.cpp
+    src/app/ip_assignment_preflight.h
+    src/app/ip_assignment_preflight.cpp
+    src/app/batch_operation_runner.h
+    src/app/batch_operation_runner.cpp
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
     src/adapters/adapter_registry.h
@@ -27,6 +33,10 @@ qt_add_executable(camera-ip-search
     src/adapters/network_config_validator.h
     src/adapters/network_config_validator.cpp
     src/core/device_record.h
+    src/firmware/firmware_package_validator.h
+    src/firmware/firmware_package_validator.cpp
+    src/core/diagnostic_logger.h
+    src/core/diagnostic_logger.cpp
     src/core/device_identity.h
     src/core/device_identity.cpp
     src/discovery/discovery_service.h
@@ -39,12 +49,24 @@ qt_add_executable(camera-ip-search
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
     src/discovery/reachability_checker.cpp
+    src/discovery/onvif_network_interface_parser.h
+    src/discovery/onvif_network_interface_parser.cpp
+    src/discovery/onvif_dns_parser.h
+    src/discovery/onvif_dns_parser.cpp
+    src/discovery/ip_conflict_probe.h
+    src/discovery/ip_conflict_probe.cpp
+    src/discovery/ip_assignment_planner.h
+    src/discovery/ip_assignment_planner.cpp
     src/ui/main_window.cpp
     src/ui/main_window.h
     src/ui/oxita_theme.h
 )
 
-target_link_libraries(camera-ip-search PRIVATE Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml)
+target_link_libraries(camera-ip-search PRIVATE Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent)
+
+if(WIN32)
+    target_link_libraries(camera-ip-search PRIVATE iphlpapi)
+endif()
 target_include_directories(camera-ip-search PRIVATE src)
 
 if(MSVC)
@@ -124,6 +146,112 @@ if(BUILD_TESTING)
     target_include_directories(device-identity-tests PRIVATE src)
     target_link_libraries(device-identity-tests PRIVATE Qt6::Test Qt6::Network)
     add_test(NAME device-identity-tests COMMAND device-identity-tests)
+
+
+    qt_add_executable(onvif-network-interface-parser-tests
+        tests/onvif_network_interface_parser_test.cpp
+        src/discovery/onvif_network_interface_parser.h
+        src/discovery/onvif_network_interface_parser.cpp
+    )
+    target_include_directories(onvif-network-interface-parser-tests PRIVATE src)
+    target_link_libraries(onvif-network-interface-parser-tests PRIVATE Qt6::Test Qt6::Xml)
+    add_test(NAME onvif-network-interface-parser-tests COMMAND onvif-network-interface-parser-tests)
+
+    qt_add_executable(onvif-dns-parser-tests
+        tests/onvif_dns_parser_test.cpp
+        src/discovery/onvif_dns_parser.h
+        src/discovery/onvif_dns_parser.cpp
+    )
+    target_include_directories(onvif-dns-parser-tests PRIVATE src)
+    target_link_libraries(onvif-dns-parser-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
+    add_test(NAME onvif-dns-parser-tests COMMAND onvif-dns-parser-tests)
+
+    qt_add_executable(ip-assignment-planner-tests
+        tests/ip_assignment_planner_test.cpp
+        src/discovery/ip_assignment_planner.h
+        src/discovery/ip_assignment_planner.cpp
+    )
+    target_include_directories(ip-assignment-planner-tests PRIVATE src)
+    target_link_libraries(ip-assignment-planner-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME ip-assignment-planner-tests COMMAND ip-assignment-planner-tests)
+
+    qt_add_executable(ip-assignment-preflight-tests
+        tests/ip_assignment_preflight_test.cpp
+        src/discovery/ip_assignment_planner.h
+        src/app/ip_assignment_preflight.h
+        src/app/ip_assignment_preflight.cpp
+        src/discovery/ip_conflict_probe.h
+        src/discovery/ip_conflict_probe.cpp
+    )
+    target_include_directories(ip-assignment-preflight-tests PRIVATE src)
+    target_link_libraries(ip-assignment-preflight-tests PRIVATE Qt6::Test Qt6::Network)
+    if(WIN32)
+        target_link_libraries(ip-assignment-preflight-tests PRIVATE iphlpapi)
+    endif()
+    add_test(NAME ip-assignment-preflight-tests COMMAND ip-assignment-preflight-tests)
+
+    qt_add_executable(ip-conflict-probe-tests
+        tests/ip_conflict_probe_test.cpp
+        src/discovery/ip_assignment_planner.h
+        src/discovery/ip_conflict_probe.h
+        src/discovery/ip_conflict_probe.cpp
+    )
+    target_include_directories(ip-conflict-probe-tests PRIVATE src)
+    target_link_libraries(ip-conflict-probe-tests PRIVATE Qt6::Test Qt6::Network)
+    if(WIN32)
+        target_link_libraries(ip-conflict-probe-tests PRIVATE iphlpapi)
+    endif()
+    add_test(NAME ip-conflict-probe-tests COMMAND ip-conflict-probe-tests)
+
+    qt_add_executable(batch-operation-preflight-tests
+        tests/batch_operation_preflight_test.cpp
+        src/core/device_record.h
+        src/adapters/device_adapter.h
+        src/adapters/onvif_adapter.h
+        src/adapters/onvif_adapter.cpp
+        src/adapters/adapter_registry.h
+        src/adapters/adapter_registry.cpp
+        src/app/batch_operation_preflight.h
+        src/app/batch_operation_preflight.cpp
+    )
+    target_include_directories(batch-operation-preflight-tests PRIVATE src)
+    target_link_libraries(batch-operation-preflight-tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME batch-operation-preflight-tests COMMAND batch-operation-preflight-tests)
+
+    qt_add_executable(batch-operation-runner-tests
+        tests/batch_operation_runner_test.cpp
+        src/core/device_record.h
+        src/adapters/device_adapter.h
+        src/adapters/onvif_adapter.h
+        src/adapters/onvif_adapter.cpp
+        src/adapters/adapter_registry.h
+        src/adapters/adapter_registry.cpp
+        src/app/batch_operation_preflight.h
+        src/app/batch_operation_preflight.cpp
+        src/app/batch_operation_runner.h
+        src/app/batch_operation_runner.cpp
+    )
+    target_include_directories(batch-operation-runner-tests PRIVATE src)
+    target_link_libraries(batch-operation-runner-tests PRIVATE Qt6::Test Qt6::Network Qt6::Concurrent)
+    add_test(NAME batch-operation-runner-tests COMMAND batch-operation-runner-tests)
+
+    qt_add_executable(firmware-package-validator-tests
+        tests/firmware_package_validator_test.cpp
+        src/firmware/firmware_package_validator.h
+        src/firmware/firmware_package_validator.cpp
+    )
+    target_include_directories(firmware-package-validator-tests PRIVATE src)
+    target_link_libraries(firmware-package-validator-tests PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME firmware-package-validator-tests COMMAND firmware-package-validator-tests)
+
+    qt_add_executable(diagnostic-logger-tests
+        tests/diagnostic_logger_test.cpp
+        src/core/diagnostic_logger.h
+        src/core/diagnostic_logger.cpp
+    )
+    target_include_directories(diagnostic-logger-tests PRIVATE src)
+    target_link_libraries(diagnostic-logger-tests PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME diagnostic-logger-tests COMMAND diagnostic-logger-tests)
 
     set_tests_properties(
         discovery-parser-tests
