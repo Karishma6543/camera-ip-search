@@ -440,6 +440,7 @@ void MainWindow::buildUi()
     selectedNetworkSummary_ = mutedLabel(
         tr("Select a camera in the inventory to inspect its network and verification state."),
         selectedPanel);
+    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
     selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     selectedLayout->addWidget(selectedDeviceSummary_);
     selectedLayout->addWidget(selectedNetworkSummary_);
