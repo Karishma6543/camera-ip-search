@@ -849,19 +849,22 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 }
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
-    auto *page = new QWidget(parent);
-    auto *layout = new QVBoxLayout(page);
+    auto *page = new QScrollArea(parent);
+    page->setWidgetResizable(true);
+    page->setFrameShape(QFrame::NoFrame);
+    auto *content = new QWidget(page);
+    auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(16, 14, 16, 14);
     layout->setSpacing(12);
 
-    auto *heading = new QLabel(tr("Device actions"), page);
+    auto *heading = new QLabel(tr("Device actions"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
         tr("Actions are performed against the selected camera. Review the target address before opening its web interface or changing network settings."),
         page));
 
-    auto *devicePanel = panel(tr("Device access & diagnostics"), page);
+    auto *devicePanel = panel(tr("Device access & diagnostics"), content);
     auto *deviceLayout = new QVBoxLayout(devicePanel);
     deviceLayout->setSpacing(8);
     auto *deviceDescription = mutedLabel(
@@ -884,7 +887,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     deviceLayout->addLayout(deviceActions);
     layout->addWidget(devicePanel);
 
-    auto *networkPanel = panel(tr("IPv4 network configuration"), page);
+    auto *networkPanel = panel(tr("IPv4 network configuration"), content);
     auto *networkLayout = new QVBoxLayout(networkPanel);
     networkLayout->setSpacing(8);
     networkLayout->addWidget(mutedLabel(
@@ -899,7 +902,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addLayout(networkActions);
     layout->addWidget(networkPanel);
 
-    auto *firmwarePanel = panel(tr("Firmware & device maintenance"), page);
+    auto *firmwarePanel = panel(tr("Firmware & device maintenance"), content);
     auto *firmwareLayout = new QVBoxLayout(firmwarePanel);
     firmwareLayout->setSpacing(8);
     firmwareStatusSummary_ = new QLabel(tr("Select a camera to inspect its reported firmware version."), firmwarePanel);
@@ -919,7 +922,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     firmwareLayout->addLayout(firmwareActions);
     layout->addWidget(firmwarePanel);
 
-    auto *backupPanel = panel(tr("Inventory backup & recovery"), page);
+    auto *backupPanel = panel(tr("Inventory backup & recovery"), content);
     auto *backupLayout = new QVBoxLayout(backupPanel);
     backupLayout->addWidget(mutedLabel(
         tr("Create a consistent SQLite snapshot or restore a previously validated backup. Restoring keeps a separate pre-restore recovery snapshot beside the active inventory."),
@@ -1152,6 +1155,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         refreshOperationHistory();
         discovery_->refreshDeviceInfo(device);
     });
+    page->setWidget(content);
     return page;
 }
 
