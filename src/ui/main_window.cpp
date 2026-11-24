@@ -1102,7 +1102,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         QVector<int> rows;
         for (int row = 0; row < deviceTable_->rowCount(); ++row) {
             const auto *check = deviceTable_->item(row, 0);
-            if (check && check->checkState() == Qt::Checked) rows.append(row);
+            if (check && check->checkState() == Qt::Checked && !deviceTable_->isRowHidden(row))
+                rows.append(row);
         }
         if (rows.isEmpty()) {
             for (const QModelIndex &index : deviceTable_->selectionModel()->selectedRows()) rows.append(index.row());
