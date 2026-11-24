@@ -48,6 +48,7 @@ private:
     QTableWidget *historyTable_{nullptr};
     QLabel *statusLabel_{nullptr};
     QLabel *summaryLabel_{nullptr};
+    QLabel *inventoryEmptyState_{nullptr};
     QLabel *deviceCountValue_{nullptr};
     QLabel *discoveredMetric_{nullptr};
     QLabel *reachableMetric_{nullptr};
