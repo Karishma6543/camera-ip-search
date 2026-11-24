@@ -122,6 +122,7 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("backupInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("restoreInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton")));
 
     auto *reachability = window.findChild<QPushButton *>(QStringLiteral("reachabilityButton"));
     QTest::mouseClick(reachability, Qt::LeftButton);
