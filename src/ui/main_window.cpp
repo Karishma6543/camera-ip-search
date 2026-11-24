@@ -56,6 +56,7 @@
 #include <QSysInfo>
 #include <QSaveFile>
 #include <QRegularExpression>
+#include <QSet>
 #include <QPainter>
 #include <QPixmap>
 #include <QPainterPath>
@@ -1527,6 +1528,27 @@ void MainWindow::exportDiagnosticBundle()
         tr("The support bundle was saved. Review it before sharing; network addresses and operation details may be sensitive."));
 }
 
+void MainWindow::startNextBulkIpv4Configuration()
+{
+    if (!bulkIpv4Running_) return;
+    if (bulkIpv4Next_ >= bulkIpv4Queue_.size()) {
+        bulkIpv4Running_ = false;
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton"))) button->setEnabled(true);
+        const QString summary = tr("Bulk IPv4 configuration finished: %1 verified, %2 failed, %3 total.")
+            .arg(bulkIpv4Succeeded_).arg(bulkIpv4Failed_).arg(bulkIpv4Queue_.size());
+        recordOperation(tr("Bulk static IPv4"), QString(),
+                        bulkIpv4Failed_ == 0 ? tr("Completed") : tr("Completed with failures"), summary);
+        refreshOperationHistory();
+        updateStatus(summary);
+        QMessageBox::information(this, tr("Bulk configuration results"), summary + tr("\nReview Operation history for each camera's result. Rediscover cameras after network changes."));
+        bulkIpv4Queue_.clear();
+        return;
+    }
+    const BulkIpv4Target target = bulkIpv4Queue_.at(bulkIpv4Next_);
+    updateStatus(tr("Configuring camera %1 of %2 at %3…")
+        .arg(bulkIpv4Next_ + 1).arg(bulkIpv4Queue_.size()).arg(target.device.ipAddress));
+    discovery_->applyStaticIpv4(target.device, target.address, target.subnetMask, target.gateway);
+}
 void MainWindow::updateSelectedDevicePanel()
 {
     if (!selectedDeviceSummary_ || !selectedNetworkSummary_ || !deviceTable_) return;
