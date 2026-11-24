@@ -11,6 +11,7 @@ class QTableWidget;
 class QPushButton;
 class QLineEdit;
 class QComboBox;
+class QProgressBar;
 class DiscoveryService;
 class SubnetScanner;
 class ReachabilityChecker;
@@ -46,6 +47,7 @@ private:
     QTableWidget *deviceTable_{nullptr};
     QTableWidget *historyTable_{nullptr};
     QLabel *statusLabel_{nullptr};
+    QProgressBar *operationProgress_{nullptr};
     QLabel *summaryLabel_{nullptr};
     QLabel *inventoryEmptyState_{nullptr};
     QLabel *deviceCountValue_{nullptr};
