@@ -159,7 +159,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateStatus(message);
     });
     connect(discovery_, &DiscoveryService::cancelled, this, [this](int count) {
-        scanButton_->setText(tr("Discover devices"));
+        scanButton_->setText(tr("Discover cameras"));
         scanButton_->setEnabled(true);
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
                         tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
@@ -236,29 +236,29 @@ void MainWindow::populateInterfaces()
 void MainWindow::buildUi()
 {
     setWindowTitle(tr("Oxita | Camera Device Manager"));
-    setMinimumSize(1120, 720);
-    resize(1480, 900);
+    setMinimumSize(1100, 700);
+    resize(1440, 900);
 
     setStyleSheet(OxitaTheme::styleSheet());
 
     auto *central = new QWidget(this);
     central->setObjectName(QStringLiteral("appRoot"));
     auto *root = new QVBoxLayout(central);
-    root->setContentsMargins(22, 20, 22, 14);
-    root->setSpacing(14);
+    root->setContentsMargins(18, 16, 18, 12);
+    root->setSpacing(12);
 
     auto *top = new QFrame(central);
     top->setObjectName(QStringLiteral("topBar"));
     auto *topLayout = new QHBoxLayout(top);
-    topLayout->setContentsMargins(20, 14, 20, 14);
+    topLayout->setContentsMargins(18, 11, 18, 11);
     topLayout->setSpacing(10);
     auto *brandLogo = new QLabel(top);
     brandLogo->setObjectName(QStringLiteral("brandLogo"));
-    brandLogo->setFixedSize(180, 57);
+    brandLogo->setFixedSize(158, 50);
     brandLogo->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     const QPixmap oxitaLogo(QStringLiteral(":/branding/oxita-logo.png"));
     if (!oxitaLogo.isNull())
-        brandLogo->setPixmap(oxitaLogo.scaled(180, 57, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        brandLogo->setPixmap(oxitaLogo.scaled(158, 50, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     brandLogo->setAccessibleName(tr("Oxita — Driven by Innovation"));
     auto *productName = new QLabel(tr("CAMERA DEVICE MANAGER"), top);
     productName->setObjectName(QStringLiteral("productName"));
@@ -267,7 +267,11 @@ void MainWindow::buildUi()
     topLayout->addWidget(productName);
     topLayout->addStretch();
     auto *help = actionButton(tr("Help"), top);
+    help->setObjectName(QStringLiteral("helpButton"));
+    help->setToolTip(tr("Guidance for discovery, device details and safe network configuration."));
     auto *settings = actionButton(tr("Settings"), top);
+    settings->setObjectName(QStringLiteral("settingsButton"));
+    settings->setToolTip(tr("View local application storage and diagnostic information."));
     topLayout->addWidget(help);
     topLayout->addWidget(settings);
     root->addWidget(top);
@@ -282,12 +286,14 @@ void MainWindow::buildUi()
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
-    searchEdit_->setPlaceholderText(tr("Search by IP address, MAC, model or manufacturer"));
-    searchEdit_->setMinimumWidth(250);
+    searchEdit_->setPlaceholderText(tr("Search devices by IP, name, MAC or model"));
+    searchEdit_->setMinimumWidth(235);
+    searchEdit_->setToolTip(tr("Search all inventory fields, including technical details hidden from the compact table."));
     searchEdit_->setClearButtonEnabled(true);
     interfaceSelector_ = new QComboBox(toolbar);
     interfaceSelector_->setObjectName(QStringLiteral("interfaceSelector"));
-    interfaceSelector_->setMinimumWidth(175);
+    interfaceSelector_->setMinimumWidth(165);
+    interfaceSelector_->setToolTip(tr("Choose the active network adapter used for discovery and subnet scanning."));
     manufacturerFilter_ = new QComboBox(toolbar);
     manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
     auto *vendorFilter = manufacturerFilter_;
@@ -297,7 +303,7 @@ void MainWindow::buildUi()
     auto *statusFilter = statusFilter_;
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
-    deviceCountValue_->setObjectName(QStringLiteral("metric"));
+    deviceCountValue_->setObjectName(QStringLiteral("muted"));
     filterRow->addWidget(searchEdit_, 2);
     filterRow->addWidget(interfaceSelector_);
     connect(interfaceSelector_, &QComboBox::currentIndexChanged, this,
@@ -311,22 +317,28 @@ void MainWindow::buildUi()
     auto *actionRow = new QHBoxLayout();
     actionRow->setSpacing(8);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
+    addDeviceButton_->setToolTip(tr("Manually add a camera or network device to the local inventory."));
     addDeviceButton_->setObjectName(QStringLiteral("addDeviceButton"));
     actionRow->addWidget(addDeviceButton_);
     auto *exportButton = actionButton(tr("Export CSV"), toolbar);
+    exportButton->setToolTip(tr("Export the complete inventory to a UTF-8 CSV file."));
     exportButton->setObjectName(QStringLiteral("exportCsvButton"));
     actionRow->addWidget(exportButton);
-    auto *renameButton = actionButton(tr("Rename label"), toolbar);
+    auto *renameButton = actionButton(tr("Rename"), toolbar);
+    renameButton->setToolTip(tr("Set a friendly name for the selected camera."));
     renameButton->setObjectName(QStringLiteral("renameLabelButton"));
     actionRow->addWidget(renameButton);
     actionRow->addStretch();
     reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
+    reachabilityButton_->setToolTip(tr("Check checked devices, selected devices or the full inventory."));
     reachabilityButton_->setObjectName(QStringLiteral("reachabilityButton"));
     actionRow->addWidget(reachabilityButton_);
-    subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
+    subnetScanButton_ = actionButton(tr("Scan subnet"), toolbar);
+    subnetScanButton_->setToolTip(tr("Find unverified hosts on the selected interface subnet; candidates are not confirmed cameras."));
     subnetScanButton_->setObjectName(QStringLiteral("subnetScanButton"));
     actionRow->addWidget(subnetScanButton_);
-    scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
+    scanButton_ = actionButton(tr("Discover cameras"), toolbar, true);
+    scanButton_->setToolTip(tr("Discover ONVIF and supported Oxita devices on the selected network interface."));
     scanButton_->setObjectName(QStringLiteral("discoverButton"));
     actionRow->addWidget(scanButton_);
     tools->addLayout(actionRow);
@@ -357,16 +369,17 @@ void MainWindow::buildUi()
     root->addLayout(metricsRow);
 
     auto *mainRow = new QHBoxLayout();
-    mainRow->setSpacing(10);
+    mainRow->setSpacing(12);
 
     auto *left = new QFrame(central);
     left->setObjectName(QStringLiteral("surface"));
     auto *leftLayout = new QVBoxLayout(left);
-    leftLayout->setContentsMargins(12, 11, 12, 12);
+    leftLayout->setContentsMargins(14, 13, 14, 14);
+    leftLayout->setSpacing(10);
     auto *listHeading = new QHBoxLayout();
-    auto *listTitle = new QLabel(tr("Discovered devices"), left);
+    auto *listTitle = new QLabel(tr("Camera inventory"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
-    summaryLabel_ = mutedLabel(tr("Ready to scan your local network"), left);
+    summaryLabel_ = mutedLabel(tr("Discover cameras on your selected network"), left);
     auto *selectAllChecks = actionButton(tr("Select all"), left);
     auto *clearChecks = actionButton(tr("Clear"), left);
     selectAllChecks->setToolTip(tr("Check every device for the next reachability operation."));
@@ -374,13 +387,14 @@ void MainWindow::buildUi()
     listHeading->addWidget(listTitle);
     listHeading->addStretch();
     listHeading->addWidget(summaryLabel_);
+    listHeading->addStretch();
     listHeading->addWidget(selectAllChecks);
     listHeading->addWidget(clearChecks);
     leftLayout->addLayout(listHeading);
 
     deviceTable_ = new QTableWidget(0, 12, left);
     deviceTable_->setObjectName(QStringLiteral("deviceTable"));
-    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
+    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DEVICE NAME"), tr("MANUFACTURER"), tr("MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("ACTIVATION"), tr("DISCOVERY SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
     auto *deviceHeader = deviceTable_->horizontalHeader();
     deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
     deviceHeader->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -397,6 +411,13 @@ void MainWindow::buildUi()
     deviceHeader->resizeSection(10, 118);
     deviceHeader->resizeSection(11, 118);
     deviceHeader->setMinimumSectionSize(72);
+    // Keep the primary inventory view scannable; technical identifiers remain
+    // searchable and are available in Device details and CSV export.
+    deviceTable_->setColumnHidden(5, true);
+    deviceTable_->setColumnHidden(6, true);
+    deviceTable_->setColumnHidden(8, true);
+    deviceTable_->setColumnHidden(9, true);
+    deviceTable_->setColumnHidden(10, true);
     deviceTable_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->verticalHeader()->setVisible(false);
@@ -405,33 +426,40 @@ void MainWindow::buildUi()
     deviceTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
-    deviceTable_->setMinimumHeight(310);
+    deviceTable_->setMinimumHeight(250);
     deviceTable_->verticalHeader()->setDefaultSectionSize(48);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
     deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
+    inventoryEmptyState_ = new QLabel(
+        tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."), left);
+    inventoryEmptyState_->setObjectName(QStringLiteral("inventoryEmptyState"));
+    inventoryEmptyState_->setAlignment(Qt::AlignCenter);
+    inventoryEmptyState_->setWordWrap(true);
+    inventoryEmptyState_->setMinimumHeight(88);
+    leftLayout->addWidget(inventoryEmptyState_);
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
     tabs->setObjectName(QStringLiteral("workspaceTabs"));
     tabs->setTabPosition(QTabWidget::North);
-    tabs->addTab(makeInfoTab(tabs), tr("Device Info"));
-    tabs->addTab(makeBulkTab(tabs), tr("Bulk Config"));
-    tabs->addTab(makeMaintenanceTab(tabs), tr("Maintenance"));
-    tabs->addTab(makeNvrTab(tabs), tr("NVR Channels"));
-    tabs->addTab(makeHistoryTab(tabs), tr("Operation History"));
+    tabs->setDocumentMode(true);
+    tabs->setUsesScrollButtons(true);
+    tabs->addTab(makeInfoTab(tabs), tr("Device details"));
+    tabs->addTab(makeMaintenanceTab(tabs), tr("Device actions"));
+    tabs->addTab(makeHistoryTab(tabs), tr("Operation history"));
     leftLayout->addWidget(tabs);
 
     auto *rightScroll = new QScrollArea(central);
     rightScroll->setWidgetResizable(true);
-    rightScroll->setMinimumWidth(340);
-    rightScroll->setMaximumWidth(440);
+    rightScroll->setMinimumWidth(290);
+    rightScroll->setMaximumWidth(360);
     auto *rightContent = new QWidget(rightScroll);
     auto *rightLayout = new QVBoxLayout(rightContent);
-    rightLayout->setContentsMargins(2, 2, 5, 2);
-    rightLayout->setSpacing(9);
+    rightLayout->setContentsMargins(2, 2, 2, 2);
+    rightLayout->setSpacing(10);
 
-    auto *selectedPanel = panel(tr("Selected device"), rightContent);
+    auto *selectedPanel = panel(tr("Device overview"), rightContent);
     auto *selectedLayout = new QVBoxLayout(selectedPanel);
     selectedLayout->setSpacing(7);
     selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
@@ -446,7 +474,7 @@ void MainWindow::buildUi()
     selectedLayout->addWidget(selectedNetworkSummary_);
     rightLayout->addWidget(selectedPanel);
 
-    auto *networkPanel = panel(tr("Network configuration"), rightContent);
+    auto *networkPanel = panel(tr("Local network"), rightContent);
     auto *networkLayout = new QVBoxLayout(networkPanel);
     networkLayout->setSpacing(8);
     networkLayout->addWidget(mutedLabel(
@@ -462,39 +490,13 @@ void MainWindow::buildUi()
         networkPanel));
     rightLayout->addWidget(networkPanel);
 
-    auto *capabilityPanel = panel(tr("Feature availability"), rightContent);
-    auto *capabilityLayout = new QVBoxLayout(capabilityPanel);
-    capabilityLayout->setSpacing(8);
-    const auto addCapability = [capabilityPanel, capabilityLayout](const QString &name,
-                                                                    const QString &state,
-                                                                    bool available) {
-        auto *row = new QHBoxLayout();
-        auto *nameLabel = new QLabel(name, capabilityPanel);
-        auto *stateLabel = new QLabel(state, capabilityPanel);
-        stateLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        stateLabel->setStyleSheet(available
-            ? QStringLiteral("color:#176B4D;font-weight:700;")
-            : QStringLiteral("color:#8A909A;font-weight:600;"));
-        row->addWidget(nameLabel, 1);
-        row->addWidget(stateLabel);
-        capabilityLayout->addLayout(row);
-    };
-    addCapability(tr("ONVIF discovery"), tr("Available"), true);
-    addCapability(tr("Device information"), tr("Available"), true);
-    addCapability(tr("TCP reachability"), tr("Available"), true);
-    addCapability(tr("Static IPv4"), tr("Conditional"), false);
-    addCapability(tr("Bulk image settings"), tr("Planned"), false);
-    addCapability(tr("Firmware update"), tr("Planned"), false);
-    addCapability(tr("NVR channels"), tr("Planned"), false);
-    addCapability(tr("Remote reboot"), tr("Planned"), false);
-    rightLayout->addWidget(capabilityPanel);
     rightLayout->addStretch();
     rightScroll->setWidget(rightContent);
-    mainRow->addWidget(left, 3);
+    mainRow->addWidget(left, 4);
     mainRow->addWidget(rightScroll, 1);
     root->addLayout(mainRow, 1);
 
-    auto *footer = mutedLabel(tr("OXITA CAMERA DEVICE MANAGER  •  Multi-vendor support is capability-based. Unverified configuration and firmware actions remain safely disabled."), central);
+    auto *footer = mutedLabel(tr("OXITA CAMERA DEVICE MANAGER  •  Device capabilities depend on the camera model, firmware and enabled services."), central);
     root->addWidget(footer);
     setCentralWidget(central);
     statusLabel_ = new QLabel(this);
