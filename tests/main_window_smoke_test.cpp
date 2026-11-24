@@ -17,6 +17,8 @@
 #include <QNetworkAddressEntry>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QScrollArea>
+#include <QSplitter>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
@@ -148,6 +150,11 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(!table->isColumnHidden(4));
     QVERIFY(!table->isColumnHidden(7));
     QVERIFY(!table->isColumnHidden(11));
+    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("deviceWorkspaceSplitter"));
+    auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
+    QVERIFY(workspace);
+    QVERIFY(detailsScroll);
+    QVERIFY(workspace->count() == 2);
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
