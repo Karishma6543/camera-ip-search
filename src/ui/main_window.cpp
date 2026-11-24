@@ -2053,6 +2053,7 @@ void MainWindow::editSelectedLabel()
     form->addRow(tr("Device name"), nameEdit);
     layout->addLayout(form);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    buttons->button(QDialogButtonBox::Save)->setObjectName(QStringLiteral("saveDeviceNameButton"));
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
