@@ -76,7 +76,7 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
     // Select a source address from the requested interface. SendARP proves
     // occupancy when it resolves a MAC; absence of a reply is inconclusive.
     const QNetworkAddressEntry *sourceEntry = nullptr;
-    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+    for (const QNetworkAddressEntry &entry : networkInterface.addressEntries()) {
         if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
             !entry.netmask().isNull() && target.isInSubnet(entry.ip(), entry.prefixLength())) {
             sourceEntry = &entry;
