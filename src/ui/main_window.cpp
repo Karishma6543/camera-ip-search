@@ -847,59 +847,6 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     layout->addWidget(note);
     return page;
 }
-QWidget *MainWindow::makeBulkTab(QWidget *parent)
-{
-    auto *page = new QWidget(parent);
-    auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(18, 16, 18, 16);
-    layout->setSpacing(10);
-
-    auto *heading = new QLabel(tr("Multi-camera configuration"), page);
-    heading->setObjectName(QStringLiteral("sectionTitle"));
-    layout->addWidget(heading);
-    layout->addWidget(mutedLabel(
-        tr("The workflow is designed for applying a consistent image profile across selected cameras. "
-           "Per-vendor adapters and capability checks are required before any setting can be sent."),
-        page));
-
-    auto *statusPanel = new QFrame(page);
-    statusPanel->setObjectName(QStringLiteral("metricCard"));
-    auto *statusLayout = new QVBoxLayout(statusPanel);
-    statusLayout->setContentsMargins(14, 12, 14, 12);
-    auto *statusTitle = new QLabel(tr("NOT AVAILABLE IN THIS BUILD"), statusPanel);
-    statusTitle->setObjectName(QStringLiteral("eyebrow"));
-    auto *statusText = new QLabel(
-        tr("No bulk configuration adapter is currently registered. These controls remain unavailable rather than sending unverified vendor commands."),
-        statusPanel);
-    statusText->setWordWrap(true);
-    statusLayout->addWidget(statusTitle);
-    statusLayout->addWidget(statusText);
-    layout->addWidget(statusPanel);
-
-    auto *capabilities = new QGridLayout();
-    capabilities->setHorizontalSpacing(14);
-    capabilities->setVerticalSpacing(10);
-    const QStringList features = {
-        tr("Day / Night profile"), tr("ICR / IR-cut control"),
-        tr("Image and IR settings"), tr("Easy Mode")
-    };
-    for (int i = 0; i < features.size(); ++i) {
-        auto *name = new QLabel(features.at(i), page);
-        auto *state = new QLabel(tr("Adapter required"), page);
-        state->setObjectName(QStringLiteral("muted"));
-        capabilities->addWidget(name, i * 2, 0);
-        capabilities->addWidget(state, i * 2, 1, Qt::AlignRight);
-        if (i + 1 < features.size()) {
-            auto *line = new QFrame(page);
-            line->setFrameShape(QFrame::HLine);
-            line->setStyleSheet(QStringLiteral("color:#ECEEF2;"));
-            capabilities->addWidget(line, i * 2 + 1, 0, 1, 2);
-        }
-    }
-    layout->addLayout(capabilities);
-    layout->addStretch();
-    return page;
-}
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
@@ -1378,36 +1325,6 @@ void MainWindow::exportDiagnosticBundle()
         tr("The support bundle was saved. Review it before sharing; network addresses and operation details may be sensitive."));
 }
 
-QWidget *MainWindow::makeNvrTab(QWidget *parent)
-{
-    auto *page = new QWidget(parent);
-    auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(18, 16, 18, 16);
-    layout->setSpacing(10);
-
-    auto *heading = new QLabel(tr("Recorder channel management"), page);
-    heading->setObjectName(QStringLiteral("sectionTitle"));
-    layout->addWidget(heading);
-    auto *emptyState = new QFrame(page);
-    emptyState->setObjectName(QStringLiteral("metricCard"));
-    auto *emptyLayout = new QVBoxLayout(emptyState);
-    emptyLayout->setContentsMargins(18, 18, 18, 18);
-    auto *eyebrow = new QLabel(tr("NVR INTEGRATION"), emptyState);
-    eyebrow->setObjectName(QStringLiteral("eyebrow"));
-    auto *title = new QLabel(tr("No recorder adapter is available"), emptyState);
-    title->setObjectName(QStringLiteral("sectionTitle"));
-    auto *description = mutedLabel(
-        tr("Channel listing, camera-to-channel mapping, stream profiles and recorder configuration require a verified NVR protocol adapter. "
-           "The current build does not send recorder-specific commands."),
-        emptyState);
-    emptyLayout->addWidget(eyebrow);
-    emptyLayout->addWidget(title);
-    emptyLayout->addWidget(description);
-    layout->addWidget(emptyState);
-    layout->addStretch();
-    return page;
-}
-
 void MainWindow::updateSelectedDevicePanel()
 {
     if (!selectedDeviceSummary_ || !selectedNetworkSummary_ || !deviceTable_) return;
@@ -1536,7 +1453,12 @@ void MainWindow::updateDeviceSummary()
             const auto *item = deviceTable_->item(row, 0);
             if (item && item->checkState() == Qt::Checked) ++checked;
         }
-        summaryLabel_->setText(tr("%1 devices · %2 checked").arg(count).arg(checked));
+        summaryLabel_->setText(tr("%1 devices · %2 selected").arg(count).arg(checked));
+    }
+    if (inventoryEmptyState_ && count == 0) {
+        inventoryEmptyState_->setText(
+            tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."));
+        inventoryEmptyState_->show();
     }
 }
 void MainWindow::upsertDevice(DeviceRecord device)
@@ -2032,7 +1954,20 @@ void MainWindow::applyFilters()
         deviceTable_->setRowHidden(row, !show);
         if (show) ++visible;
     }
-    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 / %2 devices").arg(visible).arg(deviceTable_->rowCount()));
+    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 of %2 devices").arg(visible).arg(deviceTable_->rowCount()));
+    if (inventoryEmptyState_) {
+        if (deviceTable_->rowCount() == 0) {
+            inventoryEmptyState_->setText(
+                tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."));
+            inventoryEmptyState_->show();
+        } else if (visible == 0) {
+            inventoryEmptyState_->setText(
+                tr("No devices match these filters.\nClear your search or choose different manufacturer and status filters."));
+            inventoryEmptyState_->show();
+        } else {
+            inventoryEmptyState_->hide();
+        }
+    }
 }
 
 void MainWindow::editSelectedLabel()
