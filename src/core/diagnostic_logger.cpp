@@ -89,7 +89,7 @@ QString DiagnosticLogger::redact(const QString &text)
 
     // JSON properties and XML elements often carry ONVIF credentials.
     static const QRegularExpression jsonSecrets(
-        QStringLiteral(R"(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)"\s*:\s*)"[^"]*")"),
+        QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)"\\s*:\\s*)"[^"]*")rx"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(jsonSecrets, QStringLiteral("\\1\"[REDACTED]\""));
 
