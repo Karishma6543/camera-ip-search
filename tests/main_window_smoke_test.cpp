@@ -169,7 +169,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
     table->setCurrentCell(0, 1);
-    const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("sectionTitle"));
+    const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
     QVERIFY(deviceDetails);
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
     QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
