@@ -663,6 +663,14 @@ void MainWindow::buildUi()
                 }
                 reachabilityItem->setToolTip(tr("TCP reachability check: %1").arg(status));
                 deviceTable_->setItem(row, 11, reachabilityItem);
+                if (auto *ipItem = deviceTable_->item(row, 1)) {
+                    ipItem->setData(Qt::UserRole + 14, checkedAt);
+                    ipItem->setData(Qt::UserRole + 15, lastSuccessAt);
+                }
+                if (row == deviceTable_->currentRow()) {
+                    updateDeviceDetailsProfile(row);
+                    updateSelectedDevicePanel();
+                }
                 const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
                 if (inventoryDb_.isOpen()) {
                     QSqlQuery query(inventoryDb_);
@@ -888,55 +896,8 @@ void MainWindow::buildUi()
     });
     // Device checkboxes are the explicit multi-select mechanism. Highlighted
     // rows remain available for single-device inspection and keyboard workflows.
-    connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
-        if (!deviceDetailsLabel_) return;
-        if (row < 0) {
-            deviceDetailsLabel_->setText(tr("No device selected. Select a camera in the inventory above to inspect its reported information."));
-            return;
-        }
-        QStringList details;
-        for (int col = 1; col < deviceTable_->columnCount(); ++col) {
-            const auto *item = deviceTable_->item(row, col);
-            const QString value = item && !item->text().trimmed().isEmpty()
-                ? item->text() : tr("Not reported");
-            details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + value;
-        }
-        const auto *ipItem = deviceTable_->item(row, 1);
-        if (ipItem) {
-            const auto addDetail = [&details, ipItem](int role, const QString &title) {
-                const QString value = ipItem->data(role).toString();
-                details << title + QStringLiteral(": ") +
-                    (value.isEmpty() ? tr("Not reported") : value);
-            };
-            addDetail(Qt::UserRole + 1, tr("Network interface"));
-            addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
-            addDetail(Qt::UserRole + 3, tr("Device service URL"));
-            addDetail(Qt::UserRole + 4, tr("Network interfaces"));
-            addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
-            addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
-            addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
-            addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
-            addDetail(Qt::UserRole + 9, tr("Camera subnet mask"));
-            addDetail(Qt::UserRole + 10, tr("Camera gateway"));
-            addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
-            addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
-            addDetail(Qt::UserRole + 14, tr("Last reachability check"));
-            addDetail(Qt::UserRole + 15, tr("Last successful response"));
-            addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
-        }
-        QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
-            "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
-        for (const QString &detail : details) {
-            const int separator = detail.indexOf(QStringLiteral(": "));
-            const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
-            const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
-            html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
-                "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;'>%2</td></tr>")
-                .arg(key, value);
-        }
-        html += QStringLiteral("</table></body></html>");
-        deviceDetailsLabel_->setText(html);
-    });
+    connect(deviceTable_, &QTableWidget::currentCellChanged, this,
+            [this](int row, int, int, int) { updateDeviceDetailsProfile(row); });
     updateDeviceSummary();
 }
 
@@ -1658,6 +1619,61 @@ void MainWindow::startNextBulkIpv4Configuration()
         .arg(bulkIpv4Next_ + 1).arg(bulkIpv4Queue_.size()).arg(target.device.ipAddress));
     discovery_->applyStaticIpv4(target.device, target.address, target.subnetMask, target.gateway);
 }
+void MainWindow::updateDeviceDetailsProfile(int row)
+{
+    if (!deviceDetailsLabel_ || !deviceTable_) return;
+    if (row < 0 || row >= deviceTable_->rowCount()) {
+        deviceDetailsLabel_->setText(
+            tr("No device selected. Select a camera in the inventory above to inspect its reported information."));
+        return;
+    }
+
+    QStringList details;
+    for (int column = 1; column < deviceTable_->columnCount(); ++column) {
+        const auto *item = deviceTable_->item(row, column);
+        const QString value = item && !item->text().trimmed().isEmpty()
+            ? item->text() : tr("Not reported");
+        details << deviceTable_->horizontalHeaderItem(column)->text() +
+                   QStringLiteral(": ") + value;
+    }
+    const auto *ipItem = deviceTable_->item(row, 1);
+    if (ipItem) {
+        const auto addDetail = [&details, ipItem](int role, const QString &title) {
+            const QString value = ipItem->data(role).toString();
+            details << title + QStringLiteral(": ") +
+                (value.isEmpty() ? QObject::tr("Not reported") : value);
+        };
+        addDetail(Qt::UserRole + 1, tr("Network interface"));
+        addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
+        addDetail(Qt::UserRole + 3, tr("Device service URL"));
+        addDetail(Qt::UserRole + 4, tr("Network interfaces"));
+        addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
+        addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
+        addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
+        addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
+        addDetail(Qt::UserRole + 9, tr("Camera subnet mask"));
+        addDetail(Qt::UserRole + 10, tr("Camera gateway"));
+        addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
+        addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
+        addDetail(Qt::UserRole + 14, tr("Last reachability check"));
+        addDetail(Qt::UserRole + 15, tr("Last successful response"));
+        addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
+    }
+
+    QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
+        "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
+    for (const QString &detail : details) {
+        const int separator = detail.indexOf(QStringLiteral(": "));
+        const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
+        const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
+        html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
+            "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;'>%2</td></tr>")
+            .arg(key, value);
+    }
+    html += QStringLiteral("</table></body></html>");
+    deviceDetailsLabel_->setText(html);
+}
+
 void MainWindow::updateSelectedDevicePanel()
 {
     if (!selectedDeviceSummary_ || !selectedNetworkSummary_ || !deviceTable_) return;
@@ -1974,8 +1990,10 @@ void MainWindow::upsertDevice(DeviceRecord device)
     }
     updateDeviceSummary();
     applyFilters();
-    if (row == deviceTable_->currentRow())
+    if (row == deviceTable_->currentRow()) {
+        updateDeviceDetailsProfile(row);
         updateSelectedDevicePanel();
+    }
     if (!loadingInventory_) persistDevice(device);
 }
 
