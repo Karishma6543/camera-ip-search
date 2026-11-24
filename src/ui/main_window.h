@@ -71,6 +71,7 @@ private:
     QLabel *firmwareStatusSummary_{nullptr};
     void updateSelectedDevicePanel();
     void updateLocalNetworkSummary();
+    int selectedDeviceRow() const;
     void updateDeviceDetailsProfile(int row);
     void startNextBulkIpv4Configuration();
     struct BulkIpv4Target { DeviceRecord device; QString address; QString subnetMask; QString gateway; };
