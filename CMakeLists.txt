@@ -37,6 +37,9 @@ set(CAMERA_CORE_SOURCES
     src/core/device_record.h
     src/core/device_identity.h
     src/core/device_identity.cpp
+    src/core/inventory_backup.h
+    src/core/inventory_backup.cpp
+    src/oxita_branding.qrc
     src/core/diagnostic_logger.h
     src/core/diagnostic_logger.cpp
     src/core/diagnostic_log.h
@@ -80,7 +83,7 @@ else()
     target_compile_options(camera-core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-qt_add_executable(camera-ip-search src/main.cpp src/oxita_branding.qrc)
+qt_add_executable(camera-ip-search src/main.cpp)
 target_link_libraries(camera-ip-search PRIVATE camera-core)
 
 if(BUILD_TESTING)
@@ -98,6 +101,7 @@ if(BUILD_TESTING)
     add_camera_test(subnet-scanner-tests tests/subnet_scanner_test.cpp)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
     add_camera_test(device-identity-tests tests/device_identity_test.cpp)
+    add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
     add_camera_test(onvif-dns-parser-tests tests/onvif_dns_parser_test.cpp)
     add_camera_test(ip-assignment-planner-tests tests/ip_assignment_planner_test.cpp)
