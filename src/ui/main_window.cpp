@@ -130,7 +130,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             [this](const DeviceRecord &device, const QString &operation, bool succeeded,
                    const QString &message) {
         if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
-            button->setEnabled(true);
+            button->setEnabled(selectedDeviceRow() >= 0);
         recordOperation(operation, device.ipAddress,
                         succeeded ? tr("Accepted") : tr("Failed"), message);
         refreshOperationHistory();
@@ -143,7 +143,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         if (!bulkIpv4Running_) {
             for (auto *button : findChildren<QPushButton *>()) {
                 if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
-                    button->setEnabled(true);
+                    button->setEnabled(selectedDeviceRow() >= 0);
                     break;
                 }
             }
@@ -839,6 +839,10 @@ void MainWindow::buildUi()
             button->setEnabled(hasSelection);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
             button->setEnabled(hasSelection);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
+            button->setEnabled(hasSelection);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")))
+            button->setEnabled(hasSelection);
         updateDeviceDetailsProfile(row);
         updateSelectedDevicePanel();
     });
@@ -1084,7 +1088,11 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *networkActions = new QGridLayout();
     networkActions->setHorizontalSpacing(8);
     auto *previewNetworkButton = actionButton(tr("Preview IP configuration"), networkPanel);
+    previewNetworkButton->setObjectName(QStringLiteral("previewStaticIpv4Button"));
+    previewNetworkButton->setEnabled(false);
     auto *applyNetworkButton = actionButton(tr("Apply static IPv4 (ONVIF)"), networkPanel, true);
+    applyNetworkButton->setObjectName(QStringLiteral("applyStaticIpv4Button"));
+    applyNetworkButton->setEnabled(false);
     networkActions->addWidget(previewNetworkButton, 0, 0);
     networkActions->addWidget(applyNetworkButton, 0, 1);
     networkLayout->addLayout(networkActions);
@@ -1618,8 +1626,9 @@ void MainWindow::startNextBulkIpv4Configuration()
         if (auto *button = findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton"))) button->setEnabled(true);
         for (auto *button : findChildren<QPushButton *>()) {
             if (button->text() == tr("Apply static IPv4 (ONVIF)") ||
-                button->objectName() == QStringLiteral("factoryResetCameraButton"))
-                button->setEnabled(true);
+                button->objectName() == QStringLiteral("factoryResetCameraButton") ||
+                button->objectName() == QStringLiteral("previewStaticIpv4Button"))
+                button->setEnabled(selectedDeviceRow() >= 0);
         }
         if (operationProgress_) operationProgress_->hide();
         const QString summary = tr("Bulk IPv4 configuration finished: %1 verified, %2 failed, %3 total.")
