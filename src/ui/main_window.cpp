@@ -140,10 +140,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     });
     connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
             [this](const DeviceRecord &updatedDevice, bool verified, const QString &message) {
-        for (auto *button : findChildren<QPushButton *>()) {
-            if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
-                button->setEnabled(true);
-                break;
+        if (!bulkIpv4Running_) {
+            for (auto *button : findChildren<QPushButton *>()) {
+                if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
+                    button->setEnabled(true);
+                    break;
+                }
             }
         }
         if (bulkIpv4Running_) {
@@ -152,6 +154,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             if (verified) ++bulkIpv4Succeeded_;
             else ++bulkIpv4Failed_;
             ++bulkIpv4Next_;
+            if (operationProgress_) {
+                operationProgress_->setValue(bulkIpv4Next_);
+                operationProgress_->setFormat(tr("Bulk IPv4 %1 / %2").arg(bulkIpv4Next_).arg(bulkIpv4Queue_.size()));
+            }
             refreshOperationHistory();
             updateStatus(tr("Bulk IPv4 configuration: %1 / %2 completed.")
                              .arg(bulkIpv4Next_).arg(bulkIpv4Queue_.size()));
@@ -1185,6 +1191,17 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         if (dialog.exec() != QDialog::Accepted) return;
         bulkIpv4Queue_ = targets; bulkIpv4Next_ = 0; bulkIpv4Succeeded_ = 0; bulkIpv4Failed_ = 0; bulkIpv4Running_ = true;
         bulkButton->setEnabled(false);
+        for (auto *button : findChildren<QPushButton *>()) {
+            if (button->text() == tr("Apply static IPv4 (ONVIF)") ||
+                button->objectName() == QStringLiteral("factoryResetCameraButton"))
+                button->setEnabled(false);
+        }
+        if (operationProgress_) {
+            operationProgress_->setRange(0, bulkIpv4Queue_.size());
+            operationProgress_->setValue(0);
+            operationProgress_->setFormat(tr("Bulk IPv4 0 / %1").arg(bulkIpv4Queue_.size()));
+            operationProgress_->show();
+        }
         startNextBulkIpv4Configuration();
     });
 
@@ -1615,6 +1632,12 @@ void MainWindow::startNextBulkIpv4Configuration()
     if (bulkIpv4Next_ >= bulkIpv4Queue_.size()) {
         bulkIpv4Running_ = false;
         if (auto *button = findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton"))) button->setEnabled(true);
+        for (auto *button : findChildren<QPushButton *>()) {
+            if (button->text() == tr("Apply static IPv4 (ONVIF)") ||
+                button->objectName() == QStringLiteral("factoryResetCameraButton"))
+                button->setEnabled(true);
+        }
+        if (operationProgress_) operationProgress_->hide();
         const QString summary = tr("Bulk IPv4 configuration finished: %1 verified, %2 failed, %3 total.")
             .arg(bulkIpv4Succeeded_).arg(bulkIpv4Failed_).arg(bulkIpv4Queue_.size());
         recordOperation(tr("Bulk static IPv4"), QString(),
