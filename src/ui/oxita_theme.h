@@ -129,6 +129,11 @@ inline QString styleSheet()
         }
         QCheckBox::indicator:hover { border-color: #C62836; }
         QCheckBox::indicator:checked { background: #C62836; border-color: #C62836; }
+        QSplitter::handle:vertical {
+            background: #E1E4E8; height: 7px; margin: 2px 8px;
+            border-radius: 3px;
+        }
+        QSplitter::handle:vertical:hover { background: #C62836; }
         QScrollArea { border: 0; background: transparent; }
         QScrollBar:vertical { background: transparent; width: 9px; margin: 3px; }
         QScrollBar::handle:vertical {
