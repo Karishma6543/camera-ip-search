@@ -190,6 +190,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(discovery_, &DiscoveryService::cancelled, this, [this](int count) {
         scanButton_->setText(tr("Discover cameras"));
         scanButton_->setEnabled(true);
+        if (operationProgress_) operationProgress_->hide();
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
                         tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
         refreshOperationHistory();
@@ -198,6 +199,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover cameras"));
         scanButton_->setEnabled(true);
+        if (operationProgress_) operationProgress_->hide();
         updateDeviceSummary();
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
         refreshOperationHistory();
@@ -207,13 +209,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(subnetScanner_, &SubnetScanner::statusChanged, this, &MainWindow::updateStatus);
     connect(subnetScanner_, &SubnetScanner::progressChanged, this,
             [this](int completed, int total, int candidates) {
-        if (total > 0)
+        if (total > 0) {
+            if (operationProgress_) {
+                operationProgress_->setRange(0, total);
+                operationProgress_->setValue(completed);
+                operationProgress_->setFormat(tr("Subnet %1 / %2").arg(completed).arg(total));
+            }
             updateStatus(tr("Subnet scan: %1 / %2 connection checks completed; %3 unverified candidate(s) found.")
                              .arg(completed).arg(total).arg(candidates));
+        }
     });
     connect(subnetScanner_, &SubnetScanner::cancelled, this, [this](int count) {
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
+        if (operationProgress_) operationProgress_->hide();
         recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
                         tr("Cancelled"), tr("%1 unverified candidate(s) found before cancellation").arg(count));
         refreshOperationHistory();
@@ -222,6 +231,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(subnetScanner_, &SubnetScanner::finished, this, [this](int count) {
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
+        if (operationProgress_) operationProgress_->hide();
         updateDeviceSummary();
         recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 unverified candidate(s)").arg(count));
         refreshOperationHistory();
@@ -616,6 +626,12 @@ void MainWindow::buildUi()
         if (devices.isEmpty()) { updateStatus(tr("Add or discover devices before checking reachability.")); return; }
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Cancel reachability check"));
+        if (operationProgress_) {
+            operationProgress_->setRange(0, devices.size());
+            operationProgress_->setValue(0);
+            operationProgress_->setFormat(tr("Reachability 0 / %1").arg(devices.size()));
+            operationProgress_->show();
+        }
         updateStatus(tr("Checking TCP reachability. Checked cameras take priority, then highlighted rows; if neither is selected, all devices are checked."));
         reachabilityChecker_->start(devices);
     });
@@ -657,19 +673,27 @@ void MainWindow::buildUi()
     connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        if (operationProgress_) operationProgress_->hide();
         recordOperation(tr("Reachability batch"), QString(), tr("Completed"), tr("%1 device(s) checked").arg(checked));
         refreshOperationHistory();
         updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
     });
     connect(reachabilityChecker_, &ReachabilityChecker::progressChanged, this,
             [this](int checked, int total, const QString &ip) {
-        if (total > 0 && !ip.isEmpty())
+        if (total > 0 && !ip.isEmpty()) {
+            if (operationProgress_) {
+                operationProgress_->setRange(0, total);
+                operationProgress_->setValue(checked);
+                operationProgress_->setFormat(tr("Reachability %1 / %2").arg(checked + 1).arg(total));
+            }
             updateStatus(tr("Checking reachability: %1 / %2 — %3")
                              .arg(checked + 1).arg(total).arg(ip));
+        }
     });
     connect(reachabilityChecker_, &ReachabilityChecker::cancelled, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        if (operationProgress_) operationProgress_->hide();
         recordOperation(tr("Reachability batch"), QString(), tr("Cancelled"), tr("%1 device(s) checked before cancellation").arg(checked));
         refreshOperationHistory();
         updateStatus(tr("Reachability check cancelled after %1 device(s).").arg(checked));
@@ -682,6 +706,11 @@ void MainWindow::buildUi()
             deviceTable_->setRowCount(0);
             updateDeviceSummary();
             scanButton_->setText(tr("Cancel discovery"));
+            if (operationProgress_) {
+                operationProgress_->setRange(0, 0);
+                operationProgress_->setFormat(tr("Discovering cameras…"));
+                operationProgress_->show();
+            }
             discovery_->start(interfaceSelector_->currentData().toString());
         }
     });
@@ -698,6 +727,11 @@ void MainWindow::buildUi()
                 !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
                 if (subnetScanner_->start(interface, entry)) {
                     subnetScanButton_->setText(tr("Cancel subnet scan"));
+                    if (operationProgress_) {
+                        operationProgress_->setRange(0, 0);
+                        operationProgress_->setFormat(tr("Scanning subnet…"));
+                        operationProgress_->show();
+                    }
                     return;
                 }
             }
