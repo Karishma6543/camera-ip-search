@@ -147,15 +147,16 @@ bool parseOnvifProbeMatch(const QByteArray &payload, const QHostAddress &sender,
         if (xml.isStartElement()) {
             if (++depth > kMaximumXmlDepth) return false;
             const QString name = xml.name().toString();
-            if (name == QStringLiteral("Address") && endpoint.isEmpty())
+            if (name == QStringLiteral("Address") && endpoint.isEmpty()) {
                 endpoint = xml.readElementText().trimmed();
-            --depth;
-            else if (name == QStringLiteral("XAddrs") && xaddrs.isEmpty())
+                --depth; // readElementText consumes the matching end element.
+            } else if (name == QStringLiteral("XAddrs") && xaddrs.isEmpty()) {
                 xaddrs = xml.readElementText().trimmed();
-            --depth;
-            else if (name == QStringLiteral("Scopes") && scopes.isEmpty())
+                --depth;
+            } else if (name == QStringLiteral("Scopes") && scopes.isEmpty()) {
                 scopes = xml.readElementText().trimmed();
-            --depth;
+                --depth;
+            }
         } else if (xml.isEndElement()) {
             if (--depth < 0) return false;
         }
