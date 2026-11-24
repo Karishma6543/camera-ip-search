@@ -2,7 +2,7 @@
 
 A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing device/network information and performing a limited set of explicitly supported operations.
 
-**Release status:** Pre-production. The current branch contains implemented discovery, candidate scanning, ONVIF read/enrichment, local inventory and a guarded ONVIF static-IPv4 workflow. The application has not yet passed a complete cross-platform build/test run or model-level hardware validation. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
+**Release status:** Pre-production. The latest `main` CI run (#605, commit `47b99f2`) passed the Release build and CTest suite on Windows, Ubuntu and macOS. Physical-camera interoperability, model-specific compatibility evidence, security review and signed distribution packaging are still release gates. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
 
 ## Implemented in this build
 

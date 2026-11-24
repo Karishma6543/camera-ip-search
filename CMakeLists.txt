@@ -80,7 +80,7 @@ else()
     target_compile_options(camera-core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-qt_add_executable(camera-ip-search src/main.cpp)
+qt_add_executable(camera-ip-search src/main.cpp src/oxita_branding.qrc)
 target_link_libraries(camera-ip-search PRIVATE camera-core)
 
 if(BUILD_TESTING)

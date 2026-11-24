@@ -27,9 +27,8 @@ Not implemented:
 
 ### P0 — Must pass before any production release
 
-- [ ] A clean Release build succeeds on Windows, Ubuntu and macOS using the documented Qt version.
-- [ ] All CTest targets pass on all three operating systems.
-- [ ] GitHub Actions runner provisioning is restored; the previous workflow attempts failed before job steps ran and therefore provide no compile/test result.
+- [x] Latest main CI run #605 (`47b99f2`) completed a clean Release build on Windows, Ubuntu and macOS using Qt 6.10.1.
+- [x] All CTest targets passed on all three operating systems in main CI run #605. This is automated CI evidence, not physical-camera acceptance.
 - [ ] Run discovery against real ONVIF cameras and the project's own Contract B firmware; attach sanitized logs/packet evidence.
 - [ ] Validate ONVIF static IPv4 changes on each specifically supported camera model/firmware, including authentication, rejected writes, address change, gateway failure and reboot-required response.
 - [ ] Verify multi-NIC cameras never expose a configuration token unless the interface IPv4 address matches the discovered camera address.
@@ -89,7 +88,7 @@ Not implemented:
 - [x] Make the initial legacy-schema upgrade transactional and record the schema version atomically.
 - [x] Add a startup assertion for the schema version.
 
-These are source changes only until the workflow runs successfully. Simulator fixtures do not certify real cameras or the physical network stack.
+The latest main workflow run #605 completed successfully on Windows, Ubuntu and macOS. Simulator fixtures and CI do not certify real cameras or the physical network stack.
 
 ## Release decision
 
