@@ -247,6 +247,12 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(deviceDetails);
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
     QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
+    const auto *fullProfile = window.findChild<QLabel *>(QStringLiteral("deviceDetails"));
+    QVERIFY(fullProfile);
+    QVERIFY(fullProfile->text().contains(QStringLiteral("02:00:00:00:00:10")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Firmware")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Serial Number")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Hardware ID")));
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
