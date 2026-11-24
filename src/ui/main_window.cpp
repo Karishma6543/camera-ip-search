@@ -1167,7 +1167,7 @@ void MainWindow::updateLocalNetworkSummary()
     details << tr("System name: %1").arg(interface.name());
     details << tr("Hardware address: %1").arg(
         interface.hardwareAddress().isEmpty() ? tr("Not reported") : interface.hardwareAddress());
-    details << tr("MTU: %1").arg(interface.mtu() > 0 ? QString::number(interface.mtu()) : tr("Not reported"));
+    details << tr("MTU: %1").arg(tr("Not reported"));
     bool foundIpv4 = false;
     for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
         if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol || entry.ip().isLoopback()) continue;
