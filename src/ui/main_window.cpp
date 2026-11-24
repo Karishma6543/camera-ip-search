@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
+#include "core/inventory_backup.h"
 
 #include "discovery/discovery_service.h"
 #include "discovery/subnet_scanner.h"
@@ -85,6 +86,7 @@ QGroupBox *panel(const QString &title, QWidget *parent)
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    Q_INIT_RESOURCE(oxita_branding);
     discovery_ = new DiscoveryService(this);
     subnetScanner_ = new SubnetScanner(this);
     reachabilityChecker_ = new ReachabilityChecker(this);
@@ -438,6 +440,7 @@ void MainWindow::buildUi()
     selectedNetworkSummary_ = mutedLabel(
         tr("Select a camera in the inventory to inspect its network and verification state."),
         selectedPanel);
+    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
     selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     selectedLayout->addWidget(selectedDeviceSummary_);
     selectedLayout->addWidget(selectedNetworkSummary_);
@@ -967,6 +970,75 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     firmwareLayout->addLayout(firmwareActions);
     layout->addWidget(firmwarePanel);
 
+    auto *backupPanel = panel(tr("Inventory backup & recovery"), page);
+    auto *backupLayout = new QVBoxLayout(backupPanel);
+    backupLayout->addWidget(mutedLabel(
+        tr("Create a consistent SQLite snapshot or restore a previously validated backup. Restoring keeps a separate pre-restore recovery snapshot beside the active inventory."),
+        backupPanel));
+    auto *backupActions = new QHBoxLayout();
+    auto *backupButton = actionButton(tr("Back up inventory"), backupPanel);
+    backupButton->setObjectName(QStringLiteral("backupInventoryButton"));
+    auto *restoreButton = actionButton(tr("Restore inventory"), backupPanel);
+    restoreButton->setObjectName(QStringLiteral("restoreInventoryButton"));
+    backupActions->addWidget(backupButton);
+    backupActions->addWidget(restoreButton);
+    backupActions->addStretch();
+    backupLayout->addLayout(backupActions);
+    layout->addWidget(backupPanel);
+
+    connect(backupButton, &QPushButton::clicked, this, [this] {
+        if (!inventoryDb_.isOpen()) {
+            QMessageBox::warning(this, tr("Inventory unavailable"),
+                                 tr("The local inventory database is not open."));
+            return;
+        }
+        const QString path = QFileDialog::getSaveFileName(
+            this, tr("Back up camera inventory"), QStringLiteral("oxita-camera-inventory.sqlite"),
+            tr("SQLite database (*.sqlite *.db)"));
+        if (path.isEmpty()) return;
+        QString error;
+        if (!InventoryBackup::create(inventoryDb_, path, &error)) {
+            QMessageBox::warning(this, tr("Inventory backup failed"), error);
+            return;
+        }
+        recordOperation(tr("Inventory backup"), path, tr("Completed"),
+                        tr("A consistent SQLite backup was created and integrity-checked."));
+        refreshOperationHistory();
+        QMessageBox::information(this, tr("Backup created"),
+                                 tr("The inventory backup was created and validated successfully."));
+    });
+    connect(restoreButton, &QPushButton::clicked, this, [this] {
+        if (!inventoryDb_.isOpen()) {
+            QMessageBox::warning(this, tr("Inventory unavailable"),
+                                 tr("The local inventory database is not open."));
+            return;
+        }
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Restore camera inventory"), QString(),
+            tr("SQLite database (*.sqlite *.db)"));
+        if (path.isEmpty()) return;
+        const auto answer = QMessageBox::warning(
+            this, tr("Confirm inventory restore"),
+            tr("Replace the current camera inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes) return;
+        QString error;
+        if (!InventoryBackup::restore(inventoryDb_, path, &error)) {
+            QMessageBox::critical(this, tr("Inventory restore failed"), error);
+            return;
+        }
+        if (deviceTable_) deviceTable_->setRowCount(0);
+        loadInventory();
+        refreshOperationHistory();
+        updateDeviceSummary();
+        updateSelectedDevicePanel();
+        recordOperation(tr("Inventory restore"), path, tr("Completed"),
+                        tr("Validated backup restored; pre-restore snapshot retained beside the database."));
+        refreshOperationHistory();
+        QMessageBox::information(this, tr("Inventory restored"),
+                                 tr("The backup was restored successfully. The previous inventory is retained as a recovery snapshot."));
+    });
+
     auto *safetyNote = new QLabel(
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
         page);
@@ -1260,7 +1332,7 @@ void MainWindow::exportDiagnosticBundle()
                                    QStringLiteral("application.log.2"), QStringLiteral("application.log.3")}) {
         QFile logFile(logDirectory + QLatin1Char('/') + logName);
         if (!logFile.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
-        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\\n'), Qt::SkipEmptyParts);
+        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
         stream << "--- " << logName << " ---\n";
         const int first = qMax(0, lines.size() - 250);
         for (int index = first; index < lines.size(); ++index) stream << lines.at(index) << "\n";

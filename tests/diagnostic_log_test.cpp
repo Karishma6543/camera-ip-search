@@ -14,6 +14,7 @@ private slots:
     void redactsBearerAndUrlCredentials();
     void redactsXmlSecretElements();
     void redactsAuthorizationCookiesAndQuerySecrets();
+    void redactsJsonAndExtendedCredentialFields();
     void rotatesLogsAndRetainsOnlyThreeArchives();
 };
 
@@ -60,6 +61,22 @@ void DiagnosticLogTest::redactsAuthorizationCookiesAndQuerySecrets()
     QVERIFY(!output.contains(QStringLiteral("private-token")));
     QVERIFY(output.contains(QStringLiteral("Authorization: [REDACTED]")));
     QVERIFY(output.contains(QStringLiteral("Cookie: [REDACTED]")));
+}
+
+void DiagnosticLogTest::redactsJsonAndExtendedCredentialFields()
+{
+    const QString input = QStringLiteral(
+        R"({"username":"camera-admin","api_key":"private-api-key","refresh_token":"private-refresh"})"
+        " username=operator nonce=nonce-secret"
+        " GET /device?refresh_token=query-refresh&mode=read"
+        " <wsse:AccessToken>soap-access-secret</wsse:AccessToken>");
+    const QString output = DiagnosticLog::redactSensitiveData(input);
+    for (const QString &secret : {QStringLiteral("camera-admin"), QStringLiteral("private-api-key"),
+                                  QStringLiteral("private-refresh"), QStringLiteral("operator"),
+                                  QStringLiteral("nonce-secret"), QStringLiteral("query-refresh"),
+                                  QStringLiteral("soap-access-secret")})
+        QVERIFY2(!output.contains(secret), qPrintable(secret));
+    QVERIFY(output.contains(QStringLiteral("[REDACTED]")));
 }
 
 void DiagnosticLogTest::rotatesLogsAndRetainsOnlyThreeArchives()

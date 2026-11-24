@@ -12,6 +12,7 @@ Implemented in source:
 - Bounded TCP candidate scan (up to 256 addresses around the selected interface address on larger subnets).
 - TCP reachability checks.
 - Local SQLite inventory, manual entry, labels and CSV export.
+- SQLite online backup with integrity validation and guarded restore that retains a pre-restore recovery snapshot.
 - Guarded ONVIF static IPv4 request, confirmation and post-change verification path.
 - Unsupported activation, firmware, reboot, NVR and batch operations remain unavailable.
 
@@ -39,8 +40,8 @@ Not implemented:
 
 - [ ] Complete end-to-end discovery-service integration tests for selected interface, multiple IPv4 addresses, multicast/broadcast delivery, timeouts, duplicate responses and cancellation. [x] Add a service lifecycle test that starts probes on an available physical IPv4 interface and cancels them. C++ loopback UDP/TCP tests exercise datagram round trips and ONVIF parsing; neither proves multicast/broadcast delivery on physical NICs.
 - [ ] Add scanner tests for full-subnet and capped-window selection, progress, cancellation, real host probing and no-camera false positives. [x] Add validation coverage for network/broadcast boundaries and /30 host boundaries. [x] Add deterministic multi-port aggregation and duplicate suppression coverage; live multi-port host probing still requires a controlled LAN fixture.
-- [ ] Expand UI tests beyond the startup smoke test: [x] verify all five workspaces, stable automation selectors, empty-inventory reachability error, search filtering and ONVIF/Oxita manufacturer filtering. Still required: device selection/detail rendering, manual-entry and rename dialogs, CSV export, static-IP confirmation/recovery dialogs, scan cancellation and persistence/error states.
-- [ ] Add SQLite migration/recovery tests for read-only directory, disk-full, backup/restore and process interruption. [x] Add legacy-schema migration, forced-failure rollback and corrupt-database preservation tests. The startup migration is transactional and versioned with SQLite `user_version`.
+- [ ] Expand UI tests beyond the startup smoke test: [x] verify all five workspaces, stable automation selectors, empty-inventory reachability error, search filtering, ONVIF/Oxita manufacturer filtering, official Oxita logo resource/display, selected-device manufacturer/model detail rendering and backup/restore controls. Still required: manual-entry and rename dialogs, CSV export, static-IP confirmation/recovery dialogs, scan cancellation and persistence/error states.
+- [ ] Complete SQLite failure testing for read-only directories, disk-full and abrupt process interruption. [x] Add transactional SQLite online backup, read-only backup integrity validation, guarded restore, retained pre-restore recovery snapshot and automated backup/restore/corruption tests. [x] Add legacy-schema migration, forced-failure rollback and corrupt-database preservation tests. The startup migration is transactional and versioned with SQLite `user_version`.
 - [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
 - [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
