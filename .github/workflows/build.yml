@@ -52,7 +52,7 @@ jobs:
       - name: Test camera simulator fixtures
         run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Install Qt
-        uses: jurplep/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
           cache: true
