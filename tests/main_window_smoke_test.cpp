@@ -538,9 +538,9 @@ void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
                 QByteArray request = peer->property("requestBuffer").toByteArray();
                 request.append(peer->readAll());
                 peer->setProperty("requestBuffer", request);
-                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
                 if (headerEnd < 0) return;
-                const QRegularExpression lengthPattern(QStringLiteral("Content-Length\\\\s*:\\\\s*(\\\\d+)"), QRegularExpression::CaseInsensitiveOption);
+                const QRegularExpression lengthPattern(QStringLiteral("Content-Length\\s*:\\s*(\\d+)"), QRegularExpression::CaseInsensitiveOption);
                 const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
                 const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
                 if (request.size() < headerEnd + 4 + bodyLength) return;
@@ -548,7 +548,7 @@ void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
                 if (!body.contains("SetSystemFactoryDefault") || !body.contains("<tds:FactoryDefault>Soft</tds:FactoryDefault>")) return;
                 requestSeen = true;
                 const QByteArray responseBody = QByteArrayLiteral("<s:Envelope xmlns:s='urn:soap' xmlns:tds='urn:onvif'><s:Body><tds:SetSystemFactoryDefaultResponse/></s:Body></s:Envelope>");
-                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\nContent-Type: application/soap+xml\\r\\nContent-Length: ") + QByteArray::number(responseBody.size()) + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + responseBody;
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml\r\nContent-Length: ") + QByteArray::number(responseBody.size()) + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
                 peer->write(response);
                 peer->disconnectFromHost();
             });
