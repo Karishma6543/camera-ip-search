@@ -131,7 +131,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
     QVERIFY(table);
     QVERIFY(emptyState);
-    QVERIFY(emptyState->isVisible());
+    QVERIFY(!emptyState->isHidden());
     QVERIFY(emptyState->text().contains(QStringLiteral("Discover cameras")));
     QVERIFY(table->isColumnHidden(5));
     QVERIFY(table->isColumnHidden(6));
@@ -201,11 +201,11 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
     const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
-    QVERIFY(emptyState && emptyState->isVisible());
+    QVERIFY(emptyState && !emptyState->isHidden());
     QVERIFY(emptyState->text().contains(QStringLiteral("No devices match")));
     search->clear();
     QVERIFY(!table->isRowHidden(0));
-    QVERIFY(!emptyState->isVisible());
+    QVERIFY(!!emptyState->isHidden());
 
     vendor->setCurrentText(QStringLiteral("Oxita devices"));
     QVERIFY(table->isRowHidden(0));
