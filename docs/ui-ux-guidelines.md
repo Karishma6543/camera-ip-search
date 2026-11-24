@@ -60,15 +60,22 @@ Technical identifiers such as MAC, firmware, discovery source, serial and hardwa
 - Keep primary inventory fields visible at the minimum supported desktop size; move secondary technical data into details rather than forcing horizontal scrolling.
 - Ensure long content can scroll and dialogs fit within smaller displays.
 
-## Current redesign scope
+## Current implementation
 
-The current UI refresh establishes the neutral/red theme, reduces the inventory table to its operational columns, moves technical metadata into details, removes unfinished Bulk Config and NVR Channels placeholders from the active navigation, adds explicit inventory empty/filter states, makes device actions scrollable and replaces quick-input prompts with guided manual-entry and rename dialogs.
+The current desktop workspace includes the Oxita neutral/red theme, a resizable inventory/details split, scrollable device profiles and action workspaces, searchable technical metadata, explicit empty states, row sorting, a header context menu for column visibility, and a shared progress indicator for discovery, subnet scanning and reachability.
 
-## Follow-up UI work still required
+Camera network configuration supports a guarded single-camera static IPv4 workflow and a sequential bulk IPv4 workflow. Bulk mode requires checked or selected cameras, refreshed ONVIF interface details, a unique new address per camera, local validation and per-camera result/history reporting. The selected camera's discovered service host is kept separate from the ONVIF-reported interface address to avoid sending requests to a mismatched endpoint.
 
-- Add visual regression/screenshot review on Windows, macOS and Linux at common DPI/scaling settings.
-- Audit all modal dialogs, including static IPv4 preview/apply, restore confirmation, authentication, Help and Settings, for consistent wording and keyboard flow.
-- Review table sorting, column visibility preferences and a dedicated device context menu.
-- Add progress surfaces for discovery, subnet scans and reachability rather than relying only on the status bar.
-- Add a complete first-run walkthrough and a focused troubleshooting/help surface.
-- Conduct keyboard-only and screen-reader review on supported operating systems.
+Camera maintenance exposes ONVIF \`SetSystemFactoryDefault\` with explicit Soft/Hard mode selection, a target summary and two confirmation steps. This is a protocol request, not a universal vendor reset guarantee: the camera must expose the ONVIF operation, authenticate the request and implement the selected reset mode. A reset can erase settings and change the camera's IP address.
+
+Backup/restore, diagnostics export, settings storage details, Help, operation history, manual inventory entry and rename workflows remain available. Technical device data is selectable and long profile content scrolls rather than being clipped.
+
+## Remaining production validation
+
+- Run the latest Windows, macOS and Ubuntu CI matrix and resolve every test failure.
+- Visually review common display scaling and smaller window sizes on all supported operating systems.
+- Verify static IPv4, bulk assignment and factory reset against real ONVIF cameras from multiple vendors; simulator/loopback tests cannot prove physical-camera interoperability.
+- Add vendor-specific configuration adapters where a camera does not implement the relevant ONVIF operation.
+- Complete keyboard-only and screen-reader review, including focus order in dialogs and the table's column menu.
+- Add automated tests for column visibility, sorting, long-value wrapping, all dialog validation paths and partial failures in a multi-camera batch.
+- Add a guided first-run walkthrough and a focused troubleshooting surface.
