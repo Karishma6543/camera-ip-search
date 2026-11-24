@@ -372,6 +372,7 @@ void MainWindow::buildUi()
     actionRow->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename"), toolbar);
     renameButton->setToolTip(tr("Set a friendly name for the selected camera."));
+    renameButton->setEnabled(false);
     renameButton->setObjectName(QStringLiteral("renameLabelButton"));
     actionRow->addWidget(renameButton);
     actionRow->addStretch();
@@ -492,6 +493,7 @@ void MainWindow::buildUi()
         previousColumn = column;
         deviceTable_->sortItems(column, order);
         deviceHeader->setSortIndicator(column, order);
+        updateDeviceDetailsProfile(selectedDeviceRow());
         updateSelectedDevicePanel();
     });
     deviceHeader->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1000,6 +1002,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         maintenancePanel));
     auto *factoryResetButton = actionButton(tr("Factory reset camera"), maintenancePanel);
     factoryResetButton->setObjectName(QStringLiteral("factoryResetCameraButton"));
+    factoryResetButton->setEnabled(false);
+    factoryResetButton->setAccessibleName(tr("Factory reset selected camera"));
     factoryResetButton->setToolTip(tr("Send an ONVIF factory-default request to the selected camera. This may erase configuration and change its IP address."));
     maintenanceLayout->addWidget(factoryResetButton);
     layout->addWidget(maintenancePanel);
@@ -1684,7 +1688,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
         const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
         html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
-            "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;'>%2</td></tr>")
+            "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
             .arg(key, value);
     }
     html += QStringLiteral("</table></body></html>");
