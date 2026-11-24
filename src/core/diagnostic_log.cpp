@@ -40,9 +40,9 @@ QString redact(QString message)
     const QRegularExpression jsonSecret(
         QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)"\s*:\s*)"[^"]*")rx"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(jsonSecret, QStringLiteral("\\1\\"[REDACTED]\\""));
+        QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)"\s*:\s*)"[^"]*")rx"),
     const QRegularExpression querySecret(
-        QStringLiteral(R"(([?&](?:password|passwd|token|access_token|refresh_token|api[_-]?key|secret)=)[^&#\s]*)"),
+    message.replace(jsonSecret, QStringLiteral("\\1\"[REDACTED]\""));
         QRegularExpression::CaseInsensitiveOption);
     message.replace(querySecret, QStringLiteral("\\1[REDACTED]"));
     const QRegularExpression bearer(
