@@ -1,6 +1,9 @@
 #include "ui/main_window.h"
 
 #include <QStandardPaths>
+#include <QApplication>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QTabWidget>
@@ -30,6 +33,7 @@ private slots:
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
+    void guidedManualEntryAndRenameDialogsWork();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
@@ -145,6 +149,45 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(!table->isColumnHidden(7));
     QVERIFY(!table->isColumnHidden(11));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
+}
+
+void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
+    auto *renameButton = window.findChild<QPushButton *>(QStringLiteral("renameLabelButton"));
+    QVERIFY(table && addButton && renameButton);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *address = dialog->findChild<QLineEdit *>(QStringLiteral("manualAddress"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("manualDeviceName"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveManualDeviceButton"));
+        QVERIFY(address && name && save);
+        address->setText(QStringLiteral("192.168.10.25"));
+        name->setText(QStringLiteral("Front entrance"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(addButton, Qt::LeftButton);
+    QCOMPARE(table->rowCount(), 1);
+    QCOMPARE(table->item(0, 1)->text(), QStringLiteral("192.168.10.25"));
+    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Front entrance"));
+
+    table->setCurrentCell(0, 1);
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("deviceFriendlyName"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveDeviceNameButton"));
+        QVERIFY(name && save);
+        name->setText(QStringLiteral("Loading bay"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(renameButton, Qt::LeftButton);
+    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
