@@ -38,13 +38,13 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
         return unknown(QStringLiteral("ARP probe requires a valid IPv4 target."));
     if (interfaceName.trimmed().isEmpty())
         return unknown(QStringLiteral("Select a network interface before probing."));
-    const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName.trimmed());
-    if (!interface.isValid() || !(interface.flags() & QNetworkInterface::IsUp) ||
+    const QNetworkInterface networkInterface = QNetworkInterface::interfaceFromName(interfaceName.trimmed());
+    if (!networkInterface.isValid() || !(networkInterface.flags() & QNetworkInterface::IsUp) ||
         !(interface.flags() & QNetworkInterface::IsRunning))
         return unknown(QStringLiteral("The selected network interface is unavailable or not running."));
 
     bool inSelectedSubnet = false;
-    for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+    for (const QNetworkAddressEntry &entry : networkInterface.addressEntries()) {
         if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
             entry.netmask().isNull())
             continue;
