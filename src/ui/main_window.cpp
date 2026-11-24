@@ -485,12 +485,12 @@ void MainWindow::buildUi()
     connect(deviceHeader, &QHeaderView::sectionClicked, this,
             [this, deviceHeader](int column) {
         if (column <= 0 || column >= deviceTable_->columnCount()) return;
-        static int previousColumn = -1;
-        static Qt::SortOrder order = Qt::AscendingOrder;
-        order = previousColumn == column
-            ? (order == Qt::AscendingOrder ? Qt::DescendingOrder : Qt::AscendingOrder)
-            : Qt::AscendingOrder;
-        previousColumn = column;
+        if (sortColumn_ == column) sortAscending_ = !sortAscending_;
+        else {
+            sortColumn_ = column;
+            sortAscending_ = true;
+        }
+        const Qt::SortOrder order = sortAscending_ ? Qt::AscendingOrder : Qt::DescendingOrder;
         deviceTable_->sortItems(column, order);
         deviceHeader->setSortIndicator(column, order);
         updateDeviceDetailsProfile(selectedDeviceRow());
