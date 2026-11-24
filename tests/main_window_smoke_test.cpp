@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <QPixmap>
 #include <QTableWidget>
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
@@ -26,6 +27,7 @@ class MainWindowSmokeTest final : public QObject
     Q_OBJECT
 private slots:
     void startupShowsOperationHistory();
+    void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
@@ -36,6 +38,17 @@ private slots:
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
     void shutdownAbortsActiveOnvifEnrichment();
 };
+
+void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const QPixmap logo(QStringLiteral(":/branding/oxita-logo.png"));
+    QVERIFY2(!logo.isNull(), "The official Oxita logo must be embedded in the application resources.");
+    const auto *logoLabel = window.findChild<QLabel *>(QStringLiteral("brandLogo"));
+    QVERIFY(logoLabel);
+    QVERIFY2(!logoLabel->pixmap().isNull(), "The application header must display the bundled Oxita logo.");
+}
 
 void MainWindowSmokeTest::startupShowsOperationHistory()
 {
@@ -152,6 +165,11 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(table && search && vendor && statusFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
+    table->setCurrentCell(0, 1);
+    const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("deviceDetails"));
+    QVERIFY(deviceDetails);
+    QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
+    QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
