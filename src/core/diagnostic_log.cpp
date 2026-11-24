@@ -38,13 +38,13 @@ QString redact(QString message)
         QRegularExpression::CaseInsensitiveOption);
     message.replace(keyValue, QStringLiteral("\\1=[REDACTED]"));
     const QRegularExpression jsonSecret(
-        QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)"\\s*:\\s*)"[^"]*")rx"),
+        QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)"\s*:\s*)"[^"]*")rx"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(jsonSecret, QStringLiteral("\\\\1\\\"[REDACTED]\\\""));
+    message.replace(jsonSecret, QStringLiteral("\\1\"[REDACTED]\""));
     const QRegularExpression querySecret(
-        QStringLiteral(R"rx(([?&](?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)=)[^&#\\s]*)rx"),
+        QStringLiteral(R"rx(([?&](?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)=)[^&#\s]*)rx"),
         QRegularExpression::CaseInsensitiveOption);
-    message.replace(querySecret, QStringLiteral("\\\\1[REDACTED]"));
+    message.replace(querySecret, QStringLiteral("\\1[REDACTED]"));
     const QRegularExpression bearer(
         QStringLiteral(R"(Bearer\s+[A-Za-z0-9._~+/-]+=*)"),
         QRegularExpression::CaseInsensitiveOption);
