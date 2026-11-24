@@ -1020,6 +1020,93 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addLayout(networkActions);
     layout->addWidget(networkPanel);
 
+    auto *bulkPanel = panel(tr("Bulk IPv4 configuration"), content);
+    auto *bulkLayout = new QVBoxLayout(bulkPanel);
+    bulkLayout->addWidget(mutedLabel(tr("Configure checked cameras with a different static IPv4 address per device. Each camera must first be refreshed so its ONVIF interface token and current subnet are verified. Devices are changed sequentially and verified individually."), bulkPanel));
+    auto *bulkButton = actionButton(tr("Configure checked cameras"), bulkPanel, true);
+    bulkButton->setObjectName(QStringLiteral("bulkIpv4ConfigureButton"));
+    bulkLayout->addWidget(bulkButton);
+    layout->addWidget(bulkPanel);
+    connect(bulkButton, &QPushButton::clicked, this, [this, bulkButton] {
+        if (bulkIpv4Running_) return;
+        QVector<int> rows;
+        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+            const auto *check = deviceTable_->item(row, 0);
+            if (check && check->checkState() == Qt::Checked) rows.append(row);
+        }
+        if (rows.isEmpty()) {
+            for (const QModelIndex &index : deviceTable_->selectionModel()->selectedRows()) rows.append(index.row());
+        }
+        if (rows.size() < 2) {
+            QMessageBox::information(this, tr("Bulk IPv4 configuration"), tr("Check at least two cameras in the first inventory column, or select at least two rows."));
+            return;
+        }
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Review bulk IPv4 assignments"));
+        dialog.setMinimumSize(900, 420);
+        auto *form = new QVBoxLayout(&dialog);
+        form->addWidget(mutedLabel(tr("Enter a unique new IPv4 address for each camera. Existing network values are prefilled where available."), &dialog));
+        auto *table = new QTableWidget(rows.size(), 4, &dialog);
+        table->setObjectName(QStringLiteral("bulkIpv4Assignments"));
+        table->setHorizontalHeaderLabels({tr("CURRENT IP"), tr("NEW IP"), tr("SUBNET MASK"), tr("GATEWAY")});
+        table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        table->verticalHeader()->setVisible(false);
+        QVector<BulkIpv4Target> targets;
+        for (int i = 0; i < rows.size(); ++i) {
+            const int row = rows.at(i);
+            const auto *ipItem = deviceTable_->item(row, 1);
+            const auto value = [this, row](int col) { const auto *item = deviceTable_->item(row, col); return item ? item->text().trimmed() : QString(); };
+            DeviceRecord device;
+            device.ipAddress = value(1); device.macAddress = value(5); device.manufacturer = value(3); device.model = value(4);
+            device.deviceServiceUrl = ipItem ? ipItem->data(Qt::UserRole + 3).toString() : QString();
+            device.onvifEndpoint = ipItem ? ipItem->data(Qt::UserRole + 2).toString() : QString();
+            device.networkInterfaceToken = ipItem ? ipItem->data(Qt::UserRole + 7).toString() : QString();
+            device.ipv4Address = ipItem ? ipItem->data(Qt::UserRole + 8).toString() : QString();
+            device.ipv4SubnetMask = ipItem ? ipItem->data(Qt::UserRole + 9).toString() : QString();
+            device.ipv4Gateway = ipItem ? ipItem->data(Qt::UserRole + 10).toString() : QString();
+            device.discoverySources = value(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+            if (device.deviceServiceUrl.isEmpty() || device.networkInterfaceToken.isEmpty() || device.ipv4Address.isEmpty() || device.ipv4SubnetMask.isEmpty()) {
+                QMessageBox::warning(this, tr("Bulk configuration unavailable"), tr("Camera %1 needs a successful Refresh device info before it can be configured.").arg(device.ipAddress));
+                return;
+            }
+            targets.append({device, QString(), device.ipv4SubnetMask, device.ipv4Gateway});
+            auto *current = new QTableWidgetItem(device.ipAddress); current->setFlags(current->flags() & ~Qt::ItemIsEditable); table->setItem(i, 0, current);
+            table->setItem(i, 1, new QTableWidgetItem());
+            table->setItem(i, 2, new QTableWidgetItem(device.ipv4SubnetMask));
+            table->setItem(i, 3, new QTableWidgetItem(device.ipv4Gateway));
+        }
+        form->addWidget(table, 1);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Apply | QDialogButtonBox::Cancel, &dialog);
+        form->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+            QSet<QString> addresses;
+            for (int i = 0; i < table->rowCount(); ++i) {
+                const QString address = table->item(i, 1)->text().trimmed();
+                const QString mask = table->item(i, 2)->text().trimmed();
+                const QString gateway = table->item(i, 3)->text().trimmed();
+                QString error;
+                if (!NetworkConfigValidator::validateStaticIpv4(address, mask, gateway, QString(), &error)) {
+                    QMessageBox::warning(&dialog, tr("Invalid IPv4 assignment"), error); table->setCurrentCell(i, 1); return;
+                }
+                if (addresses.contains(address)) { QMessageBox::warning(&dialog, tr("Duplicate address"), tr("Each camera must have a unique new IPv4 address.")); table->setCurrentCell(i, 1); return; }
+                addresses.insert(address);
+                for (int existingRow = 0; existingRow < deviceTable_->rowCount(); ++existingRow) {
+                    if (rows.contains(existingRow)) continue;
+                    const auto *existing = deviceTable_->item(existingRow, 1);
+                    if (existing && existing->text().trimmed() == address) { QMessageBox::warning(&dialog, tr("Address already in use"), tr("The address %1 belongs to another inventory device.").arg(address)); table->setCurrentCell(i, 1); return; }
+                }
+                targets[i].address = address; targets[i].subnetMask = mask; targets[i].gateway = gateway;
+            }
+            const auto answer = QMessageBox::warning(&dialog, tr("Confirm bulk configuration"), tr("Apply the reviewed IPv4 settings to %1 cameras sequentially? Each camera may disconnect when its address changes.").arg(targets.size()), QMessageBox::Apply | QMessageBox::Cancel, QMessageBox::Cancel);
+            if (answer == QMessageBox::Apply) dialog.accept();
+        });
+        if (dialog.exec() != QDialog::Accepted) return;
+        bulkIpv4Queue_ = targets; bulkIpv4Next_ = 0; bulkIpv4Succeeded_ = 0; bulkIpv4Failed_ = 0; bulkIpv4Running_ = true;
+        bulkButton->setEnabled(false);
+        startNextBulkIpv4Configuration();
+    });
+
     auto *firmwarePanel = panel(tr("Firmware information"), content);
     auto *firmwareLayout = new QVBoxLayout(firmwarePanel);
     firmwareStatusSummary_ = new QLabel(
