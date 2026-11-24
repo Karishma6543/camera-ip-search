@@ -250,6 +250,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(table && search && vendor && statusFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
+    table->selectRow(0);
     table->setCurrentCell(0, 1);
     const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
     QVERIFY(deviceDetails);
@@ -267,6 +268,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     table->clearSelection();
     table->setCurrentCell(-1, -1);
     QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
+    table->selectRow(0);
     table->setCurrentCell(0, 1);
 
     search->setText(QStringLiteral("does-not-exist"));
