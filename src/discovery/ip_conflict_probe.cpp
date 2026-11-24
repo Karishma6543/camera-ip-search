@@ -40,7 +40,7 @@ IpAddressProbeResult IpConflictProbe::probe(const QString &targetAddress,
         return unknown(QStringLiteral("Select a network interface before probing."));
     const QNetworkInterface networkInterface = QNetworkInterface::interfaceFromName(interfaceName.trimmed());
     if (!networkInterface.isValid() || !(networkInterface.flags() & QNetworkInterface::IsUp) ||
-        !(interface.flags() & QNetworkInterface::IsRunning))
+        !(networkInterface.flags() & QNetworkInterface::IsRunning))
         return unknown(QStringLiteral("The selected network interface is unavailable or not running."));
 
     bool inSelectedSubnet = false;
