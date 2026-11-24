@@ -4,6 +4,7 @@
 
 #include <QMainWindow>
 #include <QSqlDatabase>
+#include <QVector>
 
 class QLabel;
 class QTableWidget;
@@ -68,6 +69,13 @@ private:
     QLabel *firmwareStatusSummary_{nullptr};
     void updateSelectedDevicePanel();
     void updateLocalNetworkSummary();
+    void startNextBulkIpv4Configuration();
+    struct BulkIpv4Target { DeviceRecord device; QString address; QString subnetMask; QString gateway; };
+    QVector<BulkIpv4Target> bulkIpv4Queue_;
+    int bulkIpv4Next_{0};
+    int bulkIpv4Succeeded_{0};
+    int bulkIpv4Failed_{0};
+    bool bulkIpv4Running_{false};
     QPushButton *addDeviceButton_{nullptr};
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};
