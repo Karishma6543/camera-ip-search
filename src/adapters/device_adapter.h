@@ -5,8 +5,6 @@
 #include <QString>
 #include <QStringList>
 
-// Operations are deliberately explicit: discovering a device does not imply
-// that management operations are supported for its model or firmware.
 enum class DeviceOperation {
     ReadDeviceInformation,
     ReadCapabilities,
@@ -30,8 +28,9 @@ public:
     virtual bool canHandle(const DeviceRecord &device) const = 0;
     virtual QStringList verifiedReadOperations() const = 0;
 
-    // Conservative default: only operations represented by the adapter's
-    // verified read-operation list are reported as supported.
+    // Empty by default: write operations must be explicitly implemented by an adapter.
+    virtual QStringList implementedWriteOperations() const { return {}; }
+
     virtual bool supports(DeviceOperation operation) const
     {
         switch (operation) {
@@ -42,6 +41,7 @@ public:
         case DeviceOperation::ReadNetworkInterfaces:
             return verifiedReadOperations().contains(QStringLiteral("GetNetworkInterfaces"));
         case DeviceOperation::ConfigureStaticIpv4:
+            return implementedWriteOperations().contains(QStringLiteral("SetNetworkInterfaces"));
         case DeviceOperation::PreviewStream:
         case DeviceOperation::CaptureSnapshot:
         case DeviceOperation::Reboot:

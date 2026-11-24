@@ -39,3 +39,9 @@ QStringList AdapterRegistry::supportedReadOperations(const DeviceRecord &device)
     const DeviceAdapter *adapter = adapterFor(device);
     return adapter ? adapter->verifiedReadOperations() : QStringList{};
 }
+
+QStringList AdapterRegistry::implementedWriteOperations(const DeviceRecord &device) const
+{
+    const DeviceAdapter *adapter = adapterFor(device);
+    return adapter ? adapter->implementedWriteOperations() : QStringList{};
+}
