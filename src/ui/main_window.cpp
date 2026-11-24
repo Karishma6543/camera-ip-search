@@ -1191,9 +1191,9 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
         page));
     auto *actions = new QHBoxLayout();
     auto *refresh = actionButton(tr("Refresh history"), page);
-    auto *export = actionButton(tr("Export diagnostics"), page, true);
+    auto *exportButton = actionButton(tr("Export diagnostics"), page, true);
     actions->addWidget(refresh);
-    actions->addWidget(export);
+    actions->addWidget(exportButton);
     actions->addStretch();
     layout->addLayout(actions);
     historyTable_ = new QTableWidget(0, 5, page);
@@ -1215,7 +1215,7 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
         tr("Diagnostic exports include OS/application details, selected interface addresses and recent operation history. Review the file before sharing it."),
         page));
     connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshOperationHistory);
-    connect(export, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
+    connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
     refreshOperationHistory();
     return page;
 }
@@ -1447,7 +1447,7 @@ void MainWindow::updateLocalNetworkSummary()
     details << tr("System name: %1").arg(interface.name());
     details << tr("Hardware address: %1").arg(
         interface.hardwareAddress().isEmpty() ? tr("Not reported") : interface.hardwareAddress());
-    details << tr("MTU: %1").arg(interface.mtu() > 0 ? QString::number(interface.mtu()) : tr("Not reported"));
+    details << tr("MTU: %1").arg(tr("Not reported"));
     bool foundIpv4 = false;
     for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
         if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol || entry.ip().isLoopback()) continue;
