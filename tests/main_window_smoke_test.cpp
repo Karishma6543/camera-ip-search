@@ -190,6 +190,7 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
     QCOMPARE(table->item(0, 1)->text(), QStringLiteral("192.168.10.25"));
     QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Front entrance"));
 
+    table->selectRow(0);
     table->setCurrentCell(0, 1);
     QTimer::singleShot(0, &window, [&window] {
         auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
@@ -263,6 +264,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
     QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
+    table->clearSelection();
     table->setCurrentCell(-1, -1);
     QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
     table->setCurrentCell(0, 1);
