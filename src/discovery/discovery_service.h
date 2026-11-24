@@ -26,6 +26,7 @@ public:
     void cancel();
     bool isRunning() const;
     void refreshDeviceInfo(const DeviceRecord &device);
+    void factoryReset(const DeviceRecord &device, const QString &factoryDefaultType);
     void applyStaticIpv4(const DeviceRecord &device, const QString &address,
                          const QString &subnetMask, const QString &gateway);
 
@@ -37,6 +38,8 @@ signals:
     void authenticationRequested(QAuthenticator *authenticator);
     void networkConfigurationFinished(const DeviceRecord &device, bool verified,
                                       const QString &message);
+    void maintenanceOperationFinished(const DeviceRecord &device, const QString &operation,
+                                       bool succeeded, const QString &message);
 
 private:
     struct InterfaceSocket {
