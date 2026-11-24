@@ -29,8 +29,12 @@ QString redact(QString message)
         QStringLiteral(R"((authorization|proxy-authorization|cookie|set-cookie)\s*:\s*[^\r\n]*)"),
         QRegularExpression::CaseInsensitiveOption);
     message.replace(headerSecret, QStringLiteral("\\1: [REDACTED]"));
+    const QRegularExpression authorizationAssignment(
+        QStringLiteral(R"(\bauthorization\s*=\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
+        QRegularExpression::CaseInsensitiveOption);
+    message.replace(authorizationAssignment, QStringLiteral("authorization=[REDACTED]"));
     const QRegularExpression keyValue(
-        QStringLiteral(R"((password|passwd|authorization|token|credential|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
+        QStringLiteral(R"((password|passwd|token|credential|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
         QRegularExpression::CaseInsensitiveOption);
     message.replace(keyValue, QStringLiteral("\\1=[REDACTED]"));
     const QRegularExpression querySecret(
