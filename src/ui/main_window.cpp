@@ -667,7 +667,7 @@ void MainWindow::buildUi()
                     ipItem->setData(Qt::UserRole + 14, checkedAt);
                     ipItem->setData(Qt::UserRole + 15, lastSuccessAt);
                 }
-                if (row == deviceTable_->currentRow()) {
+                if (row == selectedDeviceRow()) {
                     updateDeviceDetailsProfile(row);
                     updateSelectedDevicePanel();
                 }
@@ -823,9 +823,15 @@ void MainWindow::buildUi()
     });
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
     connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
-        const bool hasSelection = deviceTable_->currentRow() >= 0;
+        const int row = selectedDeviceRow();
+        const bool hasSelection = row >= 0;
         openWebButton_->setEnabled(hasSelection);
         refreshDeviceButton_->setEnabled(hasSelection);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("renameLabelButton")))
+            button->setEnabled(hasSelection);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
+            button->setEnabled(hasSelection);
+        updateDeviceDetailsProfile(row);
         updateSelectedDevicePanel();
     });
     connect(help, &QPushButton::clicked, this, [this] {
@@ -897,7 +903,7 @@ void MainWindow::buildUi()
     // Device checkboxes are the explicit multi-select mechanism. Highlighted
     // rows remain available for single-device inspection and keyboard workflows.
     connect(deviceTable_, &QTableWidget::currentCellChanged, this,
-            [this](int row, int, int, int) { updateDeviceDetailsProfile(row); });
+            [this](int, int, int, int) { updateDeviceDetailsProfile(selectedDeviceRow()); });
     updateDeviceSummary();
 }
 
@@ -998,7 +1004,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     maintenanceLayout->addWidget(factoryResetButton);
     layout->addWidget(maintenancePanel);
     connect(factoryResetButton, &QPushButton::clicked, this, [this, factoryResetButton] {
-        const int row = deviceTable_ ? deviceTable_->currentRow() : -1;
+        const int row = deviceTable_ ? selectedDeviceRow() : -1;
         if (row < 0) {
             QMessageBox::information(this, tr("Factory reset"), tr("Select one camera first."));
             return;
@@ -1261,7 +1267,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     layout->addWidget(safetyNote);
     layout->addStretch();
     connect(applyNetworkButton, &QPushButton::clicked, this, [this, applyNetworkButton] {
-        const int row = deviceTable_->currentRow();
+        const int row = selectedDeviceRow();
         if (row < 0) {
             QMessageBox::information(this, tr("IP configuration"), tr("Select one camera first."));
             return;
@@ -1329,7 +1335,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         dialog.exec();
     });
     connect(previewNetworkButton, &QPushButton::clicked, this, [this] {
-        const int row = deviceTable_->currentRow();
+        const int row = selectedDeviceRow();
         if (row < 0) {
             QMessageBox::information(this, tr("IP configuration"), tr("Select one camera first."));
             return;
@@ -1385,7 +1391,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         dialog.exec();
     });
     connect(refreshDeviceButton_, &QPushButton::clicked, this, [this] {
-        const int row = deviceTable_->currentRow();
+        const int row = selectedDeviceRow();
         if (row < 0) return;
         const auto *ip = deviceTable_->item(row, 1);
         if (!ip) return;
@@ -1619,6 +1625,17 @@ void MainWindow::startNextBulkIpv4Configuration()
         .arg(bulkIpv4Next_ + 1).arg(bulkIpv4Queue_.size()).arg(target.device.ipAddress));
     discovery_->applyStaticIpv4(target.device, target.address, target.subnetMask, target.gateway);
 }
+int MainWindow::selectedDeviceRow() const
+{
+    if (!deviceTable_ || !deviceTable_->selectionModel()) return -1;
+    const QModelIndexList selected = deviceTable_->selectionModel()->selectedRows();
+    if (selected.isEmpty()) return -1;
+    const int current = deviceTable_->currentRow();
+    for (const QModelIndex &index : selected)
+        if (index.row() == current) return current;
+    return selected.first().row();
+}
+
 void MainWindow::updateDeviceDetailsProfile(int row)
 {
     if (!deviceDetailsLabel_ || !deviceTable_) return;
@@ -1677,7 +1694,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
 void MainWindow::updateSelectedDevicePanel()
 {
     if (!selectedDeviceSummary_ || !selectedNetworkSummary_ || !deviceTable_) return;
-    const int row = deviceTable_->currentRow();
+    const int row = selectedDeviceRow();
     if (row < 0) {
         selectedDeviceSummary_->setText(tr("No device selected"));
         selectedNetworkSummary_->setText(
@@ -1990,7 +2007,7 @@ void MainWindow::upsertDevice(DeviceRecord device)
     }
     updateDeviceSummary();
     applyFilters();
-    if (row == deviceTable_->currentRow()) {
+    if (row == selectedDeviceRow()) {
         updateDeviceDetailsProfile(row);
         updateSelectedDevicePanel();
     }
@@ -2386,7 +2403,7 @@ void MainWindow::applyFilters()
 
 void MainWindow::editSelectedLabel()
 {
-    const int row = deviceTable_->currentRow();
+    const int row = selectedDeviceRow();
     if (row < 0) {
         updateStatus(tr("Select a device before renaming its label."));
         return;
@@ -2434,7 +2451,7 @@ void MainWindow::editSelectedLabel()
 
 void MainWindow::openSelectedWebInterface()
 {
-    const int row=deviceTable_->currentRow();
+    const int row=selectedDeviceRow();
     if (row<0) return;
     const auto *item=deviceTable_->item(row,1);
     if (!item || item->text().isEmpty()) return;
