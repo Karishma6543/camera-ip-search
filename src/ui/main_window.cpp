@@ -819,7 +819,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
         tr("Review discovery identity, ONVIF service details, network interfaces and reported capabilities for the selected camera."),
-        content);
+        page);
     layout->addWidget(heading);
     layout->addWidget(description);
 
@@ -842,7 +842,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 
     auto *note = mutedLabel(
         tr("Information is device-reported and may be incomplete. An empty field means the camera did not provide that value during the latest query; it does not necessarily indicate a fault."),
-        content);
+        page);
     layout->addWidget(note);
     return page;
 }
@@ -1169,7 +1169,7 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
         tr("Local history of discovery, scanning, reachability, inventory and network-configuration outcomes. Credentials and ONVIF interface tokens are not intentionally recorded."),
-        content));
+        page));
     auto *actions = new QHBoxLayout();
     auto *refresh = actionButton(tr("Refresh history"), page);
     auto *exportButton = actionButton(tr("Export diagnostics"), page, true);
@@ -1194,7 +1194,7 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
     layout->addWidget(historyTable_, 1);
     layout->addWidget(mutedLabel(
         tr("Diagnostic exports include OS/application details, selected interface addresses and recent operation history. Review the file before sharing it."),
-        content));
+        page));
     connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshOperationHistory);
     connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
     refreshOperationHistory();
