@@ -29,6 +29,7 @@ private slots:
     void startupShowsOperationHistory();
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
+    void inventoryStartsWithGuidanceAndCompactColumns();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
@@ -60,7 +61,7 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
-        if (tabs->tabText(index) == QStringLiteral("Operation History")) {
+        if (tabs->tabText(index) == QStringLiteral("Operation history")) {
             historyFound = true;
             break;
         }
@@ -90,9 +91,8 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
-        QStringLiteral("Device Info"), QStringLiteral("Bulk Config"),
-        QStringLiteral("Maintenance"), QStringLiteral("NVR Channels"),
-        QStringLiteral("Operation History")
+        QStringLiteral("Device details"), QStringLiteral("Device actions"),
+        QStringLiteral("Operation history")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
     for (int index = 0; index < expectedTabs.size(); ++index) {
@@ -121,6 +121,30 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
     QVERIFY(status);
     QVERIFY(status->text().contains(QStringLiteral("Add or discover devices")));
+}
+
+void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
+    QVERIFY(table);
+    QVERIFY(emptyState);
+    QVERIFY(emptyState->isVisible());
+    QVERIFY(emptyState->text().contains(QStringLiteral("Discover cameras")));
+    QVERIFY(table->isColumnHidden(5));
+    QVERIFY(table->isColumnHidden(6));
+    QVERIFY(table->isColumnHidden(8));
+    QVERIFY(table->isColumnHidden(9));
+    QVERIFY(table->isColumnHidden(10));
+    QVERIFY(!table->isColumnHidden(1));
+    QVERIFY(!table->isColumnHidden(2));
+    QVERIFY(!table->isColumnHidden(3));
+    QVERIFY(!table->isColumnHidden(4));
+    QVERIFY(!table->isColumnHidden(7));
+    QVERIFY(!table->isColumnHidden(11));
+    QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
@@ -176,8 +200,12 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
+    const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
+    QVERIFY(emptyState && emptyState->isVisible());
+    QVERIFY(emptyState->text().contains(QStringLiteral("No devices match")));
     search->clear();
     QVERIFY(!table->isRowHidden(0));
+    QVERIFY(!emptyState->isVisible());
 
     vendor->setCurrentText(QStringLiteral("Oxita devices"));
     QVERIFY(table->isRowHidden(0));
