@@ -2,7 +2,7 @@
 
 ## Product goal
 
-Oxita Camera Device Manager is a cross-platform desktop utility for discovering IP cameras, inspecting supported device information and performing only explicitly verified operations. It uses capability-based compatibility; it does not assume every camera supports every operation.
+Oxita Camera Device Manager is a cross-platform desktop utility for discovering IP cameras, inspecting supported device information and performing only explicitly verified operations. Compatibility is capability-driven: discovery or an open TCP port does not prove that a device supports a management action.
 
 See:
 - [Universal compatibility strategy](universal-compatibility.md)
@@ -11,80 +11,72 @@ See:
 - [Production-readiness checklist](production-readiness.md)
 - [Compatibility and hardware test matrix](compatibility-matrix.md)
 - [Firmware communication contract](protocol-contract.md)
+- [Simulator and integration testing](simulator-and-integration-testing.md)
 
-## Technology currently used
+## Technology
 
-- C++20
-- Qt 6 Widgets for the desktop UI
+- C++20 and Qt 6 Widgets for the desktop UI
 - Qt Network for UDP discovery, TCP reachability and ONVIF HTTP/SOAP requests
-- Qt SQL with SQLite for local, non-sensitive device inventory
-- CMake
-- Qt Test for automated unit tests
+- Qt SQL with SQLite for local, non-sensitive inventory and operation history
+- Qt Concurrent for bounded asynchronous application work
+- CMake and Qt Test
+- Python 3.12+ for deterministic simulator fixture tests
 
 ## Current source layout
 
-```text
+~~~text
 src/
-  adapters/       ONVIF adapter registry and IPv4 validation
-  core/           Device record model
-  discovery/      ONVIF/project discovery, enrichment and subnet scanner
-  ui/             Qt Widgets application and Oxita theme
-tests/            Parser, adapter, ONVIF network-config, IPv4 validation
-                  and subnet-scanner tests
-docs/             Architecture, compatibility, protocol and release guidance
-```
+  adapters/       DeviceAdapter contract, registry, ONVIF adapter and IPv4 validation
+  app/            Batch-operation and IP-assignment preflight/runner foundations
+  core/           Device identity, diagnostics and logging
+  discovery/      ONVIF/project discovery, enrichment, subnet scan, reachability,
+                  IP conflict probing, assignment planning and protocol parsers
+  firmware/       Firmware package metadata and integrity candidate validation
+  ui/             Qt Widgets desktop application and Oxita theme
+tests/            Qt unit, protocol, safety and desktop smoke tests
+tools/            Local Contract B / limited ONVIF simulator
+docs/             Architecture, security, compatibility and release guidance
+~~~
 
-The source is currently more compact than the long-term target architecture. Application coordination, persistence and some protocol orchestration still live in the desktop window and discovery service. The modular boundaries below are a target for future refactoring, not a claim that all those modules already exist.
+The camera-core static library compiles shared implementation once and is linked by the desktop executable and focused test targets. The UI, application coordination and some persistence logic still share responsibilities; a dedicated repository/service layer and a more explicit application coordinator remain future refactoring work.
 
-## Target module boundaries
+## Runtime boundaries
 
-- UI -> application coordinator/services -> core interfaces.
-- Discovery providers return observations, not UI rows.
-- A coordinator normalizes and merges observations while retaining provenance.
-- Device operations are enabled only when a matching adapter and the required device information are available.
-- SQLite repositories persist only approved non-sensitive state.
-- The core domain should not depend on Qt Widgets.
+- **UI:** presents discovery, inventory, details, operation history and user-confirmed actions. It must not invent device capabilities.
+- **Application safety layer:** validates target identity, duplicate targets, address ranges and operation capability before any batch action can run.
+- **Adapters:** identify devices and declare verified protocol operations. Unsupported write operations default to disabled.
+- **Discovery providers and transports:** perform bounded UDP/TCP/HTTP exchanges with timeouts, cancellation and response-size limits.
+- **Normalization:** converts protocol-specific observations into a common device record while retaining source/provenance.
+- **Persistence:** stores non-sensitive inventory and bounded operation history. Credentials and ONVIF interface tokens are not included in diagnostic exports.
+- **Firmware validation:** checks package metadata and integrity candidates; it does not verify a vendor signature or perform firmware flashing.
 
 ## Discovery strategy
 
 1. ONVIF WS-Discovery (UDP 3702 multicast) for standards-based devices.
-2. Project firmware discovery (UDP 9988) strictly for the project's own firmware and Contract B.
+2. Project firmware discovery (UDP 9988) strictly for the project's own documented Contract B firmware.
 3. Vendor-specific providers only when official protocol/SDK behavior is verified and licensing permits use.
-4. Bounded, opt-in IPv4 scanning for additional candidate endpoints.
-5. Manual entry for devices that cannot be discovered automatically.
+4. Bounded, opt-in local IPv4 TCP candidate scanning for devices that do not respond to discovery.
 
-These paths are complementary. Port responses and unverified fingerprints are candidate evidence, not proof of camera identity.
+Discovery is local-link IPv4 only; multicast and limited broadcast do not cross routers. Candidate scanning is bounded and does not prove a candidate is a camera or ONVIF device.
 
-## Network limitations
+## Operation safety
 
-Limited broadcast and link-local multicast do not cross routers by themselves. Current discovery is local-link IPv4; multi-interface selection does not create routed-subnet discovery. The fallback scanner checks at most 256 host addresses on the selected interface and common TCP ports. On larger subnets it scans a window centered around the selected interface address, not the entire subnet; it can still miss devices outside that window and reports candidates only.
+- Adapter capability and authorization checks precede management actions.
+- IP assignment uses planning and conflict preflight. Unknown conflict results block writes.
+- Static IPv4 changes require validation and explicit user confirmation, then post-change verification.
+- A successful new-address check followed by a failed gateway stage is reported as a partial outcome with recovery guidance; automatic rollback is not guaranteed.
+- Batch operations require stable device identity, duplicate detection, explicit target results and preflight before execution.
+- Firmware candidate checks are not signature verification. Firmware flashing remains unavailable.
+- No undocumented vendor commands are guessed. Preview, reboot, activation/password, bulk image/IR and NVR operations remain unavailable unless a verified adapter implements them.
 
-## Reliability and security requirements
+## Reliability and security
 
-- Never ship default camera credentials or guess passwords.
-- Do not persist plaintext credentials; prefer OS credential storage when implemented.
-- Redact secrets from logs and diagnostics.
-- Validate and bound packet size, schema, encoding, endpoint data, retries, timeouts, concurrency and scan ranges.
-- Use asynchronous Qt networking and event-driven sockets so network waits do not block the UI; move CPU-heavy work off the GUI thread.
-- Require confirmation for activation, network changes, reboot, batch actions and firmware upgrades.
-- Verify firmware model/hardware compatibility and integrity before upgrade.
-- Show per-device outcomes for batch operations and never hide partial failures.
-- Avoid intrusive scanning and scan only user-selected local networks/ranges.
+- Bound network response sizes and use explicit timeouts/cancellation.
+- Treat malformed, stale, oversized and ambiguous responses as failures or Unknown.
+- Do not log credentials, tokens or raw sensitive SOAP payloads.
+- SQLite integrity is checked before schema migration; migrations are transactional and versioned.
+- Simulator and loopback tests supplement, but do not replace, physical-network and hardware acceptance.
 
-## Implementation status (source inspection; not hardware certification)
+## Implementation status
 
-- [x] Qt Widgets desktop shell and Oxita visual theme.
-- [x] Active IPv4 interface enumeration and interface selection.
-- [x] ONVIF WS-Discovery probe and ProbeMatch parsing.
-- [x] Project Contract B UDP 9988 discovery probe/response parser.
-- [x] Bounded local IPv4 TCP candidate scanner (maximum 256 addresses).
-- [x] ONVIF GetDeviceInformation, GetCapabilities, GetNetworkInterfaces and GetDNS request/response handling.
-- [x] Reachability checks, manual device entry, CSV export and local SQLite inventory.
-- [x] Guarded ONVIF static IPv4 request and post-change verification path.
-- [ ] Full discovery and scanner integration tests on Windows, macOS and Linux.
-- [ ] Hardware validation against exact camera models/firmware and network topologies.
-- [ ] CP Plus, Hikvision, Prama and other vendor-specific adapters.
-- [ ] Project-firmware activation and configuration (wire contract not yet defined).
-- [ ] Secure credential storage and complete security review.
-- [ ] Cross-platform installers, signing, upgrade/uninstall and release packaging.
-
+The repository includes the pre-production discovery, inventory, diagnostics, safety-preflight and automated test foundations described above. It is not production-certified. Exact-model camera interoperability, physical-interface multicast/broadcast, credential security, TLS/WS-Security, backup/restore and interrupted/disk-full recovery, release packaging and hardware-specific state-changing operations still require validation or implementation.
