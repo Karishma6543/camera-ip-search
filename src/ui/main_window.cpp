@@ -134,7 +134,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     refreshOperationHistory();
     populateInterfaces();
     updateLocalNetworkSummary();
-    updateStatus(tr("Ready — choose a local interface to scan your subnet."));
+    if (inventoryDb_.isOpen())
+        updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
     connect(discovery_, &DiscoveryService::authenticationRequested, this,
