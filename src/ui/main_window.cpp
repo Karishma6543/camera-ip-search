@@ -338,14 +338,17 @@ void MainWindow::buildUi()
     searchEdit_->setClearButtonEnabled(true);
     interfaceSelector_ = new QComboBox(toolbar);
     interfaceSelector_->setObjectName(QStringLiteral("interfaceSelector"));
+    interfaceSelector_->setAccessibleName(tr("Network interface for discovery and scanning"));
     interfaceSelector_->setMinimumWidth(165);
     interfaceSelector_->setToolTip(tr("Choose the active network adapter used for discovery and subnet scanning."));
     manufacturerFilter_ = new QComboBox(toolbar);
     manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
+    manufacturerFilter_->setAccessibleName(tr("Filter by manufacturer or discovery protocol"));
     auto *vendorFilter = manufacturerFilter_;
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     statusFilter_ = new QComboBox(toolbar);
     statusFilter_->setObjectName(QStringLiteral("statusFilter"));
+    statusFilter_->setAccessibleName(tr("Filter by camera status"));
     auto *statusFilter = statusFilter_;
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
@@ -577,6 +580,7 @@ void MainWindow::buildUi()
     localNetworkSummary_->setWordWrap(true);
     localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
+    localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
     networkLayout->addWidget(localNetworkSummary_);
     networkLayout->addWidget(mutedLabel(
         tr("Camera-side IPv4 settings are shown in the Selected device panel and can be previewed or applied from the Maintenance tab."),
@@ -597,6 +601,8 @@ void MainWindow::buildUi()
     statusBar()->addWidget(statusLabel_, 1);
     operationProgress_ = new QProgressBar(this);
     operationProgress_->setObjectName(QStringLiteral("operationProgress"));
+    operationProgress_->setAccessibleName(tr("Current network operation progress"));
+    operationProgress_->setAccessibleDescription(tr("Progress of discovery, scanning, reachability or bulk configuration."));
     operationProgress_->setMaximumWidth(220);
     operationProgress_->setMinimumWidth(130);
     operationProgress_->setTextVisible(true);
@@ -946,6 +952,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     deviceDetailsLabel_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     deviceDetailsLabel_->setMinimumHeight(150);
     deviceDetailsLabel_->setObjectName(QStringLiteral("deviceDetails"));
+    deviceDetailsLabel_->setAccessibleName(tr("Selected camera full device profile"));
     identityLayout->addWidget(identityTitle);
     identityLayout->addWidget(deviceDetailsLabel_);
     layout->addWidget(identityPanel);
