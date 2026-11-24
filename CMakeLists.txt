@@ -64,6 +64,7 @@ set(CAMERA_CORE_SOURCES
     src/ui/main_window.h
     src/ui/main_window.cpp
     src/ui/oxita_theme.h
+    src/oxita_branding.qrc
 )
 
 add_library(camera-core STATIC ${CAMERA_CORE_SOURCES})
@@ -80,7 +81,7 @@ else()
     target_compile_options(camera-core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-qt_add_executable(camera-ip-search src/main.cpp src/oxita_branding.qrc)
+qt_add_executable(camera-ip-search src/main.cpp)
 target_link_libraries(camera-ip-search PRIVATE camera-core)
 
 if(BUILD_TESTING)
