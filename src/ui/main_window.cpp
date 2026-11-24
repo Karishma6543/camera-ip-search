@@ -57,6 +57,9 @@
 #include <QSaveFile>
 #include <QRegularExpression>
 #include <QSet>
+#include <QMenu>
+#include <QAction>
+#include <QProgressBar>
 #include <QPainter>
 #include <QPixmap>
 #include <QPainterPath>
@@ -456,6 +459,37 @@ void MainWindow::buildUi()
     deviceTable_->verticalHeader()->setDefaultSectionSize(48);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
+    deviceHeader->setSectionsClickable(true);
+    deviceHeader->setSortIndicatorShown(true);
+    deviceHeader->setSortIndicator(1, Qt::AscendingOrder);
+    connect(deviceHeader, &QHeaderView::sectionClicked, this,
+            [this, deviceHeader](int column) {
+        if (column <= 0 || column >= deviceTable_->columnCount()) return;
+        static int previousColumn = -1;
+        static Qt::SortOrder order = Qt::AscendingOrder;
+        order = previousColumn == column
+            ? (order == Qt::AscendingOrder ? Qt::DescendingOrder : Qt::AscendingOrder)
+            : Qt::AscendingOrder;
+        previousColumn = column;
+        deviceTable_->sortItems(column, order);
+        deviceHeader->setSortIndicator(column, order);
+        updateSelectedDevicePanel();
+    });
+    deviceHeader->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(deviceHeader, &QWidget::customContextMenuRequested, this,
+            [this, deviceHeader](const QPoint &position) {
+        QMenu menu(deviceTable_);
+        for (int column = 1; column < deviceTable_->columnCount(); ++column) {
+            auto *action = menu.addAction(deviceTable_->horizontalHeaderItem(column)->text());
+            action->setCheckable(true);
+            action->setChecked(!deviceTable_->isColumnHidden(column));
+            connect(action, &QAction::toggled, this, [this, column](bool visible) {
+                deviceTable_->setColumnHidden(column, !visible);
+            });
+        }
+        menu.exec(deviceHeader->mapToGlobal(position));
+    });
+
     deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
     inventoryEmptyState_ = new QLabel(
         tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."), left);
@@ -540,6 +574,15 @@ void MainWindow::buildUi()
     statusLabel_ = new QLabel(this);
     statusLabel_->setObjectName(QStringLiteral("applicationStatus"));
     statusBar()->addWidget(statusLabel_, 1);
+    operationProgress_ = new QProgressBar(this);
+    operationProgress_->setObjectName(QStringLiteral("operationProgress"));
+    operationProgress_->setMaximumWidth(220);
+    operationProgress_->setMinimumWidth(130);
+    operationProgress_->setTextVisible(true);
+    operationProgress_->setRange(0, 0);
+    operationProgress_->hide();
+    statusBar()->addPermanentWidget(operationProgress_);
+
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
         if (reachabilityChecker_->isRunning()) {
