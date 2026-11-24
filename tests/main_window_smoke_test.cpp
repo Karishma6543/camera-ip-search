@@ -44,6 +44,7 @@ private slots:
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
     void shutdownAbortsActiveOnvifEnrichment();
+    void sendsAndVerifiesOnvifFactoryResetRequest();
 };
 
 void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
@@ -255,6 +256,9 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("FIRMWARE")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("SERIAL NUMBER")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
+    table->setCurrentCell(-1, -1);
+    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
+    table->setCurrentCell(0, 1);
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
@@ -522,6 +526,49 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
 }
 
 
+void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool requestSeen = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requestSeen] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &requestSeen] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(QStringLiteral("Content-Length\\\\s*:\\\\s*(\\\\d+)"), QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                const QByteArray body = request.mid(headerEnd + 4, bodyLength);
+                if (!body.contains("SetSystemFactoryDefault") || !body.contains("<tds:FactoryDefault>Soft</tds:FactoryDefault>")) return;
+                requestSeen = true;
+                const QByteArray responseBody = QByteArrayLiteral("<s:Envelope xmlns:s='urn:soap' xmlns:tds='urn:onvif'><s:Body><tds:SetSystemFactoryDefaultResponse/></s:Body></s:Envelope>");
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\nContent-Type: application/soap+xml\\r\\nContent-Length: ") + QByteArray::number(responseBody.size()) + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + responseBody;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService service;
+    QSignalSpy completed(&service, &DiscoveryService::maintenanceOperationFinished);
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("127.0.0.1");
+    device.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service").arg(camera.serverPort());
+    device.onvifEndpoint = QStringLiteral("urn:uuid:factory-reset-test");
+    device.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    service.factoryReset(device, QStringLiteral("Soft"));
+    QTRY_COMPARE_WITH_TIMEOUT(completed.count(), 1, 3000);
+    QVERIFY(requestSeen);
+    const QList<QVariant> result = completed.takeFirst();
+    QVERIFY(result.at(2).toBool());
+    QVERIFY(result.at(3).toString().contains(QStringLiteral("accepted"), Qt::CaseInsensitive));
+}
 void MainWindowSmokeTest::shutdownAbortsActiveOnvifEnrichment()
 {
     QStandardPaths::setTestModeEnabled(true);
