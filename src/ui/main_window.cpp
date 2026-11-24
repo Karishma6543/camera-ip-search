@@ -496,7 +496,7 @@ void MainWindow::buildUi()
     localNetworkSummary_ = new QLabel(tr("Select an active IPv4 interface to inspect its address and link details."), networkPanel);
     localNetworkSummary_->setWordWrap(true);
     localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    localNetworkSummary_->setObjectName(QStringLiteral("deviceDetails"));
+    localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
     networkLayout->addWidget(localNetworkSummary_);
     networkLayout->addWidget(mutedLabel(
         tr("Camera-side IPv4 settings are shown in the Selected device panel and can be previewed or applied from the Maintenance tab."),
