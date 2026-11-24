@@ -47,7 +47,8 @@ void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
     QVERIFY2(!logo.isNull(), "The official Oxita logo must be embedded in the application resources.");
     const auto *logoLabel = window.findChild<QLabel *>(QStringLiteral("brandLogo"));
     QVERIFY(logoLabel);
-    QVERIFY2(!logoLabel->pixmap().isNull(), "The application header must display the bundled Oxita logo.");
+    const QPixmap displayed = logoLabel->pixmap(Qt::ReturnByValue);
+    QVERIFY2(!displayed.isNull(), "The application header must display the bundled Oxita logo.");
 }
 
 void MainWindowSmokeTest::startupShowsOperationHistory()
