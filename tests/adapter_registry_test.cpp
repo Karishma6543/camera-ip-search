@@ -12,6 +12,7 @@ private slots:
     void rejectsEndpointWithEmbeddedCredentials();
     void exposesOnlyImplementedReadOperations();
     void exposesImplementedOnvifWriteOperations();
+    void exposesFactoryResetOnlyForOnvifAdapter();
 };
 
 void AdapterRegistryTest::recognizesOnvifDeviceService()
@@ -73,6 +74,19 @@ void AdapterRegistryTest::exposesImplementedOnvifWriteOperations()
     const QStringList operations = registry.implementedWriteOperations(device);
     QVERIFY(operations.contains(QStringLiteral("SetNetworkInterfaces")));
     QVERIFY(operations.contains(QStringLiteral("SetNetworkDefaultGateway")));
+}
+
+void AdapterRegistryTest::exposesFactoryResetOnlyForOnvifAdapter()
+{
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("192.168.1.20");
+    device.deviceServiceUrl = QStringLiteral("http://192.168.1.20/onvif/device_service");
+    device.discoverySources << QStringLiteral("ONVIF");
+    AdapterRegistry registry;
+    const DeviceAdapter *adapter = registry.adapterFor(device);
+    QVERIFY(adapter);
+    QVERIFY(adapter->supports(DeviceOperation::FactoryReset));
+    QVERIFY(registry.implementedWriteOperations(device).contains(QStringLiteral("SetSystemFactoryDefault")));
 }
 
 QTEST_MAIN(AdapterRegistryTest)
