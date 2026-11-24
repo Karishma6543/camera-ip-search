@@ -25,9 +25,7 @@ private:
     void buildUi();
     void populateInterfaces();
     QWidget *makeInfoTab(QWidget *parent);
-    QWidget *makeBulkTab(QWidget *parent);
     QWidget *makeMaintenanceTab(QWidget *parent);
-    QWidget *makeNvrTab(QWidget *parent);
     QWidget *makeHistoryTab(QWidget *parent);
     void recordOperation(const QString &operation, const QString &target, const QString &outcome, const QString &details);
     void refreshOperationHistory();
