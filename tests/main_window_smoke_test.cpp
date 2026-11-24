@@ -18,6 +18,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QScrollArea>
+#include <QProgressBar>
 #include <QSplitter>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -153,6 +154,9 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(!table->isColumnHidden(4));
     QVERIFY(!table->isColumnHidden(7));
     QVERIFY(!table->isColumnHidden(11));
+    QVERIFY(table->horizontalHeader()->sectionsClickable());
+    QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
+    QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
     auto *workspace = window.findChild<QSplitter *>(QStringLiteral("deviceWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
     QVERIFY(workspace);
@@ -227,7 +231,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
         insert.addBindValue(QStringLiteral("Acme"));
         insert.addBindValue(QStringLiteral("A-100"));
         insert.addBindValue(QStringLiteral("1.0"));
-        insert.addBindValue(QStringLiteral("A100"));
+        insert.addBindValue(QString(180, QLatin1Char('S')));
         insert.addBindValue(QStringLiteral("HW-A"));
         insert.addBindValue(QStringLiteral("Activated"));
         insert.addBindValue(QStringLiteral("ONVIF WS-Discovery"));
@@ -256,6 +260,9 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("FIRMWARE")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("SERIAL NUMBER")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
+    QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
     table->setCurrentCell(-1, -1);
     QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
     table->setCurrentCell(0, 1);
