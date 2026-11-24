@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSplitter>
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -426,7 +427,7 @@ void MainWindow::buildUi()
     deviceTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
-    deviceTable_->setMinimumHeight(250);
+    deviceTable_->setMinimumHeight(170);
     deviceTable_->verticalHeader()->setDefaultSectionSize(48);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
@@ -438,7 +439,6 @@ void MainWindow::buildUi()
     inventoryEmptyState_->setWordWrap(true);
     inventoryEmptyState_->setMinimumHeight(88);
     leftLayout->addWidget(inventoryEmptyState_);
-    leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
     tabs->setObjectName(QStringLiteral("workspaceTabs"));
@@ -448,7 +448,20 @@ void MainWindow::buildUi()
     tabs->addTab(makeInfoTab(tabs), tr("Device details"));
     tabs->addTab(makeMaintenanceTab(tabs), tr("Device actions"));
     tabs->addTab(makeHistoryTab(tabs), tr("Operation history"));
-    leftLayout->addWidget(tabs);
+
+    // Keep the inventory and selected-device workspace independently usable.
+    // A vertical splitter prevents the table from consuming the space needed
+    // by the details panel on shorter displays; users can resize either area.
+    auto *deviceWorkspace = new QSplitter(Qt::Vertical, left);
+    deviceWorkspace->setObjectName(QStringLiteral("deviceWorkspaceSplitter"));
+    deviceWorkspace->setChildrenCollapsible(false);
+    deviceWorkspace->setHandleWidth(7);
+    deviceWorkspace->addWidget(deviceTable_);
+    deviceWorkspace->addWidget(tabs);
+    deviceWorkspace->setStretchFactor(0, 3);
+    deviceWorkspace->setStretchFactor(1, 2);
+    deviceWorkspace->setSizes({390, 280});
+    leftLayout->addWidget(deviceWorkspace, 1);
 
     auto *rightScroll = new QScrollArea(central);
     rightScroll->setWidgetResizable(true);
@@ -765,7 +778,11 @@ void MainWindow::buildUi()
     // Device checkboxes are the explicit multi-select mechanism. Highlighted
     // rows remain available for single-device inspection and keyboard workflows.
     connect(deviceTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
-        if (row < 0 || !deviceDetailsLabel_) return;
+        if (!deviceDetailsLabel_) return;
+        if (row < 0) {
+            deviceDetailsLabel_->setText(tr("No device selected. Select a camera in the inventory above to inspect its reported information."));
+            return;
+        }
         QStringList details;
         for (int col = 1; col < deviceTable_->columnCount(); ++col) {
             const auto *item = deviceTable_->item(row, col);
@@ -791,15 +808,14 @@ void MainWindow::buildUi()
             addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
             addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
         }
-        QString html = QStringLiteral("<html><body style='margin:4px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
-            "<div style='font-size:10px;font-weight:700;letter-spacing:1px;color:#8A909A;margin-bottom:8px;'>DEVICE PROFILE</div>"
-            "<table width='100%' cellspacing='0' cellpadding='5'>");
+        QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
+            "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
         for (const QString &detail : details) {
             const int separator = detail.indexOf(QStringLiteral(": "));
             const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
             const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
-            html += QStringLiteral("<tr><td width='34%' valign='top' style='color:#7B818B;border-bottom:1px solid #ECEEF1;font-size:11px;'>%1</td>"
-                "<td valign='top' style='color:#303640;border-bottom:1px solid #ECEEF1;font-size:11px;font-weight:600;'>%2</td></tr>")
+            html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
+                "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;'>%2</td></tr>")
                 .arg(key, value);
         }
         html += QStringLiteral("</table></body></html>");
@@ -810,23 +826,30 @@ void MainWindow::buildUi()
 
 QWidget *MainWindow::makeInfoTab(QWidget *parent)
 {
-    auto *page = new QWidget(parent);
-    auto *layout = new QVBoxLayout(page);
+    auto *page = new QScrollArea(parent);
+    page->setObjectName(QStringLiteral("deviceDetailsScrollArea"));
+    page->setWidgetResizable(true);
+    page->setFrameShape(QFrame::NoFrame);
+    page->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    auto *content = new QWidget(page);
+    auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(16, 14, 16, 14);
     layout->setSpacing(10);
 
-    auto *heading = new QLabel(tr("Device information"), page);
+    auto *heading = new QLabel(tr("Device information"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
-        tr("Review discovery identity, ONVIF service details, network interfaces and reported capabilities for the selected camera."),
-        page);
+        tr("Select a camera above to review its identity, discovery evidence, ONVIF services, network configuration and reported capabilities."),
+        content);
     layout->addWidget(heading);
     layout->addWidget(description);
 
-    auto *identityPanel = new QFrame(page);
+    auto *identityPanel = new QFrame(content);
     identityPanel->setObjectName(QStringLiteral("metricCard"));
     auto *identityLayout = new QVBoxLayout(identityPanel);
-    identityLayout->setContentsMargins(12, 10, 12, 10);
+    identityLayout->setContentsMargins(14, 12, 14, 12);
+    identityLayout->setSpacing(8);
     auto *identityTitle = new QLabel(tr("DEVICE PROFILE"), identityPanel);
     identityTitle->setObjectName(QStringLiteral("eyebrow"));
     deviceDetailsLabel_ = new QLabel(
@@ -835,15 +858,19 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     deviceDetailsLabel_->setWordWrap(true);
     deviceDetailsLabel_->setTextFormat(Qt::RichText);
     deviceDetailsLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    deviceDetailsLabel_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    deviceDetailsLabel_->setMinimumHeight(150);
     deviceDetailsLabel_->setObjectName(QStringLiteral("deviceDetails"));
     identityLayout->addWidget(identityTitle);
     identityLayout->addWidget(deviceDetailsLabel_);
-    layout->addWidget(identityPanel, 1);
+    layout->addWidget(identityPanel);
 
     auto *note = mutedLabel(
         tr("Information is device-reported and may be incomplete. An empty field means the camera did not provide that value during the latest query; it does not necessarily indicate a fault."),
-        page);
+        content);
     layout->addWidget(note);
+    layout->addStretch();
+    page->setWidget(content);
     return page;
 }
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
