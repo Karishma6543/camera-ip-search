@@ -43,6 +43,7 @@ QStringList OnvifAdapter::implementedWriteOperations() const
 {
     return {
         QStringLiteral("SetNetworkInterfaces"),
-        QStringLiteral("SetNetworkDefaultGateway")
+        QStringLiteral("SetNetworkDefaultGateway"),
+        QStringLiteral("SetSystemFactoryDefault")
     };
 }
