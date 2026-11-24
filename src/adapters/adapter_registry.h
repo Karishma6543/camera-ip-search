@@ -9,6 +9,8 @@ class AdapterRegistry final
 {
 public:
     AdapterRegistry();
+
+    bool registerAdapter(std::unique_ptr<DeviceAdapter> adapter);
     const DeviceAdapter *adapterFor(const DeviceRecord &device) const;
     QStringList supportedReadOperations(const DeviceRecord &device) const;
     QStringList implementedWriteOperations(const DeviceRecord &device) const;

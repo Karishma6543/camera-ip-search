@@ -11,16 +11,16 @@ set(CMAKE_AUTORCC ON)
 
 include(CTest)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 endif()
 qt_standard_project_setup()
 
-qt_add_executable(camera-ip-search
-    src/main.cpp
-    src/core/diagnostic_log.h
-    src/core/diagnostic_log.cpp
+# Compile application code once and share it between the desktop executable and
+# focused test binaries. This avoids recompiling the same implementation files
+# for every test target, keeping CI resource usage predictable.
+set(CAMERA_CORE_SOURCES
     src/adapters/device_adapter.h
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
@@ -28,173 +28,88 @@ qt_add_executable(camera-ip-search
     src/adapters/adapter_registry.cpp
     src/adapters/network_config_validator.h
     src/adapters/network_config_validator.cpp
+    src/app/batch_operation_preflight.h
+    src/app/batch_operation_preflight.cpp
+    src/app/ip_assignment_preflight.h
+    src/app/ip_assignment_preflight.cpp
+    src/app/batch_operation_runner.h
+    src/app/batch_operation_runner.cpp
     src/core/device_record.h
     src/core/device_identity.h
     src/core/device_identity.cpp
+    src/core/diagnostic_logger.h
+    src/core/diagnostic_logger.cpp
+    src/core/diagnostic_log.h
+    src/core/diagnostic_log.cpp
+    src/firmware/firmware_package_validator.h
+    src/firmware/firmware_package_validator.cpp
     src/discovery/discovery_service.h
+    src/discovery/discovery_service.cpp
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
-    src/discovery/discovery_service.cpp
     src/discovery/onvif_network_config.h
     src/discovery/onvif_network_config.cpp
     src/discovery/subnet_scanner.h
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
     src/discovery/reachability_checker.cpp
-    src/ui/main_window.cpp
+    src/discovery/onvif_network_interface_parser.h
+    src/discovery/onvif_network_interface_parser.cpp
+    src/discovery/onvif_dns_parser.h
+    src/discovery/onvif_dns_parser.cpp
+    src/discovery/ip_conflict_probe.h
+    src/discovery/ip_conflict_probe.cpp
+    src/discovery/ip_assignment_planner.h
+    src/discovery/ip_assignment_planner.cpp
     src/ui/main_window.h
+    src/ui/main_window.cpp
     src/ui/oxita_theme.h
 )
 
-target_link_libraries(camera-ip-search PRIVATE Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml)
-target_include_directories(camera-ip-search PRIVATE src)
+add_library(camera-core STATIC ${CAMERA_CORE_SOURCES})
+target_include_directories(camera-core PUBLIC src)
+target_link_libraries(camera-core PUBLIC Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent)
 
-if(MSVC)
-    target_compile_options(camera-ip-search PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(camera-ip-search PRIVATE -Wall -Wextra -Wpedantic)
+if(WIN32)
+    target_link_libraries(camera-core PUBLIC iphlpapi)
 endif()
 
+if(MSVC)
+    target_compile_options(camera-core PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(camera-core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+qt_add_executable(camera-ip-search src/main.cpp)
+target_link_libraries(camera-ip-search PRIVATE camera-core)
+
 if(BUILD_TESTING)
-    qt_add_executable(discovery-parser-tests
-        tests/discovery_parser_test.cpp
-        src/core/device_record.h
-        src/discovery/discovery_parser.h
-        src/discovery/discovery_parser.cpp
-    )
-    target_include_directories(discovery-parser-tests PRIVATE src)
-    target_link_libraries(discovery-parser-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
-    add_test(NAME discovery-parser-tests COMMAND discovery-parser-tests)
+    function(add_camera_test target source)
+        qt_add_executable(${target} ${source})
+        target_link_libraries(${target} PRIVATE camera-core Qt6::Test)
+        add_test(NAME ${target} COMMAND ${target})
+        set_tests_properties(${target} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endfunction()
 
-    qt_add_executable(adapter-registry-tests
-        tests/adapter_registry_test.cpp
-        src/core/device_record.h
-        src/adapters/device_adapter.h
-        src/adapters/onvif_adapter.h
-        src/adapters/onvif_adapter.cpp
-        src/adapters/adapter_registry.h
-        src/adapters/adapter_registry.cpp
-    )
-    target_include_directories(adapter-registry-tests PRIVATE src)
-    target_link_libraries(adapter-registry-tests PRIVATE Qt6::Test Qt6::Network)
-    add_test(NAME adapter-registry-tests COMMAND adapter-registry-tests)
-
-    qt_add_executable(onvif-network-config-tests
-        tests/onvif_network_config_test.cpp
-        src/discovery/onvif_network_config.h
-        src/discovery/onvif_network_config.cpp
-    )
-    target_include_directories(onvif-network-config-tests PRIVATE src)
-    target_link_libraries(onvif-network-config-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
-    add_test(NAME onvif-network-config-tests COMMAND onvif-network-config-tests)
-
-    qt_add_executable(network-config-validator-tests
-        tests/network_config_validator_test.cpp
-        src/adapters/network_config_validator.h
-        src/adapters/network_config_validator.cpp
-    )
-    target_include_directories(network-config-validator-tests PRIVATE src)
-    target_link_libraries(network-config-validator-tests PRIVATE Qt6::Test Qt6::Network)
-    add_test(NAME network-config-validator-tests COMMAND network-config-validator-tests)
-
-    qt_add_executable(subnet-scanner-tests
-        tests/subnet_scanner_test.cpp
-        src/core/device_record.h
-        src/discovery/subnet_scanner.h
-        src/discovery/subnet_scanner.cpp
-    )
-    target_include_directories(subnet-scanner-tests PRIVATE src)
-    target_link_libraries(subnet-scanner-tests PRIVATE Qt6::Test Qt6::Network)
-    add_test(NAME subnet-scanner-tests COMMAND subnet-scanner-tests)
-
-    qt_add_executable(reachability-checker-tests
-        tests/reachability_checker_test.cpp
-        src/core/device_record.h
-        src/discovery/reachability_checker.h
-        src/discovery/reachability_checker.cpp
-    )
-    target_include_directories(reachability-checker-tests PRIVATE src)
-    target_link_libraries(reachability-checker-tests PRIVATE Qt6::Test Qt6::Network)
-    add_test(NAME reachability-checker-tests COMMAND reachability-checker-tests)
-
-    qt_add_executable(device-identity-tests
-        tests/device_identity_test.cpp
-        src/core/device_record.h
-        src/core/diagnostic_log.h
-        src/core/diagnostic_log.cpp
-        src/core/device_identity.h
-        src/core/device_identity.cpp
-    )
-    target_include_directories(device-identity-tests PRIVATE src)
-    target_link_libraries(device-identity-tests PRIVATE Qt6::Test Qt6::Network)
-    add_test(NAME device-identity-tests COMMAND device-identity-tests)
-
-    qt_add_executable(discovery-wire-integration-tests
-        tests/discovery_wire_integration_test.cpp
-        src/core/device_record.h
-        src/discovery/discovery_parser.h
-        src/discovery/discovery_parser.cpp
-    )
-    target_include_directories(discovery-wire-integration-tests PRIVATE src)
-    target_link_libraries(discovery-wire-integration-tests PRIVATE Qt6::Test Qt6::Network Qt6::Xml)
-    add_test(NAME discovery-wire-integration-tests COMMAND discovery-wire-integration-tests)
-
-    qt_add_executable(diagnostic-log-tests
-        tests/diagnostic_log_test.cpp
-        src/core/diagnostic_log.h
-        src/core/diagnostic_log.cpp
-    )
-    target_include_directories(diagnostic-log-tests PRIVATE src)
-    target_link_libraries(diagnostic-log-tests PRIVATE Qt6::Test)
-    add_test(NAME diagnostic-log-tests COMMAND diagnostic-log-tests)
-
-    qt_add_executable(main-window-smoke-tests
-        tests/main_window_smoke_test.cpp
-        src/core/diagnostic_log.h
-        src/core/diagnostic_log.cpp
-        src/core/device_record.h
-        src/core/device_identity.h
-        src/core/device_identity.cpp
-        src/adapters/device_adapter.h
-        src/adapters/onvif_adapter.h
-        src/adapters/onvif_adapter.cpp
-        src/adapters/adapter_registry.h
-        src/adapters/adapter_registry.cpp
-        src/adapters/network_config_validator.h
-        src/adapters/network_config_validator.cpp
-        src/discovery/discovery_service.h
-        src/discovery/discovery_service.cpp
-        src/discovery/discovery_parser.h
-        src/discovery/discovery_parser.cpp
-        src/discovery/onvif_network_config.h
-        src/discovery/onvif_network_config.cpp
-        src/discovery/subnet_scanner.h
-        src/discovery/subnet_scanner.cpp
-        src/discovery/reachability_checker.h
-        src/discovery/reachability_checker.cpp
-        src/ui/main_window.h
-        src/ui/main_window.cpp
-        src/ui/oxita_theme.h
-    )
-    target_include_directories(main-window-smoke-tests PRIVATE src)
-    target_link_libraries(main-window-smoke-tests PRIVATE
-        Qt6::Test Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml
-    )
-    add_test(NAME main-window-smoke-tests COMMAND main-window-smoke-tests)
-
-    set_tests_properties(
-        discovery-parser-tests
-        adapter-registry-tests
-        onvif-network-config-tests
-        network-config-validator-tests
-        subnet-scanner-tests
-        device-identity-tests
-        reachability-checker-tests
-        main-window-smoke-tests
-        diagnostic-log-tests
-        discovery-wire-integration-tests
-        PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-    )
+    add_camera_test(discovery-parser-tests tests/discovery_parser_test.cpp)
+    add_camera_test(adapter-registry-tests tests/adapter_registry_test.cpp)
+    add_camera_test(onvif-network-config-tests tests/onvif_network_config_test.cpp)
+    add_camera_test(network-config-validator-tests tests/network_config_validator_test.cpp)
+    add_camera_test(subnet-scanner-tests tests/subnet_scanner_test.cpp)
+    add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
+    add_camera_test(device-identity-tests tests/device_identity_test.cpp)
+    add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
+    add_camera_test(onvif-dns-parser-tests tests/onvif_dns_parser_test.cpp)
+    add_camera_test(ip-assignment-planner-tests tests/ip_assignment_planner_test.cpp)
+    add_camera_test(ip-assignment-preflight-tests tests/ip_assignment_preflight_test.cpp)
+    add_camera_test(ip-conflict-probe-tests tests/ip_conflict_probe_test.cpp)
+    add_camera_test(batch-operation-preflight-tests tests/batch_operation_preflight_test.cpp)
+    add_camera_test(batch-operation-runner-tests tests/batch_operation_runner_test.cpp)
+    add_camera_test(firmware-package-validator-tests tests/firmware_package_validator_test.cpp)
+    add_camera_test(diagnostic-logger-tests tests/diagnostic_logger_test.cpp)
+    add_camera_test(diagnostic-log-tests tests/diagnostic_log_test.cpp)
+    add_camera_test(discovery-wire-integration-tests tests/discovery_wire_integration_test.cpp)
+    add_camera_test(main-window-smoke-tests tests/main_window_smoke_test.cpp)
 endif()
 
 include(GNUInstallDirs)
