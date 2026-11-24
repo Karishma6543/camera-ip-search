@@ -13,13 +13,17 @@ public:
     explicit ReachabilityChecker(QObject *parent = nullptr);
     bool isRunning() const;
     void start(const QVector<DeviceRecord> &devices);
+    void cancel();
 signals:
     void deviceChecked(const QString &ipAddress, const QString &status,
                        const QString &checkedAt, const QString &lastSuccessfulResponseAt);
     void finished(int checkedCount);
+    void cancelled(int checkedCount);
+    void progressChanged(int checkedCount, int totalCount, const QString &currentIp);
 private:
     void checkNextDevice();
     void tryNextPort();
+    void advanceAfterFailedAttempt();
     void completeCurrent(const QString &status);
     QVector<DeviceRecord> devices_;
     QStringList ports_;
@@ -28,6 +32,7 @@ private:
     int checkedCount_{0};
     bool running_{false};
     bool completed_{false};
+    bool attemptInProgress_{false};
     QTcpSocket *socket_{nullptr};
     QTimer timeout_;
 };

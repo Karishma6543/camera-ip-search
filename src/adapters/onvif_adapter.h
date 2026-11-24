@@ -9,4 +9,5 @@ public:
     QString displayName() const override;
     bool canHandle(const DeviceRecord &device) const override;
     QStringList verifiedReadOperations() const override;
+    QStringList implementedWriteOperations() const override;
 };

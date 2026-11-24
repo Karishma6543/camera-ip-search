@@ -24,7 +24,8 @@ QString usableIpv4(const QString &candidate, const QHostAddress &fallback)
     QHostAddress address;
     if (address.setAddress(candidate.trimmed()) &&
         address.protocol() == QAbstractSocket::IPv4Protocol &&
-        !address.isNull() && !address.isLoopback())
+        !address.isNull() && !address.isLoopback() && !address.isMulticast() &&
+        address.toIPv4Address() != 0U && address.toIPv4Address() != 0xffffffffU)
         return address.toString();
     return fallback.toString();
 }
@@ -90,7 +91,21 @@ bool parseProjectResponse(const QByteArray &payload, quint32 expectedSequence,
         !fields.value(QStringLiteral("dhcp")).isBool()) return false;
 
     DeviceRecord parsed;
-    parsed.ipAddress = usableIpv4(ipValue.toString(), sender);
+    const QString advertisedIp = usableIpv4(ipValue.toString(), sender);
+    QHostAddress resolvedAddress;
+    if (!resolvedAddress.setAddress(advertisedIp) ||
+        resolvedAddress.protocol() != QAbstractSocket::IPv4Protocol ||
+        resolvedAddress.isLoopback() || resolvedAddress.isMulticast() ||
+        resolvedAddress.toIPv4Address() == 0U ||
+        resolvedAddress.toIPv4Address() == 0xffffffffU)
+        return false;
+    const quint32 senderIpv4 = sender.toIPv4Address();
+    // The payload may supply the configured address when an unconfigured
+    // camera replies from 0.0.0.0. Otherwise the UDP source is authoritative;
+    // reject a payload that attempts to redirect the inventory to another host.
+    if (senderIpv4 != 0U && advertisedIp != sender.toString())
+        return false;
+    parsed.ipAddress = senderIpv4 == 0U ? advertisedIp : sender.toString();
     parsed.macAddress = normalizedMac(macValue.toString());
     parsed.manufacturer = QStringLiteral("Oxita");
     parsed.model = socValue.toString().trimmed();
@@ -133,11 +148,19 @@ bool parseOnvifProbeMatch(const QByteArray &payload, const QHostAddress &sender,
     DeviceRecord parsed;
     parsed.ipAddress = sender.toString();
     parsed.onvifEndpoint = endpoint;
-    const QString firstXAddr = xaddrs.section(QRegularExpression(QStringLiteral("\\s+")), 0, 0);
-    const QUrl serviceUrl(firstXAddr);
-    if ((serviceUrl.scheme() == QStringLiteral("http") || serviceUrl.scheme() == QStringLiteral("https")) &&
-        serviceUrl.host() == sender.toString())
-        parsed.deviceServiceUrl = serviceUrl.toString();
+    const QStringList advertisedEndpoints = xaddrs.split(
+        QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    for (const QString &candidate : advertisedEndpoints) {
+        const QUrl serviceUrl(candidate);
+        if (serviceUrl.isValid() &&
+            (serviceUrl.scheme() == QStringLiteral("http") ||
+             serviceUrl.scheme() == QStringLiteral("https")) &&
+            serviceUrl.host().compare(sender.toString(), Qt::CaseInsensitive) == 0 &&
+            serviceUrl.userInfo().isEmpty() && serviceUrl.query().isEmpty() && serviceUrl.fragment().isEmpty()) {
+            parsed.deviceServiceUrl = serviceUrl.toString();
+            break;
+        }
+    }
     parsed.discoverySources << QStringLiteral("ONVIF WS-Discovery");
     parsed.interfaceName = interfaceName;
     parsed.manufacturer = QStringLiteral("ONVIF device (manufacturer unknown)");

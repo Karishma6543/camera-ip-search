@@ -7,7 +7,7 @@
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
 #include <QPointer>
-#include <QSet>
+#include <QHash>
 #include <QTimer>
 #include <QTcpSocket>
 #include <QVector>
@@ -18,6 +18,7 @@ class SubnetScanner final : public QObject
 public:
     explicit SubnetScanner(QObject *parent = nullptr);
     bool start(const QNetworkInterface &interface, const QNetworkAddressEntry &entry);
+    static bool isUsableSubnet(const QNetworkAddressEntry &entry);
     void cancel();
     bool isRunning() const;
 
@@ -41,7 +42,7 @@ private:
 
     QVector<Probe> active_;
     QVector<QPair<QString, quint16>> pending_;
-    QSet<QString> emitted_;
+    QHash<QString, DeviceRecord> discoveredCandidates_;
     QTimer scheduler_;
     bool running_{false};
     int candidates_{0};

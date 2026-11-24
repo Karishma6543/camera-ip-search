@@ -14,13 +14,15 @@
 #include <QTimer>
 #include <QUdpSocket>
 #include <QVector>
+#include <QList>
 
 class DiscoveryService final : public QObject
 {
     Q_OBJECT
 public:
     explicit DiscoveryService(QObject *parent = nullptr);
-    void start();
+    // Empty selects every eligible interface; a non-empty name scopes discovery to one interface.
+    void start(const QString &interfaceName = QString());
     void cancel();
     bool isRunning() const;
     void refreshDeviceInfo(const DeviceRecord &device);
@@ -47,6 +49,9 @@ private:
     void sendProjectProbe(InterfaceSocket &entry);
     void processDatagram(QUdpSocket *socket);
     void mergeAndEmit(DeviceRecord device);
+    QString storageKeyForDevice(const DeviceRecord &device) const;
+    void cancelEnrichmentRequests();
+    void trackEnrichmentReply(QNetworkReply *reply);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);
@@ -57,10 +62,12 @@ private:
     void handleOnvifDns(QNetworkReply *reply, const QString &deviceKey);
 
     QVector<InterfaceSocket> sockets_;
+    QList<QPointer<QNetworkReply>> enrichmentReplies_;
     QHash<QString, DeviceRecord> devices_;
     QTimer timeout_;
     QNetworkAccessManager networkManager_;
     AdapterRegistry adapterRegistry_;
     bool running_{false};
     quint32 sequence_{0};
+    quint64 enrichmentGeneration_{0};
 };

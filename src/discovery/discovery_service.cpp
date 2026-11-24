@@ -1,4 +1,5 @@
 #include "discovery_service.h"
+#include "core/device_identity.h"
 #include "onvif_network_config.h"
 #include "discovery_parser.h"
 #include "adapters/network_config_validator.h"
@@ -18,6 +19,16 @@ namespace {
 constexpr quint16 kProjectPort = 9988;
 constexpr quint16 kOnvifPort = 3702;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
+
+bool isSafeDeviceServiceUrl(const QUrl &url, const QString &deviceIp)
+{
+    return url.isValid() &&
+           (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https")) &&
+           url.host() == deviceIp &&
+           url.userInfo().isEmpty() &&
+           url.query().isEmpty() &&
+           url.fragment().isEmpty();
+}
 }
 
 DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
@@ -49,7 +60,7 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
         emit statusChanged(tr("No verified protocol adapter is available for this device. Refresh requires a valid ONVIF device-service endpoint."));
         return;
     }
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     if (key.isEmpty()) {
         emit statusChanged(tr("Cannot refresh device information without a stable device address."));
         return;
@@ -59,9 +70,10 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
     requestOnvifDeviceInformation(device);
 }
 
-void DiscoveryService::start()
+void DiscoveryService::start(const QString &interfaceName)
 {
     if (running_) return;
+    cancelEnrichmentRequests();
     devices_.clear();
     sockets_.clear();
     running_ = true;
@@ -69,6 +81,7 @@ void DiscoveryService::start()
 
     const auto interfaces = QNetworkInterface::allInterfaces();
     for (const auto &interface : interfaces) {
+        if (!interfaceName.isEmpty() && interface.name() != interfaceName) continue;
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
             !flags.testFlag(QNetworkInterface::IsRunning) ||
@@ -87,8 +100,9 @@ void DiscoveryService::start()
         return;
     }
 
-    emit statusChanged(tr("Sending ONVIF and project-camera discovery probes on %1 interface address(es)…")
-                           .arg(sockets_.size()));
+    emit statusChanged(interfaceName.isEmpty()
+        ? tr("Sending ONVIF and project-camera discovery probes on %1 interface address(es)…").arg(sockets_.size())
+        : tr("Sending ONVIF and project-camera discovery probes on the selected interface (%1 address(es))…").arg(sockets_.size()));
     for (auto &entry : sockets_) {
         sendOnvifProbe(entry);
         sendProjectProbe(entry);
@@ -98,15 +112,20 @@ void DiscoveryService::start()
 
 void DiscoveryService::cancel()
 {
-    if (!running_) return;
+    const bool wasRunning = running_;
+    if (!wasRunning && enrichmentReplies_.isEmpty()) return;
     timeout_.stop();
     running_ = false;
+    cancelEnrichmentRequests();
     for (auto &entry : sockets_) {
         if (entry.socket) entry.socket->close();
     }
     sockets_.clear();
-    emit statusChanged(tr("Discovery cancelled."));
-    emit finished(devices_.size());
+    emit statusChanged(wasRunning
+        ? tr("Discovery and device enrichment cancelled.")
+        : tr("Device enrichment cancelled."));
+    if (wasRunning)
+        emit finished(devices_.size());
 }
 
 void DiscoveryService::addInterfaceSocket(const QNetworkInterface &interface,
@@ -181,31 +200,61 @@ void DiscoveryService::processDatagram(QUdpSocket *socket)
 
 void DiscoveryService::mergeAndEmit(DeviceRecord device)
 {
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress
-        : (!device.ipAddress.isEmpty() ? device.ipAddress : device.onvifEndpoint);
-    if (key.isEmpty()) return;
-    if (devices_.contains(key)) {
-        auto &existing = devices_[key];
-        for (const auto &source : device.discoverySources)
-            if (!existing.discoverySources.contains(source)) existing.discoverySources.append(source);
-        if (existing.macAddress.isEmpty()) existing.macAddress = device.macAddress;
-        if (existing.manufacturer.isEmpty() ||
-            existing.manufacturer.startsWith(QStringLiteral("ONVIF")))
-            existing.manufacturer = device.manufacturer;
-        if (existing.model.isEmpty() || existing.model == tr("Model unknown"))
-            existing.model = device.model;
-        if (existing.firmwareVersion.isEmpty()) existing.firmwareVersion = device.firmwareVersion;
-        if (existing.onvifEndpoint.isEmpty()) existing.onvifEndpoint = device.onvifEndpoint;
-        const bool needsOnvifInfo = existing.deviceServiceUrl.isEmpty() &&
+    QString key = DeviceIdentity::findMatchingKey(devices_, device);
+    if (!key.isEmpty()) {
+        DeviceRecord merged = DeviceIdentity::mergeObservations(devices_.value(key), device);
+        const bool needsOnvifInfo = merged.deviceServiceUrl.isEmpty() &&
                                     !device.deviceServiceUrl.isEmpty();
-        if (needsOnvifInfo) existing.deviceServiceUrl = device.deviceServiceUrl;
-        emit deviceFound(existing);
-        if (needsOnvifInfo) requestOnvifDeviceInformation(existing);
+        if (needsOnvifInfo)
+            merged.deviceServiceUrl = device.deviceServiceUrl;
+        devices_.insert(key, merged);
+        emit deviceFound(merged);
+        if (needsOnvifInfo)
+            requestOnvifDeviceInformation(merged);
         return;
     }
+
+    key = !device.macAddress.isEmpty() ? device.macAddress
+        : (!device.ipAddress.isEmpty() ? device.ipAddress : device.onvifEndpoint);
+    if (key.isEmpty()) return;
     devices_.insert(key, device);
     emit deviceFound(device);
-    if (!device.deviceServiceUrl.isEmpty()) requestOnvifDeviceInformation(device);
+    if (!device.deviceServiceUrl.isEmpty())
+        requestOnvifDeviceInformation(device);
+}
+
+QString DiscoveryService::storageKeyForDevice(const DeviceRecord &device) const
+{
+    const QString existingKey = DeviceIdentity::findMatchingKey(devices_, device);
+    if (!existingKey.isEmpty())
+        return existingKey;
+    if (!device.macAddress.isEmpty()) return device.macAddress;
+    if (!device.ipAddress.isEmpty()) return device.ipAddress;
+    return device.onvifEndpoint;
+}
+
+void DiscoveryService::cancelEnrichmentRequests()
+{
+    ++enrichmentGeneration_;
+    const auto pending = enrichmentReplies_;
+    enrichmentReplies_.clear();
+    for (const auto &reply : pending) {
+        if (reply)
+            reply->abort();
+    }
+}
+
+void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
+{
+    if (!reply) return;
+    enrichmentReplies_.append(QPointer<QNetworkReply>(reply));
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        for (int index = enrichmentReplies_.size() - 1; index >= 0; --index) {
+            if (enrichmentReplies_.at(index).isNull() ||
+                enrichmentReplies_.at(index).data() == reply)
+                enrichmentReplies_.removeAt(index);
+        }
+    });
 }
 
 
@@ -225,9 +274,17 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         return;
     }
 
+    const QStringList writeOperations = adapterRegistry_.implementedWriteOperations(device);
+    if (!writeOperations.contains(QStringLiteral("SetNetworkInterfaces")) ||
+        (!gateway.trimmed().isEmpty() &&
+         !writeOperations.contains(QStringLiteral("SetNetworkDefaultGateway")))) {
+        emit networkConfigurationFinished(device, false,
+            tr("The selected device adapter does not implement the requested ONVIF network operation."));
+        return;
+    }
+
     const QUrl oldUrl(device.deviceServiceUrl);
-    if (!oldUrl.isValid() || (oldUrl.scheme() != QStringLiteral("http") &&
-        oldUrl.scheme() != QStringLiteral("https")) || oldUrl.host() != device.ipAddress) {
+    if (!isSafeDeviceServiceUrl(oldUrl, device.ipAddress)) {
         emit networkConfigurationFinished(device, false,
             tr("The ONVIF service URL does not match the camera's current IP address."));
         return;
@@ -279,7 +336,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *setReply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
+    const QString key = storageKeyForDevice(device);
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -337,24 +394,32 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
                     return;
                 }
-                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl] {
+                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl]
+                    (bool gatewayApplied) {
                     DeviceRecord updated = device;
                     updated.ipAddress = address;
                     updated.ipv4Address = address;
                     updated.ipv4SubnetMask = subnetMask;
-                    if (!gateway.trimmed().isEmpty()) updated.ipv4Gateway = gateway.trimmed();
+                    if (!gateway.trimmed().isEmpty() && gatewayApplied)
+                        updated.ipv4Gateway = gateway.trimmed();
                     updated.ipv4DhcpEnabled = false;
                     updated.ipv4ConfigurationKnown = true;
                     updated.deviceServiceUrl = verifyUrl.toString();
                     if (devices_.contains(key)) devices_[key] = updated;
+                    // The address change is independently verified. Persist it
+                    // even when the subsequent gateway operation fails, so the
+                    // inventory never continues pointing at the camera's old IP.
                     emit deviceFound(updated);
-                    emit networkConfigurationFinished(updated, true,
-                        tr("Static IPv4 address was verified at %1%2.")
+                    const bool complete = gateway.trimmed().isEmpty() || gatewayApplied;
+                    const QString message = !complete
+                        ? tr("The new IP address was verified, but the gateway change was not confirmed. Inventory now records the new IP and retains the previous gateway; review the gateway setting and reconnect if needed.")
+                        : tr("Static IPv4 address was verified at %1%2.")
                             .arg(address, gateway.trimmed().isEmpty()
-                                ? QString() : tr("; gateway was also applied")));
+                                ? QString() : tr("; gateway was also applied"));
+                    emit networkConfigurationFinished(updated, complete, message);
                 };
                 if (gateway.trimmed().isEmpty()) {
-                    finishVerified();
+                    finishVerified(true);
                     return;
                 }
                 const QByteArray gatewaySoap =
@@ -378,11 +443,10 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                                 gatewayResponse, QStringLiteral("SetNetworkDefaultGatewayResponse"));
                         gatewayReply->deleteLater();
                         if (!gatewayOk) {
-                            emit networkConfigurationFinished(device, false,
-                                tr("The new IP was verified, but the gateway change was not confirmed. The camera may now have the new IP with its previous gateway."));
+                            finishVerified(false);
                             return;
                         }
-                        finishVerified();
+                        finishVerified(true);
                     });
             });
     });
@@ -391,9 +455,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
 void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
 {
     const QUrl url(device.deviceServiceUrl);
-    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
-                           url.scheme() != QStringLiteral("https")) ||
-        url.host() != device.ipAddress)
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress))
         return;
 
     const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
@@ -406,8 +468,14 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
+    const QString key = storageKeyForDevice(device);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifDeviceInformation(reply, key);
     });
 }
@@ -452,9 +520,7 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
 void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
 {
     const QUrl url(device.deviceServiceUrl);
-    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
-                           url.scheme() != QStringLiteral("https")) ||
-        url.host() != device.ipAddress)
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress))
         return;
     const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
@@ -466,8 +532,14 @@ void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
+    const QString key = storageKeyForDevice(device);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifCapabilities(reply, key);
     });
 }
@@ -505,9 +577,7 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
 void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
 {
     const QUrl url(device.deviceServiceUrl);
-    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
-                           url.scheme() != QStringLiteral("https")) ||
-        url.host() != device.ipAddress)
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress))
         return;
     const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
@@ -519,8 +589,14 @@ void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
+    const QString key = storageKeyForDevice(device);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifNetworkInterfaces(reply, key);
     });
 }
@@ -534,92 +610,44 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
         return;
 
-    struct InterfaceData {
-        QString token;
-        QString name;
-        QString mac;
-        QString address;
-        QString prefix;
-        QString dhcp;
-        QString gateway;
-    };
-    QVector<InterfaceData> parsed;
-    QXmlStreamReader xml(payload);
-    QStringList path;
-    InterfaceData current;
-    bool inInterface = false;
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (xml.isStartElement()) {
-            const QString name = xml.name().toString();
-            path.append(name);
-            if (name == QStringLiteral("NetworkInterface")) {
-                inInterface = true;
-                current = InterfaceData{};
-                current.token = xml.attributes().value(QStringLiteral("token")).toString();
-                continue;
-            }
-            if (!inInterface) continue;
-            const QString joined = path.join(QLatin1Char('/'));
-            const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-            if (joined.endsWith(QStringLiteral("/NetworkInterface/Name"))) current.name = value;
-            else if (joined.endsWith(QStringLiteral("/NetworkInterface/HwAddress"))) current.mac = value;
-            else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP"))) current.dhcp = value;
-            else if (joined.endsWith(QStringLiteral("/IPv4/Config/Manual/IPv4Address")) ||
-                     joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/IPv4Address")) ||
-                     joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/IPv4Address"))) {
-                if (current.address.isEmpty()) current.address = value;
-            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/Manual/PrefixLength")) ||
-                       joined.endsWith(QStringLiteral("/IPv4/Config/FromDHCP/PrefixLength")) ||
-                       joined.endsWith(QStringLiteral("/IPv4/Config/LinkLocal/PrefixLength"))) {
-                if (current.prefix.isEmpty()) current.prefix = value;
-            } else if (joined.endsWith(QStringLiteral("/IPv4/Config/Gateway/IPv4Address"))) {
-                current.gateway = value;
-            }
-            path.removeLast();
-        } else if (xml.isEndElement()) {
-            if (xml.name() == QStringLiteral("NetworkInterface") && inInterface) {
-                parsed.append(current);
-                inInterface = false;
-            }
-            if (!path.isEmpty()) path.removeLast();
-        }
-    }
-    if (xml.hasError()) return;
-
+    OnvifNetworkConfig::InterfaceIpv4Info selected;
     QStringList summaries;
-    const InterfaceData *selected = nullptr;
-    for (const auto &entry : parsed) {
-        QStringList fields;
-        if (!entry.name.isEmpty()) fields << entry.name;
-        if (!entry.address.isEmpty()) fields << entry.address;
-        if (!entry.mac.isEmpty()) fields << entry.mac;
-        if (!fields.isEmpty()) summaries << fields.join(QStringLiteral(" | "));
-        if (!selected && !entry.token.isEmpty()) selected = &entry;
+    QString parseError;
+    if (!OnvifNetworkConfig::parseNetworkInterfaces(
+            payload, devices_.value(deviceKey).ipAddress, &selected, &summaries, &parseError)) {
+        emit statusChanged(tr("Could not parse camera network interfaces: %1").arg(parseError));
+        return;
     }
 
     DeviceRecord &device = devices_[deviceKey];
     device.networkSummary = summaries.join(QStringLiteral("; "));
-    if (selected) {
-        device.networkInterfaceToken = selected->token;
-        if (!selected->address.isEmpty()) device.ipv4Address = selected->address;
+    device.networkInterfaceToken = selected.token;
+    device.ipv4ConfigurationKnown = false;
+    if (!selected.token.isEmpty()) {
+        device.ipv4SubnetMask.clear();
+        device.ipv4Gateway.clear();
+        device.ipv4DhcpEnabled = false;
+        if (!selected.address.isEmpty()) device.ipv4Address = selected.address;
         bool prefixOk = false;
-        const int prefix = selected->prefix.toInt(&prefixOk);
-        if (prefixOk && prefix >= 1 && prefix <= 32) {
+        const int prefix = selected.prefix.toInt(&prefixOk);
+        const bool validPrefix = prefixOk && prefix >= 1 && prefix <= 32;
+        if (validPrefix) {
             const quint32 mask = 0xffffffffU << (32 - prefix);
             device.ipv4SubnetMask = QHostAddress(mask).toString();
         }
-        if (selected->dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
-            selected->dhcp == QStringLiteral("1")) {
+        if (selected.dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
+            selected.dhcp == QStringLiteral("1")) {
             device.ipv4DhcpEnabled = true;
-            device.ipv4ConfigurationKnown = true;
-        } else if (selected->dhcp.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0 ||
-                   selected->dhcp == QStringLiteral("0")) {
+            device.ipv4ConfigurationKnown = validPrefix && !device.ipv4Address.isEmpty();
+        } else if (selected.dhcp.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0 ||
+                   selected.dhcp == QStringLiteral("0")) {
             device.ipv4DhcpEnabled = false;
-            device.ipv4ConfigurationKnown = !device.ipv4Address.isEmpty();
+            device.ipv4ConfigurationKnown = validPrefix && !device.ipv4Address.isEmpty();
         }
-        if (!selected->gateway.isEmpty()) device.ipv4Gateway = selected->gateway;
+        if (!selected.gateway.isEmpty()) device.ipv4Gateway = selected.gateway;
     }
+    if (!device.ipv4ConfigurationKnown)
+        device.networkInterfaceToken.clear();
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces")))
         device.discoverySources << QStringLiteral("ONVIF GetNetworkInterfaces");
     emit deviceFound(device);
@@ -628,9 +656,7 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
 void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
 {
     const QUrl url(device.deviceServiceUrl);
-    if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
-                           url.scheme() != QStringLiteral("https")) ||
-        url.host() != device.ipAddress)
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress))
         return;
     const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
@@ -642,8 +668,14 @@ void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *reply = networkManager_.post(request, soap);
-    const QString key = !device.macAddress.isEmpty() ? device.macAddress : device.ipAddress;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key] {
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
+    const QString key = storageKeyForDevice(device);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
         handleOnvifDns(reply, key);
     });
 }

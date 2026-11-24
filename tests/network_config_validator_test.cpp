@@ -11,6 +11,7 @@ private slots:
     void rejectsNonContiguousMask();
     void rejectsOffSubnetGateway();
     void allowsOptionalGatewayAndDns();
+    void rejectsUnspecifiedAndBroadcastAddresses();
 };
 
 void NetworkConfigValidatorTest::acceptsValidStaticConfiguration()
@@ -48,6 +49,20 @@ void NetworkConfigValidatorTest::allowsOptionalGatewayAndDns()
     QVERIFY(NetworkConfigValidator::validateStaticIpv4(
         QStringLiteral("10.0.0.12"), QStringLiteral("255.255.255.0"),
         QString(), QString(), nullptr));
+}
+
+
+void NetworkConfigValidatorTest::rejectsUnspecifiedAndBroadcastAddresses()
+{
+    QVERIFY(!NetworkConfigValidator::validateStaticIpv4(
+        QStringLiteral("0.0.0.0"), QStringLiteral("255.255.255.0"),
+        QString(), QString(), nullptr));
+    QVERIFY(!NetworkConfigValidator::validateStaticIpv4(
+        QStringLiteral("192.168.1.50"), QStringLiteral("255.255.255.0"),
+        QString(), QStringLiteral("255.255.255.255"), nullptr));
+    QVERIFY(!NetworkConfigValidator::validateStaticIpv4(
+        QStringLiteral("192.168.1.50"), QStringLiteral("255.255.255.0"),
+        QStringLiteral("255.255.255.255"), QString(), nullptr));
 }
 
 QTEST_MAIN(NetworkConfigValidatorTest)
