@@ -556,18 +556,26 @@ void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
     });
 
     DiscoveryService service;
-    QSignalSpy completed(&service, &DiscoveryService::maintenanceOperationFinished);
+    bool finished = false;
+    bool succeeded = false;
+    QString resultMessage;
+    connect(&service, &DiscoveryService::maintenanceOperationFinished, &service,
+            [&finished, &succeeded, &resultMessage](const DeviceRecord &, const QString &,
+                                                    bool ok, const QString &message) {
+        finished = true;
+        succeeded = ok;
+        resultMessage = message;
+    });
     DeviceRecord device;
     device.ipAddress = QStringLiteral("127.0.0.1");
     device.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service").arg(camera.serverPort());
     device.onvifEndpoint = QStringLiteral("urn:uuid:factory-reset-test");
     device.discoverySources << QStringLiteral("ONVIF WS-Discovery");
     service.factoryReset(device, QStringLiteral("Soft"));
-    QTRY_COMPARE_WITH_TIMEOUT(completed.count(), 1, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(finished, 3000);
     QVERIFY(requestSeen);
-    const QList<QVariant> result = completed.takeFirst();
-    QVERIFY(result.at(2).toBool());
-    QVERIFY(result.at(3).toString().contains(QStringLiteral("accepted"), Qt::CaseInsensitive));
+    QVERIFY(succeeded);
+    QVERIFY(resultMessage.contains(QStringLiteral("accepted"), Qt::CaseInsensitive));
 }
 void MainWindowSmokeTest::shutdownAbortsActiveOnvifEnrichment()
 {
