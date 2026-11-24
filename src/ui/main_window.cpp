@@ -142,6 +142,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 break;
             }
         }
+        if (bulkIpv4Running_) {
+            recordOperation(tr("Bulk static IPv4"), updatedDevice.ipAddress,
+                            verified ? tr("Verified") : tr("Not verified"), message);
+            if (verified) ++bulkIpv4Succeeded_;
+            else ++bulkIpv4Failed_;
+            ++bulkIpv4Next_;
+            refreshOperationHistory();
+            updateStatus(tr("Bulk IPv4 configuration: %1 / %2 completed.")
+                             .arg(bulkIpv4Next_).arg(bulkIpv4Queue_.size()));
+            startNextBulkIpv4Configuration();
+            return;
+        }
         recordOperation(tr("Static IPv4"), updatedDevice.ipAddress,
                         verified ? tr("Verified") : tr("Not verified"), message);
         refreshOperationHistory();
