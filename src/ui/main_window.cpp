@@ -897,14 +897,16 @@ void MainWindow::buildUi()
         QStringList details;
         for (int col = 1; col < deviceTable_->columnCount(); ++col) {
             const auto *item = deviceTable_->item(row, col);
-            if (item && !item->text().isEmpty())
-                details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + item->text();
+            const QString value = item && !item->text().trimmed().isEmpty()
+                ? item->text() : tr("Not reported");
+            details << deviceTable_->horizontalHeaderItem(col)->text() + QStringLiteral(": ") + value;
         }
         const auto *ipItem = deviceTable_->item(row, 1);
         if (ipItem) {
             const auto addDetail = [&details, ipItem](int role, const QString &title) {
                 const QString value = ipItem->data(role).toString();
-                if (!value.isEmpty()) details << title + QStringLiteral(": ") + value;
+                details << title + QStringLiteral(": ") +
+                    (value.isEmpty() ? tr("Not reported") : value);
             };
             addDetail(Qt::UserRole + 1, tr("Network interface"));
             addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
@@ -918,6 +920,9 @@ void MainWindow::buildUi()
             addDetail(Qt::UserRole + 10, tr("Camera gateway"));
             addDetail(Qt::UserRole + 11, tr("Camera DNS server"));
             addDetail(Qt::UserRole + 12, tr("Camera DHCP enabled"));
+            addDetail(Qt::UserRole + 14, tr("Last reachability check"));
+            addDetail(Qt::UserRole + 15, tr("Last successful response"));
+            addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
         }
         QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
             "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
@@ -1913,6 +1918,8 @@ void MainWindow::upsertDevice(DeviceRecord device)
         keepExistingWhenEmpty(Qt::UserRole + 10, device.ipv4Gateway);
     }
     keepExistingWhenEmpty(Qt::UserRole + 11, device.ipv4DnsServer);
+    keepExistingWhenEmpty(Qt::UserRole + 14, device.reachabilityCheckedAt);
+    keepExistingWhenEmpty(Qt::UserRole + 15, device.lastSuccessfulResponseAt);
     if (networkInterfacesUpdated) {
         ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
             ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
@@ -1923,6 +1930,10 @@ void MainWindow::upsertDevice(DeviceRecord device)
             : (previousIpItem ? previousIpItem->data(Qt::UserRole + 12) : QVariant()));
     }
     ipItem->setData(Qt::UserRole + 13, device.isCandidate);
+    ipItem->setData(Qt::UserRole + 16, networkInterfacesUpdated
+        ? device.ipv4ConfigurationKnown
+        : (device.ipv4ConfigurationKnown ||
+           (previousIpItem && previousIpItem->data(Qt::UserRole + 16).toBool())));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
