@@ -64,6 +64,8 @@ private:
     QComboBox *manufacturerFilter_{nullptr};
     QComboBox *statusFilter_{nullptr};
     bool loadingInventory_{false};
+    int sortColumn_{-1};
+    bool sortAscending_{true};
     QLabel *deviceDetailsLabel_{nullptr};
     QLabel *selectedDeviceSummary_{nullptr};
     QLabel *selectedNetworkSummary_{nullptr};
