@@ -101,7 +101,8 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
     const bool hasProtocolEvidence =
         observation.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
         observation.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
-        observation.discoverySources.contains(QStringLiteral("Project UDP 9988"));
+        observation.discoverySources.contains(QStringLiteral("Project UDP 9988")) ||
+        observation.discoverySources.contains(QStringLiteral("ONVIF GetNetworkInterfaces"));
     const bool verifiedObservation = !observation.isCandidate && hasProtocolEvidence;
     if (verifiedObservation && !observation.ipAddress.trimmed().isEmpty())
         merged.ipAddress = observation.ipAddress;
