@@ -281,6 +281,59 @@ void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
     });
 }
 
+
+void DiscoveryService::factoryReset(const DeviceRecord &device, const QString &factoryDefaultType)
+{
+    const QString mode = factoryDefaultType.trimmed();
+    if (mode != QStringLiteral("Soft") && mode != QStringLiteral("Hard")) {
+        emit maintenanceOperationFinished(device, QStringLiteral("Factory reset"), false,
+            tr("Choose a supported ONVIF factory-default mode."));
+        return;
+    }
+    const DeviceAdapter *adapter = adapterRegistry_.adapterFor(device);
+    if (!adapter || !adapter->supports(DeviceOperation::FactoryReset)) {
+        emit maintenanceOperationFinished(device, QStringLiteral("Factory reset"), false,
+            tr("This camera has no verified ONVIF device-service adapter. Factory reset is unavailable."));
+        return;
+    }
+    const QUrl url(device.deviceServiceUrl);
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress)) {
+        emit maintenanceOperationFinished(device, QStringLiteral("Factory reset"), false,
+            tr("The camera device-service URL does not match its current IP address."));
+        return;
+    }
+
+    const QByteArray soap = OnvifNetworkConfig::buildSetSystemFactoryDefaultRequest(mode);
+    if (soap.isEmpty()) {
+        emit maintenanceOperationFinished(device, QStringLiteral("Factory reset"), false,
+            tr("Could not construct a valid ONVIF factory-default request."));
+        return;
+    }
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,
+                      QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(8000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    guardOnvifReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, device, mode] {
+        const QByteArray payload = reply->readAll();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool transportOk = reply->error() == QNetworkReply::NoError &&
+                                 status >= 200 && status < 300;
+        QString parseError;
+        const bool accepted = transportOk && OnvifNetworkConfig::parseSoapOperationResponse(
+            payload, QStringLiteral("SetSystemFactoryDefaultResponse"), &parseError);
+        const QString error = accepted ? QString() :
+            (parseError.isEmpty() ? reply->errorString() : parseError);
+        reply->deleteLater();
+        emit maintenanceOperationFinished(device, QStringLiteral("Factory reset"), accepted,
+            accepted
+                ? tr("The camera accepted the ONVIF %1 factory-default request. It may reboot, restore defaults and change its network settings. Rediscover it before further configuration.").arg(mode)
+                : tr("The camera did not confirm the ONVIF factory-default request: %1").arg(error));
+    });
+}
+
 void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString &address,
                                              const QString &subnetMask, const QString &gateway)
 {
