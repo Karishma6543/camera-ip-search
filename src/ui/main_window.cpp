@@ -167,7 +167,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
     });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
-        scanButton_->setText(tr("Discover devices"));
+        scanButton_->setText(tr("Discover cameras"));
         scanButton_->setEnabled(true);
         updateDeviceSummary();
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
@@ -596,7 +596,7 @@ void MainWindow::buildUi()
     connect(scanButton_, &QPushButton::clicked, this, [this] {
         if (discovery_->isRunning()) {
             discovery_->cancel();
-            scanButton_->setText(tr("Discover devices"));
+            scanButton_->setText(tr("Discover cameras"));
         } else {
             deviceTable_->setRowCount(0);
             updateDeviceSummary();
@@ -698,7 +698,7 @@ void MainWindow::buildUi()
     });
     connect(help, &QPushButton::clicked, this, [this] {
         QMessageBox::information(this, tr("Oxita Camera Device Manager — Help"),
-            tr("<b>Discover devices</b><br>Uses ONVIF WS-Discovery and the application's supported vendor discovery broadcast. "
+            tr("<b>Discover cameras</b><br>Uses ONVIF WS-Discovery and the application's supported Oxita discovery broadcast. "
                "Discovery results are not a guarantee that every camera on the network was found.<br><br>"
                "<b>Scan selected subnet</b><br>Checks candidate addresses on the selected IPv4 interface. "
                "A TCP response is reachability evidence, not proof of ONVIF compatibility or camera identity.<br><br>"
@@ -706,8 +706,7 @@ void MainWindow::buildUi()
                "Reported fields depend on the camera and its firmware.<br><br>"
                "<b>Network configuration</b><br>Static IPv4 changes require a verified ONVIF interface token and current interface details. "
                "The camera may disconnect after an address change; this operation currently has no automatic rollback.<br><br>"
-               "<b>Feature availability</b><br>Bulk camera settings, NVR channel management and firmware update are not yet implemented. "
-               "They are intentionally not presented as working controls."));
+               "<b>Supported actions</b><br>Camera information and network operations depend on the camera's ONVIF support and permissions."));
     });
     connect(settings, &QPushButton::clicked, this, [this] {
         const QString dataDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -820,7 +819,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
         tr("Review discovery identity, ONVIF service details, network interfaces and reported capabilities for the selected camera."),
-        page);
+        content);
     layout->addWidget(heading);
     layout->addWidget(description);
 
@@ -843,7 +842,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 
     auto *note = mutedLabel(
         tr("Information is device-reported and may be incomplete. An empty field means the camera did not provide that value during the latest query; it does not necessarily indicate a fault."),
-        page);
+        content);
     layout->addWidget(note);
     return page;
 }
@@ -862,7 +861,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
         tr("Actions are performed against the selected camera. Review the target address before opening its web interface or changing network settings."),
-        page));
+        content));
 
     auto *devicePanel = panel(tr("Device access & diagnostics"), content);
     auto *deviceLayout = new QVBoxLayout(devicePanel);
@@ -993,7 +992,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 
     auto *safetyNote = new QLabel(
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
-        page);
+        content);
     safetyNote->setWordWrap(true);
     safetyNote->setStyleSheet(QStringLiteral("color:#8A5B13;background:#FBF3E4;border:1px solid #F0E1BE;border-radius:7px;padding:9px;"));
     layout->addWidget(safetyNote);
@@ -1170,7 +1169,7 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
         tr("Local history of discovery, scanning, reachability, inventory and network-configuration outcomes. Credentials and ONVIF interface tokens are not intentionally recorded."),
-        page));
+        content));
     auto *actions = new QHBoxLayout();
     auto *refresh = actionButton(tr("Refresh history"), page);
     auto *exportButton = actionButton(tr("Export diagnostics"), page, true);
@@ -1195,7 +1194,7 @@ QWidget *MainWindow::makeHistoryTab(QWidget *parent)
     layout->addWidget(historyTable_, 1);
     layout->addWidget(mutedLabel(
         tr("Diagnostic exports include OS/application details, selected interface addresses and recent operation history. Review the file before sharing it."),
-        page));
+        content));
     connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshOperationHistory);
     connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
     refreshOperationHistory();
