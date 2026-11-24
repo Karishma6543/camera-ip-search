@@ -273,6 +273,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
     const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
     QVERIFY(emptyState && !emptyState->isHidden());
     QVERIFY(emptyState->text().contains(QStringLiteral("No devices match")));
