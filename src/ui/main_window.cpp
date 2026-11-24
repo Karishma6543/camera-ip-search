@@ -1331,7 +1331,7 @@ void MainWindow::exportDiagnosticBundle()
                                    QStringLiteral("application.log.2"), QStringLiteral("application.log.3")}) {
         QFile logFile(logDirectory + QLatin1Char('/') + logName);
         if (!logFile.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
-        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\\n'), Qt::SkipEmptyParts);
+        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
         stream << "--- " << logName << " ---\n";
         const int first = qMax(0, lines.size() - 250);
         for (int index = first; index < lines.size(); ++index) stream << lines.at(index) << "\n";
