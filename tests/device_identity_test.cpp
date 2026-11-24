@@ -36,7 +36,7 @@ void DeviceIdentityTest::mergesScannerCandidateWithProtocolObservation()
     onvif.macAddress = QStringLiteral("00:11:22:33:44:55");
     onvif.manufacturer = QStringLiteral("Example");
     onvif.model = QStringLiteral("Camera A");
-    onvif.discoverySources << QStringLiteral("ONVIF");
+    onvif.discoverySources << QStringLiteral("ONVIF WS-Discovery");
 
     const QString key = DeviceIdentity::findMatchingKey(inventory, onvif);
     QCOMPARE(key, candidate.ipAddress);
@@ -59,6 +59,7 @@ void DeviceIdentityTest::matchesMacAfterAddressChanges()
     DeviceRecord current;
     current.ipAddress = QStringLiteral("192.168.1.45");
     current.macAddress = previous.macAddress;
+    current.discoverySources << QStringLiteral("ONVIF WS-Discovery");
     QCOMPARE(DeviceIdentity::findMatchingKey(inventory, current), previous.ipAddress);
     const DeviceRecord merged = DeviceIdentity::mergeObservations(previous, current);
     QCOMPARE(merged.ipAddress, current.ipAddress);
