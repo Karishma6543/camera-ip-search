@@ -2389,6 +2389,11 @@ void MainWindow::applyFilters()
         deviceTable_->setRowHidden(row, !show);
         if (show) ++visible;
     }
+    const int selectedRow = selectedDeviceRow();
+    if (selectedRow >= 0 && deviceTable_->isRowHidden(selectedRow)) {
+        deviceTable_->clearSelection();
+        deviceTable_->setCurrentCell(-1, -1);
+    }
     if (deviceCountValue_) deviceCountValue_->setText(tr("%1 of %2 devices").arg(visible).arg(deviceTable_->rowCount()));
     if (inventoryEmptyState_) {
         if (deviceTable_->rowCount() == 0) {
