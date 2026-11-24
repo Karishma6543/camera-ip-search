@@ -1019,8 +1019,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         const auto answer = QMessageBox::warning(
             this, tr("Confirm inventory restore"),
             tr("Replace the current camera inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
-            QMessageBox::Restore | QMessageBox::Cancel, QMessageBox::Cancel);
-        if (answer != QMessageBox::Restore) return;
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes) return;
         QString error;
         if (!InventoryBackup::restore(inventoryDb_, path, &error)) {
             QMessageBox::critical(this, tr("Inventory restore failed"), error);
