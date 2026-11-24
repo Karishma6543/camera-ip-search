@@ -1910,22 +1910,79 @@ void MainWindow::loadInventory()
 
 void MainWindow::addManualDevice()
 {
-    bool accepted=false;
-    const QString input=QInputDialog::getText(this,tr("Add device manually"),tr("Camera IPv4 address or hostname:"),QLineEdit::Normal,QString(),&accepted).trimmed();
-    if (!accepted) return;
-    const QHostAddress address(input);
-    if (input.isEmpty() || (address.isNull() && (input.contains(QLatin1Char('/')) || input.contains(QLatin1Char(' '))))) {
-        QMessageBox::warning(this,tr("Invalid address"),tr("Enter a valid IP address or hostname."));
-        return;
-    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Add camera to inventory"));
+    dialog.setMinimumWidth(480);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *heading = new QLabel(tr("Add a device manually"), &dialog);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(
+        tr("Use this when a camera is already known on your network but was not found during discovery. Adding it does not test connectivity or verify its identity."),
+        &dialog));
+
+    auto *form = new QFormLayout();
+    form->setHorizontalSpacing(14);
+    form->setVerticalSpacing(10);
+    auto *addressEdit = new QLineEdit(&dialog);
+    addressEdit->setObjectName(QStringLiteral("manualAddress"));
+    addressEdit->setPlaceholderText(tr("192.168.1.100 or camera.local"));
+    auto *nameEdit = new QLineEdit(&dialog);
+    nameEdit->setObjectName(QStringLiteral("manualDeviceName"));
+    nameEdit->setPlaceholderText(tr("e.g. Front entrance"));
+    auto *manufacturerEdit = new QLineEdit(&dialog);
+    manufacturerEdit->setObjectName(QStringLiteral("manualManufacturer"));
+    manufacturerEdit->setPlaceholderText(tr("Optional"));
+    auto *modelEdit = new QLineEdit(&dialog);
+    modelEdit->setObjectName(QStringLiteral("manualModel"));
+    modelEdit->setPlaceholderText(tr("Optional"));
+    form->addRow(tr("IP address or hostname *"), addressEdit);
+    form->addRow(tr("Device name"), nameEdit);
+    form->addRow(tr("Manufacturer"), manufacturerEdit);
+    form->addRow(tr("Model"), modelEdit);
+    layout->addLayout(form);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    buttons->button(QDialogButtonBox::Save)->setObjectName(QStringLiteral("saveManualDeviceButton"));
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, addressEdit] {
+        const QString input = addressEdit->text().trimmed();
+        QHostAddress address;
+        const bool validIpv4 = address.setAddress(input) &&
+            address.protocol() == QAbstractSocket::IPv4Protocol &&
+            !address.isNull() && !address.isLoopback() && !address.isMulticast();
+        static const QRegularExpression hostnamePattern(
+            QStringLiteral("^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*\\.?$"));
+        const bool numericAddress = QRegularExpression(QStringLiteral("^[0-9.]+$"))
+                                        .match(input).hasMatch();
+        const bool validHostname = !numericAddress && hostnamePattern.match(input).hasMatch();
+        if (!validIpv4 && !validHostname) {
+            QMessageBox::warning(&dialog, QObject::tr("Check the device address"),
+                QObject::tr("Enter a valid IPv4 address or hostname, such as 192.168.1.100 or camera.local."));
+            addressEdit->setFocus();
+            return;
+        }
+        dialog.accept();
+    });
+    addressEdit->setFocus();
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    const QString input = addressEdit->text().trimmed();
+    QHostAddress address(input);
     DeviceRecord device;
-    device.ipAddress=address.isNull()?input:address.toString();
+    device.ipAddress = address.isNull() ? input : address.toString();
+    device.userLabel = nameEdit->text().trimmed();
+    device.manufacturer = manufacturerEdit->text().trimmed();
+    device.model = modelEdit->text().trimmed();
     device.discoverySources << QStringLiteral("Manual");
-    device.activationState=QStringLiteral("Unknown");
+    device.activationState = QStringLiteral("Unknown");
     upsertDevice(device);
-    recordOperation(tr("Manual device entry"), device.ipAddress, tr("Completed"), tr("Device added to local inventory"));
+    recordOperation(tr("Manual device entry"), device.ipAddress, tr("Completed"),
+                    tr("Manually added to the local inventory; camera identity and reachability are not verified."));
     refreshOperationHistory();
-    updateStatus(tr("Added %1 manually. No credentials were requested or stored.").arg(device.ipAddress));
+    updateStatus(tr("Added %1 to inventory. Discovery or a reachability check is still required to verify it.")
+                     .arg(device.ipAddress));
 }
 
 
@@ -1981,10 +2038,28 @@ void MainWindow::editSelectedLabel()
         return;
     }
     const QString current = deviceTable_->item(row, 2) ? deviceTable_->item(row, 2)->text() : QString();
-    bool accepted = false;
-    const QString label = QInputDialog::getText(this, tr("Rename device label"),
-        tr("Friendly device name:"), QLineEdit::Normal, current, &accepted).trimmed();
-    if (!accepted) return;
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Rename camera"));
+    dialog.setMinimumWidth(420);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *heading = new QLabel(tr("Give this camera a recognizable name"), &dialog);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(tr("This name is stored in the local inventory and does not change the camera's own configuration."), &dialog));
+    auto *form = new QFormLayout();
+    auto *nameEdit = new QLineEdit(current, &dialog);
+    nameEdit->setObjectName(QStringLiteral("deviceFriendlyName"));
+    nameEdit->setPlaceholderText(tr("e.g. Warehouse loading bay"));
+    form->addRow(tr("Device name"), nameEdit);
+    layout->addLayout(form);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    nameEdit->setFocus();
+    nameEdit->selectAll();
+    if (dialog.exec() != QDialog::Accepted) return;
+    const QString label = nameEdit->text().trimmed();
     if (deviceTable_->item(row, 2)) deviceTable_->item(row, 2)->setText(label);
     const QString ip = deviceTable_->item(row, 1) ? deviceTable_->item(row, 1)->text() : QString();
     const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
@@ -1993,10 +2068,10 @@ void MainWindow::editSelectedLabel()
         query.prepare(QStringLiteral("UPDATE devices SET user_label=:label WHERE device_key=:key"));
         query.bindValue(":label", label);
         query.bindValue(":key", !mac.isEmpty() ? mac : ip);
-        if (!query.exec()) updateStatus(tr("Could not save label: %1").arg(query.lastError().text()));
-        else updateStatus(tr("Device label saved."));
+        if (!query.exec()) updateStatus(tr("Could not save device name: %1").arg(query.lastError().text()));
+        else updateStatus(tr("Device name saved."));
     } else {
-        updateStatus(tr("Label changed for this session only; inventory database is unavailable."));
+        updateStatus(tr("Name changed for this session only; local inventory storage is unavailable."));
     }
     applyFilters();
 }
