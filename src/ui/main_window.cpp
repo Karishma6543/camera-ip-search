@@ -855,8 +855,11 @@ void MainWindow::buildUi()
                "<b>Device information</b><br>Select a device and use Refresh device info to query its reachable ONVIF device service. "
                "Reported fields depend on the camera and its firmware.<br><br>"
                "<b>Network configuration</b><br>Static IPv4 changes require a verified ONVIF interface token and current interface details. "
+               "Bulk IPv4 mode assigns a different address to each checked camera and processes them sequentially. "
                "The camera may disconnect after an address change; this operation currently has no automatic rollback.<br><br>"
-               "<b>Supported actions</b><br>Camera information and network operations depend on the camera's ONVIF support and permissions."));
+               "<b>Maintenance</b><br>Factory reset sends the ONVIF SetSystemFactoryDefault request. Soft/Hard modes are destructive and may erase settings or change the camera IP. "
+               "The camera must implement and authorize this ONVIF operation; unsupported vendor reset paths are not sent.<br><br>"
+               "<b>Supported actions</b><br>Camera information, static IPv4 and factory reset depend on the camera's ONVIF support, firmware and account permissions."));
     });
     connect(settings, &QPushButton::clicked, this, [this] {
         const QString dataDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
