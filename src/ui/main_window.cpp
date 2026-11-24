@@ -325,6 +325,7 @@ void MainWindow::buildUi()
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
+    searchEdit_->setAccessibleName(tr("Search camera inventory"));
     searchEdit_->setPlaceholderText(tr("Search devices by IP, name, MAC or model"));
     searchEdit_->setMinimumWidth(235);
     searchEdit_->setToolTip(tr("Search all inventory fields, including technical details hidden from the compact table."));
@@ -461,6 +462,8 @@ void MainWindow::buildUi()
     deviceTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->verticalHeader()->setVisible(false);
     deviceTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    deviceTable_->setAccessibleName(tr("Camera inventory table"));
+    deviceTable_->setAccessibleDescription(tr("Select a row to inspect camera details. Use the first column to include cameras in bulk operations."));
     deviceTable_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     deviceTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     deviceTable_->setAlternatingRowColors(true);
@@ -1170,7 +1173,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
                 if (addresses.contains(address)) { QMessageBox::warning(&dialog, tr("Duplicate address"), tr("Each camera must have a unique new IPv4 address.")); table->setCurrentCell(i, 1); return; }
                 addresses.insert(address);
                 for (int existingRow = 0; existingRow < deviceTable_->rowCount(); ++existingRow) {
-                    if (rows.contains(existingRow)) continue;
+                    if (existingRow == rows.at(i)) continue;
                     const auto *existing = deviceTable_->item(existingRow, 1);
                     if (existing && existing->text().trimmed() == address) { QMessageBox::warning(&dialog, tr("Address already in use"), tr("The address %1 belongs to another inventory device.").arg(address)); table->setCurrentCell(i, 1); return; }
                 }
@@ -1283,8 +1286,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         const auto *ipItem = deviceTable_->item(row, 1);
         if (!ipItem) return;
         DeviceRecord device;
-        device.ipAddress = ipItem->data(Qt::UserRole + 8).toString();
-        if (device.ipAddress.isEmpty()) device.ipAddress = ipItem->text();
+        // The device-service URL is bound to the discovered host address.
+        // The ONVIF-reported interface address is kept separately in ipv4Address.
+        device.ipAddress = ipItem->text().trimmed();
         device.networkInterfaceToken = ipItem->data(Qt::UserRole + 7).toString();
         device.onvifEndpoint = ipItem->data(Qt::UserRole + 2).toString();
         device.discoverySources = deviceTable_->item(row, 8)
