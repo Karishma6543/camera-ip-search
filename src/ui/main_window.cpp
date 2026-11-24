@@ -85,6 +85,7 @@ QGroupBox *panel(const QString &title, QWidget *parent)
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    Q_INIT_RESOURCE(oxita_branding);
     discovery_ = new DiscoveryService(this);
     subnetScanner_ = new SubnetScanner(this);
     reachabilityChecker_ = new ReachabilityChecker(this);
