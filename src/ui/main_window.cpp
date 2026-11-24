@@ -122,6 +122,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         authenticator->setPassword(password);
         updateStatus(tr("Credentials supplied for this application session; they are not saved in inventory or to disk."));
     });
+    connect(discovery_, &DiscoveryService::maintenanceOperationFinished, this,
+            [this](const DeviceRecord &device, const QString &operation, bool succeeded,
+                   const QString &message) {
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
+            button->setEnabled(true);
+        recordOperation(operation, device.ipAddress,
+                        succeeded ? tr("Accepted") : tr("Failed"), message);
+        refreshOperationHistory();
+        updateStatus(message);
+        if (succeeded) QMessageBox::information(this, tr("Camera maintenance request accepted"), message);
+        else QMessageBox::warning(this, tr("Camera maintenance failed"), message);
+    });
     connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
             [this](const DeviceRecord &updatedDevice, bool verified, const QString &message) {
         for (auto *button : findChildren<QPushButton *>()) {
@@ -908,6 +920,78 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     deviceActions->addWidget(openWebButton_, 0, 1);
     deviceLayout->addLayout(deviceActions);
     layout->addWidget(devicePanel);
+
+    auto *maintenancePanel = panel(tr("Camera maintenance"), content);
+    auto *maintenanceLayout = new QVBoxLayout(maintenancePanel);
+    maintenanceLayout->setSpacing(8);
+    maintenanceLayout->addWidget(mutedLabel(
+        tr("Factory reset is a destructive camera-side operation. It is available only when the selected device exposes a verified ONVIF device service and accepts the operation."),
+        maintenancePanel));
+    auto *factoryResetButton = actionButton(tr("Factory reset camera"), maintenancePanel);
+    factoryResetButton->setObjectName(QStringLiteral("factoryResetCameraButton"));
+    factoryResetButton->setToolTip(tr("Send an ONVIF factory-default request to the selected camera. This may erase configuration and change its IP address."));
+    maintenanceLayout->addWidget(factoryResetButton);
+    layout->addWidget(maintenancePanel);
+    connect(factoryResetButton, &QPushButton::clicked, this, [this, factoryResetButton] {
+        const int row = deviceTable_ ? deviceTable_->currentRow() : -1;
+        if (row < 0) {
+            QMessageBox::information(this, tr("Factory reset"), tr("Select one camera first."));
+            return;
+        }
+        const auto cell = [this, row](int column) {
+            const auto *item = deviceTable_->item(row, column);
+            return item ? item->text().trimmed() : QString();
+        };
+        const auto *ipItem = deviceTable_->item(row, 1);
+        DeviceRecord device;
+        device.ipAddress = cell(1);
+        device.macAddress = cell(5);
+        device.manufacturer = cell(3);
+        device.model = cell(4);
+        device.onvifEndpoint = ipItem ? ipItem->data(Qt::UserRole + 2).toString() : QString();
+        device.deviceServiceUrl = ipItem ? ipItem->data(Qt::UserRole + 3).toString() : QString();
+        device.discoverySources = cell(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        if (device.deviceServiceUrl.isEmpty() || device.ipAddress.isEmpty()) {
+            QMessageBox::warning(this, tr("Factory reset unavailable"),
+                tr("Refresh this camera first. A verified ONVIF device-service URL is required."));
+            return;
+        }
+
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Confirm camera factory reset"));
+        dialog.setMinimumWidth(470);
+        auto *form = new QFormLayout(&dialog);
+        auto *target = new QLabel(
+            tr("%1 · %2\n%3").arg(device.manufacturer.isEmpty() ? tr("Unknown manufacturer") : device.manufacturer,
+                                   device.model.isEmpty() ? tr("Unknown model") : device.model,
+                                   device.ipAddress), &dialog);
+        target->setWordWrap(true);
+        auto *mode = new QComboBox(&dialog);
+        mode->setObjectName(QStringLiteral("factoryResetMode"));
+        mode->addItem(tr("Soft — restore user configuration defaults"), QStringLiteral("Soft"));
+        mode->addItem(tr("Hard — restore factory defaults"), QStringLiteral("Hard"));
+        auto *warning = mutedLabel(
+            tr("This request is sent to the camera, not just removed from this inventory. The camera may reboot, erase users/settings, disable network services or return to a different IP address. The result depends on the camera firmware and account permissions. Make sure you have physical/network recovery access."),
+            &dialog);
+        warning->setStyleSheet(QStringLiteral("color:#8A3A32;background:#FBECEE;border:1px solid #EBC8CB;border-radius:7px;padding:10px;"));
+        form->addRow(tr("Target camera"), target);
+        form->addRow(tr("Reset mode"), mode);
+        form->addRow(warning);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Yes | QDialogButtonBox::Cancel, &dialog);
+        buttons->button(QDialogButtonBox::Yes)->setText(tr("Send factory reset"));
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog] {
+            const auto answer = QMessageBox::warning(&dialog, QObject::tr("Final confirmation"),
+                QObject::tr("This can erase the camera configuration and disconnect it from the network. Continue?"),
+                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+            if (answer == QMessageBox::Yes) dialog.accept();
+        });
+        if (dialog.exec() != QDialog::Accepted) return;
+        factoryResetButton->setEnabled(false);
+        discovery_->factoryReset(device, mode->currentData().toString());
+    });
+
 
     auto *networkPanel = panel(tr("IPv4 network configuration"), content);
     auto *networkLayout = new QVBoxLayout(networkPanel);
