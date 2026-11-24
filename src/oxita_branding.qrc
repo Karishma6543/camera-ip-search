@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/branding">
+    <file alias="oxita-logo.png">../assets/oxita-logo.png</file>
+  </qresource>
+</RCC>
