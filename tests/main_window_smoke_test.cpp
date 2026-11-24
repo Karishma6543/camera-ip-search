@@ -125,6 +125,10 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("restoreInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")));
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
 
     auto *reachability = window.findChild<QPushButton *>(QStringLiteral("reachabilityButton"));
     QTest::mouseClick(reachability, Qt::LeftButton);
@@ -252,6 +256,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(!table->isRowHidden(0));
     table->selectRow(0);
     table->setCurrentCell(0, 1);
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
     const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
     QVERIFY(deviceDetails);
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
@@ -267,6 +273,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
     table->clearSelection();
     table->setCurrentCell(-1, -1);
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
     QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
     table->selectRow(0);
     table->setCurrentCell(0, 1);
