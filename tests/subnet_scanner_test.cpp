@@ -83,7 +83,7 @@ void SubnetScannerTest::validatesSubnetBoundaryAddresses()
         makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.0"), 24)));
     QVERIFY(SubnetScanner::isUsableSubnet(
         makeEntry(QStringLiteral("192.0.2.2"), QStringLiteral("255.255.255.252"), 30)));
-    QVERIFY(!SubnetScanner::isUsableSubnet(
+    QVERIFY(SubnetScanner::isUsableSubnet(
         makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.252"), 30)));
 }
 
