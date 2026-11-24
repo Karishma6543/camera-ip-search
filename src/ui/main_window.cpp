@@ -877,12 +877,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     refreshDeviceButton_->setEnabled(false);
     openWebButton_ = actionButton(tr("Open web interface"), devicePanel);
     openWebButton_->setEnabled(false);
-    auto *reboot = actionButton(tr("Reboot selected"), devicePanel);
-    reboot->setEnabled(false);
-    reboot->setToolTip(tr("Reboot is unavailable until a verified device adapter exposes a supported reboot operation."));
     deviceActions->addWidget(refreshDeviceButton_, 0, 0);
     deviceActions->addWidget(openWebButton_, 0, 1);
-    deviceActions->addWidget(reboot, 1, 0, 1, 2);
     deviceLayout->addLayout(deviceActions);
     layout->addWidget(devicePanel);
 
@@ -901,24 +897,17 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addLayout(networkActions);
     layout->addWidget(networkPanel);
 
-    auto *firmwarePanel = panel(tr("Firmware & device maintenance"), content);
+    auto *firmwarePanel = panel(tr("Firmware information"), content);
     auto *firmwareLayout = new QVBoxLayout(firmwarePanel);
-    firmwareLayout->setSpacing(8);
-    firmwareStatusSummary_ = new QLabel(tr("Select a camera to inspect its reported firmware version."), firmwarePanel);
+    firmwareStatusSummary_ = new QLabel(
+        tr("Select a camera to inspect its reported firmware version."),
+        firmwarePanel);
     firmwareStatusSummary_->setWordWrap(true);
     firmwareStatusSummary_->setObjectName(QStringLiteral("deviceDetails"));
     firmwareLayout->addWidget(firmwareStatusSummary_);
-    auto *firmwareNote = mutedLabel(
-        tr("Firmware packages are not installed or transferred by this build. A verified vendor update adapter, package validation and recovery procedure are required before flashing can be enabled."),
-        firmwarePanel);
-    firmwareLayout->addWidget(firmwareNote);
-    auto *firmwareActions = new QHBoxLayout();
-    auto *firmwareUpdateButton = actionButton(tr("Firmware update unavailable"), firmwarePanel);
-    firmwareUpdateButton->setEnabled(false);
-    firmwareUpdateButton->setToolTip(tr("Firmware update is planned but not implemented. No firmware will be uploaded."));
-    firmwareActions->addWidget(firmwareUpdateButton);
-    firmwareActions->addStretch();
-    firmwareLayout->addLayout(firmwareActions);
+    firmwareLayout->addWidget(mutedLabel(
+        tr("This workspace displays firmware details reported by the camera. Firmware installation is not available in this release."),
+        firmwarePanel));
     layout->addWidget(firmwarePanel);
 
     auto *backupPanel = panel(tr("Inventory backup & recovery"), content);
