@@ -34,11 +34,15 @@ QString redact(QString message)
         QRegularExpression::CaseInsensitiveOption);
     message.replace(authorizationAssignment, QStringLiteral("authorization=[REDACTED]"));
     const QRegularExpression keyValue(
-        QStringLiteral(R"((password|passwd|token|credential|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
+        QStringLiteral(R"((password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+))"),
         QRegularExpression::CaseInsensitiveOption);
     message.replace(keyValue, QStringLiteral("\\1=[REDACTED]"));
+    const QRegularExpression jsonSecret(
+        QStringLiteral(R"rx(("(?:password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|credential|secret|nonce)"\s*:\s*)"[^"]*")rx"),
+        QRegularExpression::CaseInsensitiveOption);
+    message.replace(jsonSecret, QStringLiteral("\\1\\"[REDACTED]\\""));
     const QRegularExpression querySecret(
-        QStringLiteral(R"(([?&](?:password|token|access_token|api_key|secret)=)[^&#\s]*)"),
+        QStringLiteral(R"(([?&](?:password|passwd|token|access_token|refresh_token|api[_-]?key|secret)=)[^&#\s]*)"),
         QRegularExpression::CaseInsensitiveOption);
     message.replace(querySecret, QStringLiteral("\\1[REDACTED]"));
     const QRegularExpression bearer(
@@ -50,7 +54,7 @@ QString redact(QString message)
         QRegularExpression::CaseInsensitiveOption);
     message.replace(basicUrl, QStringLiteral("\\1[REDACTED]@"));
     const QRegularExpression xmlSecret(
-        QStringLiteral(R"(<(?:[A-Za-z0-9_.-]+:)?(Password|Username|Token|Nonce|BinarySecurityToken)(\s[^>]*)?>.*?</(?:[A-Za-z0-9_.-]+:)?\1>)"),
+        QStringLiteral(R"(<(?:[A-Za-z0-9_.-]+:)?(Password|Username|Token|AccessToken|Nonce|Secret|BinarySecurityToken)(\s[^>]*)?>.*?</(?:[A-Za-z0-9_.-]+:)?\1>)"),
         QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
     message.replace(xmlSecret, QStringLiteral("<REDACTED>"));
     return message.left(8192);
