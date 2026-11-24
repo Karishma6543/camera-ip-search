@@ -110,7 +110,7 @@ void AdapterRegistryTest::rejectsNullAndDuplicateAdapterIds()
 {
     AdapterRegistry registry;
     QVERIFY(!registry.registerAdapter(std::unique_ptr<DeviceAdapter>{}));
-    QVERIFY(!registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
+    QVERIFY(registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
     QVERIFY(!registry.registerAdapter(std::make_unique<TestVendorAdapter>()));
 }
 
