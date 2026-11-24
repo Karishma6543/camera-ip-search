@@ -33,6 +33,7 @@ signals:
     void deviceFound(const DeviceRecord &device);
     void statusChanged(const QString &message);
     void finished(int deviceCount);
+    void cancelled(int deviceCount);
     void authenticationRequested(QAuthenticator *authenticator);
     void networkConfigurationFinished(const DeviceRecord &device, bool verified,
                                       const QString &message);
@@ -51,6 +52,7 @@ private:
     void mergeAndEmit(DeviceRecord device);
     QString storageKeyForDevice(const DeviceRecord &device) const;
     void cancelEnrichmentRequests();
+    void guardOnvifReply(QNetworkReply *reply);
     void trackEnrichmentReply(QNetworkReply *reply);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);

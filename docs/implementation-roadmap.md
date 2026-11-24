@@ -15,7 +15,9 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Require protocol evidence before promoting a TCP-only candidate.
 - [ ] Separate application coordinator and normalized observation/error models.
 - [ ] Move all persistence out of the UI layer into a testable repository.
-- [ ] Add structured, redacted logging and diagnostic export.
+- [x] Add rotating application logs with best-effort secret redaction and regression tests.
+- [x] Add user-confirmed diagnostic export with OS/application/interface details, recent operation history and recent logs.
+- [ ] Complete broader secret-redaction review and validate support-bundle privacy on each OS.
 - [ ] Move all potentially blocking work off the GUI thread and prove responsiveness under load.
 
 ## Milestone 2 — Discovery
@@ -25,7 +27,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Basic duplicate merging and discovery provenance.
 - [x] Add unit tests for invalid interfaces, IPv4 mask/prefix mismatch and unusable /31-/32 scan ranges.
 - [x] Add cancellation for in-flight ONVIF enrichment and reject stale replies after cancellation/restart.
-- [ ] Add integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts.
+- [ ] Add end-to-end integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts.
+- [x] Add a local Contract B/ONVIF simulator and deterministic Python fixture tests; full C++ socket integration remains pending.
 - [ ] Verify broadcast/multicast behavior on Windows, macOS and Linux.
 - [ ] Test VLAN, multiple NIC, Wi-Fi/Ethernet, firewall and routed-network limitations.
 
@@ -37,7 +40,9 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Bind project discovery addresses to the UDP source except for explicitly unconfigured 0.0.0.0 responses.
 - [x] Local SQLite inventory, manual device entry, labels and CSV export.
 - [ ] Add schema-versioned migrations and database recovery tests.
-- [ ] Add UI tests for device selection, filters, import/export, persistence and empty/error states.
+- [x] Run SQLite quick_check before inventory schema changes; corrupted databases are left untouched and reported.
+- [ ] Expand UI tests for device selection, filters, import/export, persistence and empty/error states.
+- [x] Add a desktop startup smoke test for the Operation History workspace.
 - [ ] Validate inventory behavior with large device lists and repeated discovery.
 
 ## Milestone 4 — Vendor integrations
@@ -55,7 +60,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [ ] Verify ONVIF write behavior, authentication and recovery on supported physical models.
 - [ ] Add robust partial-failure/recovery handling when IP changes succeed but gateway or verification fails.
 - [ ] Define and version the project's activation/network-configuration contract before implementation.
-- [ ] Add operation audit history and per-device outcomes.
+- [x] Add local operation history for discovery, scans, reachability, manual inventory changes, exports and static-IPv4 outcomes.
+- [ ] Expand audit coverage to every request/response stage and partial failure.
 - [ ] Add batch preview/confirmation only after single-device flows are validated.
 
 ## Milestone 6 — Firmware management
@@ -66,11 +72,11 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 
 ## Milestone 7 — Production release
 - [ ] Fix and pass CI on Windows, macOS and Linux.
-- [ ] Complete unit, integration, UI and network simulation coverage (unit tests exist; service/UI/network integration coverage remains).
+- [ ] Complete unit, integration, UI and network simulation coverage (simulator fixtures and a startup smoke test now exist; full socket/service/UI coverage remains).
 - [ ] Complete model/firmware hardware validation matrix.
 - [ ] Package installers and portable builds; test install, upgrade and uninstall.
 - [ ] Sign/notarize releases where applicable and define update distribution.
-- [ ] Complete security, privacy, dependency/license and support review.
+- [ ] Complete security, privacy, dependency/license and support review using [security-and-privacy-review.md](security-and-privacy-review.md).
 - [ ] Publish supported models, known limitations, troubleshooting and release notes.
 
 ## Evidence levels

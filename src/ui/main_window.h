@@ -20,6 +20,7 @@ class MainWindow final : public QMainWindow
     Q_OBJECT
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 private:
     void buildUi();
     void populateInterfaces();
@@ -27,6 +28,10 @@ private:
     QWidget *makeBulkTab(QWidget *parent);
     QWidget *makeMaintenanceTab(QWidget *parent);
     QWidget *makeNvrTab(QWidget *parent);
+    QWidget *makeHistoryTab(QWidget *parent);
+    void recordOperation(const QString &operation, const QString &target, const QString &outcome, const QString &details);
+    void refreshOperationHistory();
+    void exportDiagnosticBundle();
     void updateStatus(const QString &message);
     void updateDeviceSummary();
     void upsertDevice(DeviceRecord device);
@@ -40,6 +45,7 @@ private:
     DiscoveryService *discovery_{nullptr};
     SubnetScanner *subnetScanner_{nullptr};
     QTableWidget *deviceTable_{nullptr};
+    QTableWidget *historyTable_{nullptr};
     QLabel *statusLabel_{nullptr};
     QLabel *summaryLabel_{nullptr};
     QLabel *deviceCountValue_{nullptr};

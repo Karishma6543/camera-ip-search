@@ -18,6 +18,14 @@ SubnetScanner::SubnetScanner(QObject *parent) : QObject(parent)
 
 bool SubnetScanner::isRunning() const { return running_; }
 
+bool SubnetScanner::appendOpenPort(DeviceRecord &device, quint16 port)
+{
+    const QString value = QString::number(port);
+    if (device.openPorts.contains(value)) return false;
+    device.openPorts.append(value);
+    return true;
+}
+
 bool SubnetScanner::isUsableSubnet(const QNetworkAddressEntry &entry)
 {
     if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
@@ -135,7 +143,7 @@ void SubnetScanner::cancel()
         if (probe.timeout) probe.timeout->deleteLater();
     }
     emit statusChanged(tr("Subnet scan cancelled."));
-    emit finished(candidates_);
+    emit cancelled(candidates_);
 }
 
 void SubnetScanner::schedule()
@@ -198,13 +206,12 @@ void SubnetScanner::completeProbe(QTcpSocket *socket, bool connected)
             candidate.model = QStringLiteral("Unverified network device");
             candidate.activationState = QStringLiteral("Unverified");
             candidate.discoverySources << QStringLiteral("Local subnet TCP scan");
-            candidate.openPorts << QString::number(port);
+            appendOpenPort(candidate, port);
             candidate.isCandidate = true;
             it = discoveredCandidates_.insert(ip, candidate);
             ++candidates_;
             emit candidateFound(it.value());
-        } else if (!it->openPorts.contains(QString::number(port))) {
-            it->openPorts << QString::number(port);
+        } else if (appendOpenPort(it.value(), port)) {
             emit candidateFound(it.value());
         }
     }

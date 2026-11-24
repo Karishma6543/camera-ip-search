@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "core/diagnostic_log.h"
 #include "core/device_identity.h"
 
 #include "discovery/discovery_service.h"
@@ -49,6 +50,10 @@
 #include <QFileInfo>
 #include <QStringConverter>
 #include <QTextStream>
+#include <QDateTime>
+#include <QSysInfo>
+#include <QSaveFile>
+#include <QRegularExpression>
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
@@ -126,9 +131,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     buildUi();
     initializeInventory();
     loadInventory();
+    refreshOperationHistory();
     populateInterfaces();
     updateLocalNetworkSummary();
-    updateStatus(tr("Ready — choose a local interface to scan your subnet."));
+    if (inventoryDb_.isOpen())
+        updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
     connect(discovery_, &DiscoveryService::authenticationRequested, this,
@@ -153,21 +160,56 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateStatus(tr("Credentials supplied for this application session; they are not saved in inventory or to disk."));
     });
     connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
-            [this](const DeviceRecord &, bool verified, const QString &message) {
+            [this](const DeviceRecord &updatedDevice, bool verified, const QString &message) {
         for (auto *button : findChildren<QPushButton *>()) {
             if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
                 button->setEnabled(true);
                 break;
             }
         }
-        QMessageBox::information(this, verified ? tr("Network configuration verified")
-                                                : tr("Network configuration result"), message);
+        recordOperation(tr("Static IPv4"), updatedDevice.ipAddress,
+                        verified ? tr("Verified") : tr("Not verified"), message);
+        refreshOperationHistory();
+        if (!verified && message.contains(QStringLiteral("gateway change was not confirmed"),
+                                             Qt::CaseInsensitive)) {
+            QMessageBox recovery(this);
+            recovery.setIcon(QMessageBox::Warning);
+            recovery.setWindowTitle(tr("IP address verified — gateway needs attention"));
+            recovery.setText(message);
+            recovery.setInformativeText(
+                tr("The camera is now recorded at %1. If the camera is no longer reachable from this computer, reconnect using the new address before attempting another change.")
+                    .arg(updatedDevice.ipAddress));
+            recovery.setDetailedText(
+                tr("Suggested recovery steps:\\n"
+                   "1. Confirm that your computer is connected to the camera's new subnet.\\n"
+                   "2. Open the camera at %1 using a browser or ONVIF client.\\n"
+                   "3. Check the IPv4 address, subnet mask and default gateway on the camera.\\n"
+                   "4. Correct the gateway manually in the camera interface if it is still incorrect.\\n"
+                   "5. Return to this application and run discovery again.\\n\\n"
+                   "The application does not automatically roll back a verified IP change.")
+                    .arg(updatedDevice.ipAddress));
+            recovery.setStandardButtons(QMessageBox::Ok);
+            recovery.exec();
+        } else {
+            QMessageBox::information(this, verified ? tr("Network configuration verified")
+                                                    : tr("Network configuration result"), message);
+        }
         updateStatus(message);
+    });
+    connect(discovery_, &DiscoveryService::cancelled, this, [this](int count) {
+        scanButton_->setText(tr("Discover devices"));
+        scanButton_->setEnabled(true);
+        recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
+                        tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
+        refreshOperationHistory();
+        updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
     });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover devices"));
         scanButton_->setEnabled(true);
         updateDeviceSummary();
+        recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
+        refreshOperationHistory();
         updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
     });
     connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
@@ -178,12 +220,36 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             updateStatus(tr("Subnet scan: %1 / %2 connection checks completed; %3 unverified candidate(s) found.")
                              .arg(completed).arg(total).arg(candidates));
     });
+    connect(subnetScanner_, &SubnetScanner::cancelled, this, [this](int count) {
+        subnetScanButton_->setText(tr("Scan selected subnet"));
+        subnetScanButton_->setEnabled(true);
+        recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
+                        tr("Cancelled"), tr("%1 unverified candidate(s) found before cancellation").arg(count));
+        refreshOperationHistory();
+        updateStatus(tr("Subnet scan cancelled — %1 unverified candidate(s) retained.").arg(count));
+    });
     connect(subnetScanner_, &SubnetScanner::finished, this, [this](int count) {
         subnetScanButton_->setText(tr("Scan selected subnet"));
         subnetScanButton_->setEnabled(true);
         updateDeviceSummary();
+        recordOperation(tr("Subnet scan"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 unverified candidate(s)").arg(count));
+        refreshOperationHistory();
         updateStatus(tr("Subnet scan finished — %1 unverified candidate(s).").arg(count));
     });
+}
+
+MainWindow::~MainWindow()
+{
+    if (discovery_) discovery_->cancel();
+    if (subnetScanner_) subnetScanner_->cancel();
+    if (reachabilityChecker_) reachabilityChecker_->cancel();
+    if (inventoryDb_.isOpen()) {
+        recordOperation(tr("Application shutdown"), QString(), tr("Completed"),
+                        tr("Active network operations were asked to cancel during shutdown"));
+        inventoryDb_.close();
+    }
+    inventoryDb_ = QSqlDatabase();
+    QSqlDatabase::removeDatabase(QStringLiteral("camera_inventory"));
 }
 
 void MainWindow::populateInterfaces()
@@ -257,15 +323,19 @@ void MainWindow::buildUi()
     auto *filterRow = new QHBoxLayout();
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
+    searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
     searchEdit_->setPlaceholderText(tr("Search by IP address, MAC, model or manufacturer"));
     searchEdit_->setMinimumWidth(250);
     searchEdit_->setClearButtonEnabled(true);
     interfaceSelector_ = new QComboBox(toolbar);
+    interfaceSelector_->setObjectName(QStringLiteral("interfaceSelector"));
     interfaceSelector_->setMinimumWidth(175);
     manufacturerFilter_ = new QComboBox(toolbar);
+    manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
     auto *vendorFilter = manufacturerFilter_;
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     statusFilter_ = new QComboBox(toolbar);
+    statusFilter_->setObjectName(QStringLiteral("statusFilter"));
     auto *statusFilter = statusFilter_;
     statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
@@ -283,17 +353,23 @@ void MainWindow::buildUi()
     auto *actionRow = new QHBoxLayout();
     actionRow->setSpacing(8);
     addDeviceButton_ = actionButton(tr("Add device"), toolbar);
+    addDeviceButton_->setObjectName(QStringLiteral("addDeviceButton"));
     actionRow->addWidget(addDeviceButton_);
     auto *exportButton = actionButton(tr("Export CSV"), toolbar);
+    exportButton->setObjectName(QStringLiteral("exportCsvButton"));
     actionRow->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename label"), toolbar);
+    renameButton->setObjectName(QStringLiteral("renameLabelButton"));
     actionRow->addWidget(renameButton);
     actionRow->addStretch();
     reachabilityButton_ = actionButton(tr("Check reachability"), toolbar);
+    reachabilityButton_->setObjectName(QStringLiteral("reachabilityButton"));
     actionRow->addWidget(reachabilityButton_);
     subnetScanButton_ = actionButton(tr("Scan selected subnet"), toolbar);
+    subnetScanButton_->setObjectName(QStringLiteral("subnetScanButton"));
     actionRow->addWidget(subnetScanButton_);
     scanButton_ = actionButton(tr("Discover devices"), toolbar, true);
+    scanButton_->setObjectName(QStringLiteral("discoverButton"));
     actionRow->addWidget(scanButton_);
     tools->addLayout(actionRow);
     root->addWidget(toolbar);
@@ -345,6 +421,7 @@ void MainWindow::buildUi()
     leftLayout->addLayout(listHeading);
 
     deviceTable_ = new QTableWidget(0, 12, left);
+    deviceTable_->setObjectName(QStringLiteral("deviceTable"));
     deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DESCRIPTION"), tr("MANUFACTURER"), tr("PRODUCT SERIES / MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("STATUS"), tr("SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
     auto *deviceHeader = deviceTable_->horizontalHeader();
     deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
@@ -378,11 +455,13 @@ void MainWindow::buildUi()
     leftLayout->addWidget(deviceTable_, 1);
 
     auto *tabs = new QTabWidget(left);
+    tabs->setObjectName(QStringLiteral("workspaceTabs"));
     tabs->setTabPosition(QTabWidget::North);
     tabs->addTab(makeInfoTab(tabs), tr("Device Info"));
     tabs->addTab(makeBulkTab(tabs), tr("Bulk Config"));
     tabs->addTab(makeMaintenanceTab(tabs), tr("Maintenance"));
     tabs->addTab(makeNvrTab(tabs), tr("NVR Channels"));
+    tabs->addTab(makeHistoryTab(tabs), tr("Operation History"));
     leftLayout->addWidget(tabs);
 
     auto *rightScroll = new QScrollArea(central);
@@ -460,6 +539,7 @@ void MainWindow::buildUi()
     root->addWidget(footer);
     setCentralWidget(central);
     statusLabel_ = new QLabel(this);
+    statusLabel_->setObjectName(QStringLiteral("applicationStatus"));
     statusBar()->addWidget(statusLabel_, 1);
 
     connect(reachabilityButton_, &QPushButton::clicked, this, [this] {
@@ -528,12 +608,15 @@ void MainWindow::buildUi()
                 }
                 break;
             }
+            recordOperation(tr("Reachability"), ip, status, tr("TCP connection check completed"));
             updateDeviceSummary();
             applyFilters();
         });
     connect(reachabilityChecker_, &ReachabilityChecker::finished, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        recordOperation(tr("Reachability batch"), QString(), tr("Completed"), tr("%1 device(s) checked").arg(checked));
+        refreshOperationHistory();
         updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
     });
     connect(reachabilityChecker_, &ReachabilityChecker::progressChanged, this,
@@ -545,6 +628,8 @@ void MainWindow::buildUi()
     connect(reachabilityChecker_, &ReachabilityChecker::cancelled, this, [this](int checked) {
         reachabilityButton_->setEnabled(true);
         reachabilityButton_->setText(tr("Check reachability"));
+        recordOperation(tr("Reachability batch"), QString(), tr("Cancelled"), tr("%1 device(s) checked before cancellation").arg(checked));
+        refreshOperationHistory();
         updateStatus(tr("Reachability check cancelled after %1 device(s).").arg(checked));
     });
     connect(scanButton_, &QPushButton::clicked, this, [this] {
@@ -639,6 +724,8 @@ void MainWindow::buildUi()
             ++exported;
         }
         file.close();
+        recordOperation(tr("Inventory export"), QFileInfo(path).fileName(), tr("Completed"), tr("%1 device(s) exported").arg(exported));
+        refreshOperationHistory();
         updateStatus(tr("Exported %1 device(s) to %2.").arg(exported).arg(QFileInfo(path).fileName()));
     });
     connect(openWebButton_, &QPushButton::clicked, this, &MainWindow::openSelectedWebInterface);
@@ -1084,10 +1171,183 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             ? deviceTable_->item(row, 8)->text().split(QStringLiteral(", "), Qt::SkipEmptyParts) : QStringList{};
         device.serialNumber = deviceTable_->item(row, 9) ? deviceTable_->item(row, 9)->text() : QString();
         device.hardwareId = deviceTable_->item(row, 10) ? deviceTable_->item(row, 10)->text() : QString();
+        recordOperation(tr("Refresh device information"), device.ipAddress, tr("Requested"), tr("ONVIF information refresh requested"));
+        refreshOperationHistory();
         discovery_->refreshDeviceInfo(device);
     });
     return page;
 }
+
+QWidget *MainWindow::makeHistoryTab(QWidget *parent)
+{
+    auto *page = new QWidget(parent);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(10);
+    auto *heading = new QLabel(tr("Recent application activity"), page);
+    heading->setObjectName(QStringLiteral("sectionTitle"));
+    layout->addWidget(heading);
+    layout->addWidget(mutedLabel(
+        tr("Local history of discovery, scanning, reachability, inventory and network-configuration outcomes. Credentials and ONVIF interface tokens are not intentionally recorded."),
+        page));
+    auto *actions = new QHBoxLayout();
+    auto *refresh = actionButton(tr("Refresh history"), page);
+    auto *exportButton = actionButton(tr("Export diagnostics"), page, true);
+    actions->addWidget(refresh);
+    actions->addWidget(exportButton);
+    actions->addStretch();
+    layout->addLayout(actions);
+    historyTable_ = new QTableWidget(0, 5, page);
+    historyTable_->setHorizontalHeaderLabels({
+        tr("TIME (UTC)"), tr("OPERATION"), tr("TARGET"), tr("RESULT"), tr("DETAILS")
+    });
+    historyTable_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    historyTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    historyTable_->verticalHeader()->setVisible(false);
+    historyTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    historyTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    historyTable_->setAlternatingRowColors(true);
+    historyTable_->setMinimumHeight(260);
+    layout->addWidget(historyTable_, 1);
+    layout->addWidget(mutedLabel(
+        tr("Diagnostic exports include OS/application details, selected interface addresses and recent operation history. Review the file before sharing it."),
+        page));
+    connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshOperationHistory);
+    connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportDiagnosticBundle);
+    refreshOperationHistory();
+    return page;
+}
+
+void MainWindow::recordOperation(const QString &operation, const QString &target,
+                                 const QString &outcome, const QString &details)
+{
+    if (!inventoryDb_.isOpen()) return;
+    const auto safe = [](QString value) {
+        return DiagnosticLog::redactSensitiveData(value).left(2000);
+    };
+    QSqlQuery query(inventoryDb_);
+    query.prepare(QStringLiteral(
+        "INSERT INTO operation_history (occurred_at,operation,target,outcome,details) "
+        "VALUES (:time,:operation,:target,:outcome,:details)"));
+    query.bindValue(":time", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    query.bindValue(":operation", safe(operation));
+    query.bindValue(":target", safe(target));
+    query.bindValue(":outcome", safe(outcome));
+    query.bindValue(":details", safe(details));
+    if (!query.exec()) {
+        updateStatus(tr("Could not record operation history: %1").arg(query.lastError().text()));
+        return;
+    }
+    QSqlQuery retention(inventoryDb_);
+    retention.exec(QStringLiteral("DELETE FROM operation_history WHERE id NOT IN (SELECT id FROM operation_history ORDER BY id DESC LIMIT 1000)"));
+}
+
+void MainWindow::refreshOperationHistory()
+{
+    if (!historyTable_ || !inventoryDb_.isOpen()) return;
+    QSqlQuery query(inventoryDb_);
+    if (!query.exec(QStringLiteral(
+        "SELECT occurred_at,operation,target,outcome,details "
+        "FROM operation_history ORDER BY id DESC LIMIT 250"))) {
+        updateStatus(tr("Could not load operation history: %1").arg(query.lastError().text()));
+        return;
+    }
+    historyTable_->setRowCount(0);
+    while (query.next()) {
+        const int row = historyTable_->rowCount();
+        historyTable_->insertRow(row);
+        for (int column = 0; column < 5; ++column) {
+            auto *item = new QTableWidgetItem(query.value(column).toString());
+            item->setToolTip(item->text());
+            historyTable_->setItem(row, column, item);
+        }
+    }
+}
+
+void MainWindow::exportDiagnosticBundle()
+{
+    if (!inventoryDb_.isOpen()) {
+        QMessageBox::warning(this, tr("Diagnostics unavailable"),
+            tr("The local inventory database is unavailable, so a support bundle cannot be created."));
+        return;
+    }
+    const auto answer = QMessageBox::warning(this, tr("Export diagnostic bundle"),
+        tr("The bundle includes OS/application details, selected interface addresses and recent operation history. "
+           "It excludes the inventory database, passwords and ONVIF interface tokens. Review the file before sharing it."),
+        QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (answer != QMessageBox::Save) return;
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Save diagnostic bundle"), QStringLiteral("oxita-diagnostics.txt"),
+        tr("Text files (*.txt)"));
+    if (path.isEmpty()) return;
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Diagnostics export failed"), file.errorString());
+        return;
+    }
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf8);
+    stream << "OXITA CAMERA DEVICE MANAGER - DIAGNOSTIC BUNDLE\n";
+    stream << "Generated UTC: " << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs) << "\n";
+    stream << "Application: " << QCoreApplication::applicationName() << " "
+           << QCoreApplication::applicationVersion() << "\n";
+    stream << "Qt: " << qVersion() << "\n";
+    stream << "OS: " << QSysInfo::prettyProductName() << " ("
+           << QSysInfo::kernelType() << " " << QSysInfo::kernelVersion() << ")\n";
+    stream << "Architecture: " << QSysInfo::currentCpuArchitecture() << "\n\n";
+    stream << "RECENT REDACTED APPLICATION LOGS\n";
+    const QString logDirectory = DiagnosticLog::directoryPath();
+    for (const QString &logName : {QStringLiteral("application.log"), QStringLiteral("application.log.1"),
+                                   QStringLiteral("application.log.2"), QStringLiteral("application.log.3")}) {
+        QFile logFile(logDirectory + QLatin1Char('/') + logName);
+        if (!logFile.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        const QStringList lines = QString::fromUtf8(logFile.readAll()).split(QLatin1Char('\\n'), Qt::SkipEmptyParts);
+        stream << "--- " << logName << " ---\n";
+        const int first = qMax(0, lines.size() - 250);
+        for (int index = first; index < lines.size(); ++index) stream << lines.at(index) << "\n";
+    }
+    stream << "\nNETWORK INTERFACES (IPv4 ONLY)\n";
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        if (!(interface.flags() & QNetworkInterface::IsUp) ||
+            (interface.flags() & QNetworkInterface::IsLoopBack)) continue;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) continue;
+            stream << "- " << interface.humanReadableName() << ": "
+                   << entry.ip().toString() << "/" << entry.prefixLength() << "\n";
+        }
+    }
+    stream << "\nINVENTORY SUMMARY\n";
+    QSqlQuery countQuery(inventoryDb_);
+    if (countQuery.exec(QStringLiteral("SELECT COUNT(*) FROM devices")) && countQuery.next())
+        stream << "Devices: " << countQuery.value(0).toInt() << "\n";
+    stream << "\nRECENT OPERATIONS (MAX 250)\n";
+    QSqlQuery history(inventoryDb_);
+    if (history.exec(QStringLiteral(
+        "SELECT occurred_at,operation,target,outcome,details "
+        "FROM operation_history ORDER BY id DESC LIMIT 250"))) {
+        while (history.next()) {
+            stream << history.value(0).toString() << " | "
+                   << history.value(1).toString() << " | "
+                   << history.value(2).toString() << " | "
+                   << history.value(3).toString() << " | "
+                   << history.value(4).toString() << "\n";
+        }
+    }
+    stream.flush();
+    if (!file.commit()) {
+        QMessageBox::warning(this, tr("Diagnostics export failed"), file.errorString());
+        return;
+    }
+    recordOperation(tr("Diagnostic export"), QFileInfo(path).fileName(), tr("Completed"),
+                    tr("Support bundle created"));
+    refreshOperationHistory();
+    QMessageBox::information(this, tr("Diagnostics exported"),
+        tr("The support bundle was saved. Review it before sharing; network addresses and operation details may be sensitive."));
+}
+
 QWidget *MainWindow::makeNvrTab(QWidget *parent)
 {
     auto *page = new QWidget(parent);
@@ -1435,26 +1695,98 @@ void MainWindow::initializeInventory()
         updateStatus(tr("Local inventory unavailable; devices remain session-only."));
         return;
     }
-    inventoryDb_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("camera_inventory"));
+
+    inventoryDb_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                             QStringLiteral("camera_inventory"));
     inventoryDb_.setDatabaseName(directory + QStringLiteral("/inventory.sqlite"));
     if (!inventoryDb_.open()) {
         updateStatus(tr("Could not open local inventory: %1").arg(inventoryDb_.lastError().text()));
         return;
     }
-    QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"))) {
-        updateStatus(tr("Could not initialize inventory: %1").arg(query.lastError().text()));
-        return;
-    }
-    QSqlQuery columnQuery(inventoryDb_);
-    if (!columnQuery.exec(QStringLiteral("PRAGMA table_info(devices)"))) {
-        updateStatus(tr("Could not inspect inventory schema: %1").arg(columnQuery.lastError().text()));
-        return;
-    }
-    QStringList existingColumns;
-    while (columnQuery.next())
-        existingColumns << columnQuery.value(1).toString();
 
+    bool integrityOk = false;
+    {
+        QSqlQuery integrityQuery(inventoryDb_);
+        integrityOk = integrityQuery.exec(QStringLiteral("PRAGMA quick_check")) &&
+                      integrityQuery.next() &&
+                      integrityQuery.value(0).toString().compare(
+                          QStringLiteral("ok"), Qt::CaseInsensitive) == 0;
+    }
+    if (!integrityOk) {
+        updateStatus(tr("Inventory database integrity check failed. The database was left untouched; close the app and preserve a copy before attempting recovery."));
+        inventoryDb_.close();
+        return;
+    }
+
+    int schemaVersion = 0;
+    QString versionError;
+    {
+        QSqlQuery versionQuery(inventoryDb_);
+        if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next())
+            versionError = versionQuery.lastError().text();
+        else
+            schemaVersion = versionQuery.value(0).toInt();
+    }
+    if (!versionError.isEmpty()) {
+        updateStatus(tr("Could not read inventory schema version: %1").arg(versionError));
+        inventoryDb_.close();
+        return;
+    }
+    if (schemaVersion > 1) {
+        updateStatus(tr("Inventory schema version %1 is newer than this application supports. The database was not modified.")
+                         .arg(schemaVersion));
+        inventoryDb_.close();
+        return;
+    }
+
+    if (!inventoryDb_.transaction()) {
+        updateStatus(tr("Could not start inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
+        inventoryDb_.close();
+        return;
+    }
+
+    const auto executeMigrationSql = [this](const QString &sql, QString *error) {
+        QSqlQuery query(inventoryDb_);
+        if (query.exec(sql)) return true;
+        if (error) *error = query.lastError().text();
+        return false;
+    };
+    const auto failMigration = [this](const QString &message) {
+        inventoryDb_.rollback();
+        inventoryDb_.close();
+        updateStatus(message);
+    };
+
+    QString sqlError;
+    const QStringList baseSchema = {
+        QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        QStringLiteral("CREATE TABLE IF NOT EXISTS operation_history (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, operation TEXT NOT NULL, target TEXT NOT NULL, outcome TEXT NOT NULL, details TEXT NOT NULL)")
+    };
+    for (const QString &sql : baseSchema) {
+        if (!executeMigrationSql(sql, &sqlError)) {
+            failMigration(tr("Could not initialize inventory tables: %1").arg(sqlError));
+            return;
+        }
+    }
+
+    QStringList existingColumns;
+    QString columnError;
+    {
+        QSqlQuery columnQuery(inventoryDb_);
+        if (!columnQuery.exec(QStringLiteral("PRAGMA table_info(devices)"))) {
+            columnError = columnQuery.lastError().text();
+        } else {
+            while (columnQuery.next())
+                existingColumns << columnQuery.value(1).toString();
+        }
+    }
+    if (!columnError.isEmpty()) {
+        failMigration(tr("Could not inspect inventory schema: %1").arg(columnError));
+        return;
+    }
+
+    // Version 1 upgrades legacy unversioned inventories idempotently. The
+    // user_version marker is committed in the same transaction as every DDL step.
     const QStringList migrations = {
         QStringLiteral("user_label|ALTER TABLE devices ADD COLUMN user_label TEXT DEFAULT ''"),
         QStringLiteral("reachability_status|ALTER TABLE devices ADD COLUMN reachability_status TEXT DEFAULT 'Not checked'"),
@@ -1475,26 +1807,38 @@ void MainWindow::initializeInventory()
         QStringLiteral("ipv4_config_known|ALTER TABLE devices ADD COLUMN ipv4_config_known INTEGER DEFAULT 0")
     };
 
-    if (!inventoryDb_.transaction()) {
-        updateStatus(tr("Could not start inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
-        return;
-    }
     for (const QString &migration : migrations) {
         const int separator = migration.indexOf(QLatin1Char('|'));
         const QString columnName = migration.left(separator);
         if (existingColumns.contains(columnName)) continue;
-        QSqlQuery alterQuery(inventoryDb_);
-        if (!alterQuery.exec(migration.mid(separator + 1))) {
-            inventoryDb_.rollback();
-            updateStatus(tr("Inventory migration failed for %1: %2")
-                             .arg(columnName, alterQuery.lastError().text()));
+        if (!executeMigrationSql(migration.mid(separator + 1), &sqlError)) {
+            failMigration(tr("Inventory migration failed for %1: %2").arg(columnName, sqlError));
             return;
         }
         existingColumns << columnName;
     }
+
+    const QStringList indexes = {
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen DESC)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_time ON operation_history(occurred_at DESC)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_target ON operation_history(target)")
+    };
+    for (const QString &sql : indexes) {
+        if (!executeMigrationSql(sql, &sqlError)) {
+            failMigration(tr("Could not create inventory index: %1").arg(sqlError));
+            return;
+        }
+    }
+
+    if (!executeMigrationSql(QStringLiteral("PRAGMA user_version = 1"), &sqlError)) {
+        failMigration(tr("Could not update inventory schema version: %1").arg(sqlError));
+        return;
+    }
     if (!inventoryDb_.commit()) {
+        const QString error = inventoryDb_.lastError().text();
         inventoryDb_.rollback();
-        updateStatus(tr("Could not commit inventory schema migration: %1").arg(inventoryDb_.lastError().text()));
+        inventoryDb_.close();
+        updateStatus(tr("Could not commit inventory schema migration: %1").arg(error));
         return;
     }
 }
@@ -1624,6 +1968,8 @@ void MainWindow::addManualDevice()
     device.discoverySources << QStringLiteral("Manual");
     device.activationState=QStringLiteral("Unknown");
     upsertDevice(device);
+    recordOperation(tr("Manual device entry"), device.ipAddress, tr("Completed"), tr("Device added to local inventory"));
+    refreshOperationHistory();
     updateStatus(tr("Added %1 manually. No credentials were requested or stored.").arg(device.ipAddress));
 }
 

@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QNetworkDatagram>
 #include <QNetworkRequest>
+#include <QSslError>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QUrl>
@@ -18,6 +19,7 @@
 namespace {
 constexpr quint16 kProjectPort = 9988;
 constexpr quint16 kOnvifPort = 3702;
+constexpr qint64 kMaxOnvifResponseBytes = 1024 * 1024;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
 
 bool isSafeDeviceServiceUrl(const QUrl &url, const QString &deviceIp)
@@ -125,7 +127,7 @@ void DiscoveryService::cancel()
         ? tr("Discovery and device enrichment cancelled.")
         : tr("Device enrichment cancelled."));
     if (wasRunning)
-        emit finished(devices_.size());
+        emit cancelled(devices_.size());
 }
 
 void DiscoveryService::addInterfaceSocket(const QNetworkInterface &interface,
@@ -244,10 +246,32 @@ void DiscoveryService::cancelEnrichmentRequests()
     }
 }
 
+void DiscoveryService::guardOnvifReply(QNetworkReply *reply)
+{
+    if (!reply) return;
+    // The reply is not consumed until finished(), so bytesAvailable() is the
+    // accumulated buffered response size. Abort as soon as it exceeds the cap.
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply] {
+        if (reply->bytesAvailable() > kMaxOnvifResponseBytes) {
+            emit statusChanged(tr("Rejected ONVIF response larger than the 1 MiB safety limit."));
+            reply->abort();
+        }
+    });
+    // Qt validates TLS certificates by default. Never override/ignore certificate
+    // errors: abort explicitly and surface a safe diagnostic for the operator.
+    connect(reply, &QNetworkReply::sslErrors, this,
+            [this, reply](const QList<QSslError> &errors) {
+        emit statusChanged(tr("TLS certificate validation failed for %1 (%2 error(s)); the ONVIF request was stopped.")
+                               .arg(reply->url().host()).arg(errors.size()));
+        reply->abort();
+    });
+}
+
 void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
 {
     if (!reply) return;
     enrichmentReplies_.append(QPointer<QNetworkReply>(reply));
+    guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         for (int index = enrichmentReplies_.size() - 1; index >= 0; --index) {
             if (enrichmentReplies_.at(index).isNull() ||
@@ -256,8 +280,6 @@ void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
         }
     });
 }
-
-
 
 void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString &address,
                                              const QString &subnetMask, const QString &gateway)
@@ -336,6 +358,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QNetworkReply *setReply = networkManager_.post(request, soap);
+    guardOnvifReply(setReply);
     const QString key = storageKeyForDevice(device);
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
@@ -374,6 +397,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
         QNetworkReply *verifyReply = networkManager_.post(verifyRequest, verifySoap);
+                guardOnvifReply(verifyReply);
         connect(verifyReply, &QNetworkReply::finished, this,
             [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl] {
                 const QByteArray payload = verifyReply->readAll();
@@ -431,6 +455,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                 gatewayRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                                             QNetworkRequest::ManualRedirectPolicy);
                 QNetworkReply *gatewayReply = networkManager_.post(gatewayRequest, gatewaySoap);
+                guardOnvifReply(gatewayReply);
                 connect(gatewayReply, &QNetworkReply::finished, this,
                     [this, gatewayReply, device, address, gateway, finishVerified] {
                         const QByteArray gatewayResponse = gatewayReply->readAll();

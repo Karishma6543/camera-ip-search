@@ -9,6 +9,9 @@ private slots:
     void rejectsInvalidInterface();
     void rejectsNetmaskPrefixMismatch();
     void rejectsPointToPointAndHostOnlySubnets();
+    void validatesSubnetBoundaryAddresses();
+    void aggregatesMultipleOpenPortsWithoutDuplicates();
+    void cancelsAnActiveSubnetScan();
 };
 
 void SubnetScannerTest::rejectsInvalidInterface()
@@ -59,6 +62,70 @@ void SubnetScannerTest::rejectsPointToPointAndHostOnlySubnets()
     validHost.setNetmask(QHostAddress(QStringLiteral("255.255.255.0")));
     validHost.setPrefixLength(24);
     QVERIFY(SubnetScanner::isUsableSubnet(validHost));
+}
+
+
+void SubnetScannerTest::validatesSubnetBoundaryAddresses()
+{
+    const auto makeEntry = [](const QString &ip, const QString &mask, int prefix) {
+        QNetworkAddressEntry entry;
+        entry.setIp(QHostAddress(ip));
+        entry.setNetmask(QHostAddress(mask));
+        entry.setPrefixLength(prefix);
+        return entry;
+    };
+
+    QVERIFY(!SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.0"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(!SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.255"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.0"), 24)));
+    QVERIFY(SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.2"), QStringLiteral("255.255.255.252"), 30)));
+    QVERIFY(SubnetScanner::isUsableSubnet(
+        makeEntry(QStringLiteral("192.0.2.1"), QStringLiteral("255.255.255.252"), 30)));
+}
+
+
+void SubnetScannerTest::aggregatesMultipleOpenPortsWithoutDuplicates()
+{
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("192.0.2.55");
+    QVERIFY(SubnetScanner::appendOpenPort(candidate, 80));
+    QVERIFY(SubnetScanner::appendOpenPort(candidate, 554));
+    QVERIFY(!SubnetScanner::appendOpenPort(candidate, 80));
+    QCOMPARE(candidate.openPorts, QStringList({QStringLiteral("80"), QStringLiteral("554")}));
+}
+
+void SubnetScannerTest::cancelsAnActiveSubnetScan()
+{
+    SubnetScanner scanner;
+    QSignalSpy cancelled(&scanner, &SubnetScanner::cancelled);
+    bool started = false;
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack))
+            continue;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                !SubnetScanner::isUsableSubnet(entry))
+                continue;
+            if (scanner.start(interface, entry)) {
+                started = true;
+                break;
+            }
+        }
+        if (started) break;
+    }
+    if (!started) QSKIP("No eligible non-loopback IPv4 subnet is available on this runner.");
+
+    QVERIFY(scanner.isRunning());
+    scanner.cancel();
+    QVERIFY(!scanner.isRunning());
+    QCOMPARE(cancelled.count(), 1);
 }
 
 QTEST_GUILESS_MAIN(SubnetScannerTest)

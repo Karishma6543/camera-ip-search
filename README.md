@@ -13,8 +13,10 @@ A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing devi
 - Enriches compatible ONVIF devices using GetDeviceInformation, GetCapabilities, GetNetworkInterfaces and GetDNS where the device responds and authentication succeeds.
 - Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded maximum of 256 host addresses; on larger subnets the window is centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
 - Checks reachability using known/common TCP ports.
-- Supports manual device entry, device labels, CSV export and local SQLite inventory persistence.
+- Supports manual device entry, device labels, CSV export and local SQLite inventory persistence. SQLite integrity is checked on startup; invalid databases are not automatically overwritten.
 - Offers a guarded ONVIF static IPv4 workflow when a matching ONVIF interface token and current device-service endpoint have been obtained. It validates input, asks for confirmation and attempts to verify the new address. There is no automatic rollback.
+- Provides a local Operation History workspace and user-confirmed diagnostics text export with recent activity and OS/application/network-interface summary.
+- Includes a local Contract B/limited ONVIF simulator for deterministic pre-production testing; see [simulator and integration testing](docs/simulator-and-integration-testing.md).
 - Keeps activation, firmware flashing, reboot, NVR, bulk provisioning and unsupported vendor operations unavailable rather than simulating success.
 
 ## Compatibility boundaries
@@ -46,6 +48,7 @@ ctest --test-dir build --build-config Debug --output-on-failure
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Security and privacy review](docs/security-and-privacy-review.md)
 - [Universal compatibility strategy](docs/universal-compatibility.md)
 - [Adapter development guide](docs/adapter-development.md)
 - [Implementation roadmap](docs/implementation-roadmap.md)

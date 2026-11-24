@@ -39,6 +39,8 @@ set(CAMERA_CORE_SOURCES
     src/core/device_identity.cpp
     src/core/diagnostic_logger.h
     src/core/diagnostic_logger.cpp
+    src/core/diagnostic_log.h
+    src/core/diagnostic_log.cpp
     src/firmware/firmware_package_validator.h
     src/firmware/firmware_package_validator.cpp
     src/discovery/discovery_service.h
@@ -105,6 +107,9 @@ if(BUILD_TESTING)
     add_camera_test(batch-operation-runner-tests tests/batch_operation_runner_test.cpp)
     add_camera_test(firmware-package-validator-tests tests/firmware_package_validator_test.cpp)
     add_camera_test(diagnostic-logger-tests tests/diagnostic_logger_test.cpp)
+    add_camera_test(diagnostic-log-tests tests/diagnostic_log_test.cpp)
+    add_camera_test(discovery-wire-integration-tests tests/discovery_wire_integration_test.cpp)
+    add_camera_test(main-window-smoke-tests tests/main_window_smoke_test.cpp)
 endif()
 
 include(GNUInstallDirs)

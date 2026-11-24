@@ -1,0 +1,53 @@
+name: PR Runner Diagnostics
+
+on:
+  pull_request:
+    branches: [release/oxita-production-ready]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-runner-diagnostics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runner-and-fixtures:
+    name: Runner + simulator tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Confirm runner started
+        shell: bash
+        run: |
+          echo "RUNNER_STARTED"
+          echo "OS=${{ runner.os }}"
+          echo "ARCH=${{ runner.arch }}"
+          echo "EVENT=${{ github.event_name }}"
+          echo "SHA=${{ github.sha }}"
+          python --version || true
+          git --version || true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Report build tools
+        shell: bash
+        run: |
+          cmake --version
+          python --version
+          git --version
+
+      - name: Run simulator fixture tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
