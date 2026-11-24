@@ -7,7 +7,6 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    Q_INIT_RESOURCE(oxita_branding);
     app.setStyle("Fusion");
     QCoreApplication::setApplicationName("Oxita Camera Device Manager");
     QCoreApplication::setApplicationVersion("0.2.0");
