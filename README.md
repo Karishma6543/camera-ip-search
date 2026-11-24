@@ -56,6 +56,7 @@ ctest --test-dir build --build-config Debug --output-on-failure
 - [Compatibility and hardware test matrix](docs/compatibility-matrix.md)
 - [Firmware communication contracts](docs/protocol-contract.md)
 - [Development setup](docs/development.md)
+- [UI/UX design system and interaction guidelines](docs/ui-ux-guidelines.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Safety and known limitations
