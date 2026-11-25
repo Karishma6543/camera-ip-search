@@ -264,7 +264,10 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
     QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
     const auto *fullProfile = window.findChild<QLabel *>(QStringLiteral("deviceDetails"));
+    const auto *firmwareSummary = window.findChild<QLabel *>(QStringLiteral("firmwareDetailsSummary"));
     QVERIFY(fullProfile);
+    QVERIFY(firmwareSummary);
+    QVERIFY(fullProfile != firmwareSummary);
     QVERIFY(fullProfile->text().contains(QStringLiteral("02:00:00:00:00:10")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("FIRMWARE")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("SERIAL NUMBER")));
