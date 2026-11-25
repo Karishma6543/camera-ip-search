@@ -10,6 +10,11 @@
 #include <QXmlStreamReader>
 
 namespace {
+constexpr int kMaximumXmlDepth = 64;
+constexpr int kMaximumXmlTokens = 10000;
+}
+
+namespace {
 QString normalizedMac(QString mac)
 {
     mac = mac.trimmed().toUpper();
@@ -132,18 +137,32 @@ bool parseOnvifProbeMatch(const QByteArray &payload, const QHostAddress &sender,
     QString endpoint;
     QString xaddrs;
     QString scopes;
+    int depth = 0;
+    int tokenCount = 0;
     while (!xml.atEnd()) {
         xml.readNext();
-        if (!xml.isStartElement()) continue;
-        const QString name = xml.name().toString();
-        if (name == QStringLiteral("Address") && endpoint.isEmpty())
-            endpoint = xml.readElementText().trimmed();
-        else if (name == QStringLiteral("XAddrs") && xaddrs.isEmpty())
-            xaddrs = xml.readElementText().trimmed();
-        else if (name == QStringLiteral("Scopes") && scopes.isEmpty())
-            scopes = xml.readElementText().trimmed();
+        if (++tokenCount > kMaximumXmlTokens || xml.isDTD() || xml.isEntityReference())
+            return false;
+
+        if (xml.isStartElement()) {
+            if (++depth > kMaximumXmlDepth) return false;
+            const QString name = xml.name().toString();
+            if (name == QStringLiteral("Address") && endpoint.isEmpty()) {
+                endpoint = xml.readElementText().trimmed();
+                --depth; // readElementText consumes the matching end element.
+            } else if (name == QStringLiteral("XAddrs") && xaddrs.isEmpty()) {
+                xaddrs = xml.readElementText().trimmed();
+                --depth;
+            } else if (name == QStringLiteral("Scopes") && scopes.isEmpty()) {
+                scopes = xml.readElementText().trimmed();
+                --depth;
+            }
+        } else if (xml.isEndElement()) {
+            if (--depth < 0) return false;
+        }
     }
-    if (xml.hasError() || (endpoint.isEmpty() && xaddrs.isEmpty())) return false;
+    if (xml.hasError() || depth != 0 || (endpoint.isEmpty() && xaddrs.isEmpty()))
+        return false;
 
     DeviceRecord parsed;
     parsed.ipAddress = sender.toString();

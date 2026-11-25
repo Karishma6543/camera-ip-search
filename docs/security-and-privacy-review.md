@@ -6,6 +6,7 @@ This is a review aid, not a security certification. Complete it against the exac
 
 - Discovery parses bounded UDP payloads and validates the documented Contract B magic, version, command, sequence and field types.
 - ONVIF XAddrs are restricted to same-host HTTP(S) URLs and reject user information, query strings and fragments.
+- ONVIF discovery XML rejects DTD/entity declarations and enforces explicit nesting-depth and token-count limits in addition to the UDP payload-size limit.
 - Device-service redirects are disabled for ONVIF requests; request timeouts are applied and all tracked ONVIF SOAP replies, including static-IPv4 configuration stages, are aborted once more than 1 MiB is buffered.
 - Device identity merging avoids merging conflicting MAC addresses.
 - Network writes require a matching ONVIF interface token and adapter-declared implemented operations.
@@ -21,6 +22,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - [x] Add automated tests for log rotation and three-archive retention.
 - [ ] Complete adversarial redaction review, including multiline credentials and malformed XML. [x] Extend regression coverage for cookie headers, Authorization variants, JSON username/API/refresh-token fields, query refresh tokens and XML AccessToken elements.
 - [ ] Perform a source-level threat review of XML entity handling, XML depth/size, JSON nesting, URL parsing, redirects, DNS rebinding and endpoint trust.
+- [x] Reject DTD/entity declarations and excessive ONVIF XML nesting; add regression tests for both cases.
 - [x] Explicitly abort ONVIF requests when Qt reports TLS certificate validation errors; no certificate errors are ignored.
 - [ ] Add cross-platform tests for trusted, expired, hostname-mismatched and self-signed certificates and verify operator guidance.
 - [ ] Implement OS credential-vault integration before offering persistent credential storage. Until then, credentials remain session-only and must not be cached in app settings or SQLite.
@@ -28,7 +30,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Review database file permissions and whether local inventory metadata is sensitive in the deployment environment.
 - [ ] Review support-bundle contents on each OS and ensure users can inspect the file before sharing.
 - [ ] Run dependency/SBOM and license review for the exact release build.
-- [ ] Run static analysis and compiler sanitizers where supported.
+- [ ] Run static analysis and compiler sanitizers where supported. An Ubuntu ASan/UBSan CI job now exercises the full CTest suite; cross-platform sanitizer and static-analysis coverage remains outstanding.
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
 - [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard (execution still awaits a functioning CI runner).
 - [ ] Verify that cancellation and shutdown abort pending sockets/replies and do not leave worker threads running.

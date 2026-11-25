@@ -17,6 +17,8 @@ private slots:
     void acceptsConfiguredIpWhenUnconfiguredCameraUsesZeroSource();
     void parsesOnvifProbeMatch();
     void rejectsMalformedOnvifXml();
+    void rejectsDtdAndEntityDeclarations();
+    void rejectsExcessivelyNestedOnvifXml();
     void selectsMatchingEndpointFromMultipleXAddrs();
     void rejectsEndpointWithEmbeddedCredentials();
 };
@@ -111,6 +113,30 @@ void DiscoveryParserTest::rejectsMalformedOnvifXml()
 {
     DeviceRecord device;
     QVERIFY(!DiscoveryParser::parseOnvifProbeMatch("<ProbeMatches>",
+        QHostAddress(QStringLiteral("192.168.1.20")), QString(), &device));
+}
+
+void DiscoveryParserTest::rejectsDtdAndEntityDeclarations()
+{
+    const QByteArray payload = R"(<?xml version="1.0"?>
+      <!DOCTYPE ProbeMatches [<!ENTITY camera "Injected Camera">]>
+      <ProbeMatches><Address>urn:uuid:test</Address>
+      <Scopes>&camera;</Scopes></ProbeMatches>)";
+    DeviceRecord device;
+    QVERIFY(!DiscoveryParser::parseOnvifProbeMatch(payload,
+        QHostAddress(QStringLiteral("192.168.1.20")), QString(), &device));
+}
+
+void DiscoveryParserTest::rejectsExcessivelyNestedOnvifXml()
+{
+    QByteArray payload("<ProbeMatches>");
+    for (int depth = 0; depth < 70; ++depth) payload += "<Nested>";
+    payload += "<Address>urn:uuid:deep</Address>";
+    for (int depth = 0; depth < 70; ++depth) payload += "</Nested>";
+    payload += "</ProbeMatches>";
+
+    DeviceRecord device;
+    QVERIFY(!DiscoveryParser::parseOnvifProbeMatch(payload,
         QHostAddress(QStringLiteral("192.168.1.20")), QString(), &device));
 }
 
