@@ -174,7 +174,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(rightWorkspace);
     QCOMPARE(workspace->orientation(), Qt::Horizontal);
     QCOMPARE(workspace->count(), 2);
-    QCOMPARE(tabs->parentWidget(), rightWorkspace->widget());
+    QCOMPARE(tabs->parentWidget(), rightWorkspace);
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
