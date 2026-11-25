@@ -361,9 +361,9 @@ void MainWindow::buildUi()
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     statusFilter_ = new QComboBox(toolbar);
     statusFilter_->setObjectName(QStringLiteral("statusFilter"));
-    statusFilter_->setAccessibleName(tr("Filter by camera status"));
+    statusFilter_->setAccessibleName(tr("Filter by reachability and activation state"));
     auto *statusFilter = statusFilter_;
-    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
+    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Offline"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("muted"));
     filterRow->addWidget(searchEdit_, 2);
@@ -2435,11 +2435,16 @@ void MainWindow::applyFilters()
         }
         const QString source = deviceTable_->item(row, 8) ? deviceTable_->item(row, 8)->text() : QString();
         const QString activation = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QString();
+        const QString manufacturer = deviceTable_->item(row, 3)
+            ? deviceTable_->item(row, 3)->text() : QString();
+        const bool isOnvif = source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive);
+        const bool isOxita = manufacturer.compare(QStringLiteral("Oxita"), Qt::CaseInsensitive) == 0 ||
+            source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive) ||
+            source.contains(QStringLiteral("Project UDP 9988"), Qt::CaseInsensitive);
         const bool vendorMatch = vendor == tr("All manufacturers") ||
-            (vendor == tr("ONVIF devices") && source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
-             !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
+            (vendor == tr("ONVIF devices") && isOnvif) ||
+            (vendor == tr("Oxita devices") && isOxita) ||
+            (vendor == tr("Other / unknown") && !isOnvif && !isOxita);
         const QString reachability = deviceTable_->item(row, 11) ? deviceTable_->item(row, 11)->text() : QStringLiteral("Not checked");
         const QString classifiedType = deviceTable_->item(row, 1)
             ? deviceTable_->item(row, 1)->data(Qt::UserRole + 17).toString()
@@ -2447,6 +2452,7 @@ void MainWindow::applyFilters()
         const bool typeMatch = deviceType == QStringLiteral("all") || classifiedType == deviceType;
         const bool statusMatch = status == tr("All statuses") ||
             (status == tr("Online") && reachability == QStringLiteral("Reachable")) ||
+            (status == tr("Offline") && reachability == QStringLiteral("Unreachable")) ||
             (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
             (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
         const bool show = textMatch && vendorMatch && typeMatch && statusMatch;
