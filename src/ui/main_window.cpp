@@ -990,7 +990,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
     localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
     networkLayout->addWidget(localNetworkSummary_);
-    networkPageLayout->addWidget(networkPanel);
+    layout->addWidget(networkPanel);
 
     auto *identityPanel = new QFrame(content);
     identityPanel->setObjectName(QStringLiteral("metricCard"));
@@ -1175,7 +1175,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkActions->addWidget(previewNetworkButton, 0, 0);
     networkActions->addWidget(applyNetworkButton, 0, 1);
     networkLayout->addLayout(networkActions);
-    layout->addWidget(networkPanel);
+    networkPageLayout->addWidget(networkPanel);
 
     auto *bulkPanel = panel(tr("Bulk IPv4 configuration"), networkContent);
     auto *bulkLayout = new QVBoxLayout(bulkPanel);
