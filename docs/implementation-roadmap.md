@@ -25,7 +25,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 ## Milestone 2 — Discovery
 - [x] ONVIF WS-Discovery probe and ProbeMatch parser.
 - [x] Project UDP 9988 Contract B discovery codec.
-- [x] Bounded opt-in IPv4 TCP candidate scanner (maximum 256 host addresses) across common camera, management, printer and computer ports.
+- [x] Opt-in IPv4 TCP candidate scanner across common camera, management, printer and computer ports; user can choose full scans up to 4096 hosts or a 256-address window on larger subnets.
+- [x] Allow ONVIF, Oxita and SSDP discovery across all active IPv4 interfaces or one selected interface.
 - [x] SSDP/UPnP M-SEARCH discovery with bounded response parsing; LOCATION URLs are not fetched.
 - [x] Basic duplicate merging and discovery provenance.
 - [x] Add unit tests for invalid interfaces, IPv4 mask/prefix mismatch and unusable /31-/32 scan ranges.
