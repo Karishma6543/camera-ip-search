@@ -281,6 +281,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(table && search && vendor && statusFilter && deviceTypeFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
+    QCOMPARE(table->item(0, 11)->text(), QStringLiteral("Stale"));
     table->selectRow(0);
     table->setCurrentCell(0, 1);
     // A saved ONVIF source label is not proof of a currently reachable service
@@ -302,6 +303,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last seen (UTC)")));
     QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
     table->clearSelection();
     table->setCurrentCell(-1, -1);
@@ -332,6 +334,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     vendor->setCurrentText(QStringLiteral("ONVIF devices"));
     QVERIFY(!table->isRowHidden(0));
 
+    statusFilter->setCurrentText(QStringLiteral("Stale"));
+    QVERIFY(!table->isRowHidden(0));
     statusFilter->setCurrentText(QStringLiteral("Not activated"));
     QVERIFY(table->isRowHidden(0));
     statusFilter->setCurrentText(QStringLiteral("Activated"));
