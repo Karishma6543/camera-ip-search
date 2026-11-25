@@ -52,6 +52,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/discovery_service.cpp
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
+    src/discovery/ssdp_parser.h
+    src/discovery/ssdp_parser.cpp
     src/discovery/onvif_network_config.h
     src/discovery/onvif_network_config.cpp
     src/discovery/subnet_scanner.h
@@ -97,6 +99,7 @@ if(BUILD_TESTING)
     endfunction()
 
     add_camera_test(discovery-parser-tests tests/discovery_parser_test.cpp)
+    add_camera_test(ssdp-parser-tests tests/ssdp_parser_test.cpp)
     add_camera_test(adapter-registry-tests tests/adapter_registry_test.cpp)
     add_camera_test(onvif-network-config-tests tests/onvif_network_config_test.cpp)
     add_camera_test(network-config-validator-tests tests/network_config_validator_test.cpp)
