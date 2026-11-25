@@ -88,6 +88,35 @@ QGroupBox *panel(const QString &title, QWidget *parent)
     box->setObjectName(QStringLiteral("actionPanel"));
     return box;
 }
+
+QString reservedIpv4Reason(const QString &candidate, const QTableWidget *table,
+                           int excludedRow)
+{
+    QHostAddress parsed;
+    if (!parsed.setAddress(candidate.trimmed()) ||
+        parsed.protocol() != QAbstractSocket::IPv4Protocol)
+        return {};
+    const QString normalized = parsed.toString();
+    if (table) {
+        for (int row = 0; row < table->rowCount(); ++row) {
+            if (row == excludedRow) continue;
+            const auto *ipItem = table->item(row, 1);
+            if (ipItem && QHostAddress(ipItem->text()).toString() == normalized)
+                return QObject::tr("Address %1 is already assigned to another inventory device.").arg(normalized);
+            if (ipItem && QHostAddress(ipItem->data(Qt::UserRole + 10).toString()).toString() == normalized)
+                return QObject::tr("Address %1 is reported as another device's default gateway.").arg(normalized);
+        }
+    }
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                entry.ip().toString() == normalized)
+                return QObject::tr("Address %1 is already assigned to this computer's %2 interface.")
+                    .arg(normalized, interface.humanReadableName());
+        }
+    }
+    return {};
+}
 }
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
@@ -1225,12 +1254,18 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
                 if (!NetworkConfigValidator::validateStaticIpv4(address, mask, gateway, QString(), &error)) {
                     QMessageBox::warning(&dialog, tr("Invalid IPv4 assignment"), error); table->setCurrentCell(i, 1); return;
                 }
+                if (address == targets.at(i).device.ipAddress) {
+                    QMessageBox::warning(&dialog, tr("No IP change"), tr("Enter a new address for camera %1.").arg(address));
+                    table->setCurrentCell(i, 1);
+                    return;
+                }
                 if (addresses.contains(address)) { QMessageBox::warning(&dialog, tr("Duplicate address"), tr("Each camera must have a unique new IPv4 address.")); table->setCurrentCell(i, 1); return; }
                 addresses.insert(address);
-                for (int existingRow = 0; existingRow < deviceTable_->rowCount(); ++existingRow) {
-                    if (existingRow == rows.at(i)) continue;
-                    const auto *existing = deviceTable_->item(existingRow, 1);
-                    if (existing && existing->text().trimmed() == address) { QMessageBox::warning(&dialog, tr("Address already in use"), tr("The address %1 belongs to another inventory device.").arg(address)); table->setCurrentCell(i, 1); return; }
+                const QString reservation = reservedIpv4Reason(address, deviceTable_, rows.at(i));
+                if (!reservation.isEmpty()) {
+                    QMessageBox::warning(&dialog, tr("Address is already reserved"), reservation);
+                    table->setCurrentCell(i, 1);
+                    return;
                 }
                 targets[i].address = address; targets[i].subnetMask = mask; targets[i].gateway = gateway;
             }
@@ -1398,6 +1433,11 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             }
             if (address->text().trimmed() == device.ipAddress) {
                 QMessageBox::information(&dialog, tr("No IP change"), tr("The new address is the same as the current address."));
+                return;
+            }
+            const QString reservation = reservedIpv4Reason(address->text(), deviceTable_, row);
+            if (!reservation.isEmpty()) {
+                QMessageBox::warning(&dialog, tr("Address is already reserved"), reservation);
                 return;
             }
             const auto answer = QMessageBox::warning(&dialog, tr("Confirm camera IP change"),
