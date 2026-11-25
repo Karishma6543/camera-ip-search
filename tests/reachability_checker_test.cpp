@@ -93,7 +93,9 @@ void ReachabilityCheckerTest::reportsFailedTcpProbesAsUnreachable()
     ReachabilityChecker checker;
     QSignalSpy checked(&checker, &ReachabilityChecker::deviceChecked);
     DeviceRecord device;
-    device.ipAddress = QStringLiteral("127.0.0.1");
+    // Use a documentation-only TEST-NET address. Loopback can have unrelated
+    // services listening on common camera ports, which would make this test flaky.
+    device.ipAddress = QStringLiteral("192.0.2.10");
     device.openPorts << QString::number(unusedPort);
     checker.start(QVector<DeviceRecord>{device});
     QTRY_COMPARE_WITH_TIMEOUT(checked.count(), 1, 5000);
