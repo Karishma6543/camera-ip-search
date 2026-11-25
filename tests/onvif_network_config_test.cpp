@@ -152,7 +152,7 @@ void OnvifNetworkConfigTest::parsesSpecStylePluralInterfacesAndVerifiesSelectedT
     const QByteArray xml = R"(<s:Envelope xmlns:s="soap" xmlns:tds="device" xmlns:tt="schema">
       <s:Body><tds:GetNetworkInterfacesResponse>
         <tds:NetworkInterfaces token="eth0"><tt:Info><tt:Name>LAN</tt:Name><tt:HwAddress>AA:BB:CC:DD:EE:FF</tt:HwAddress></tt:Info>
-          <tt:IPv4><tt:Config><tt:DHCP>false</tt:DHCP><tt:Manual><tt:Address>192.168.1.20</tt:Address><tt:PrefixLength>24</tt:PrefixLength></tt:Manual></tt:Config></tt:IPv4>
+          <tt:IPv4><tt:Config><tt:DHCP><tt:Enabled>false</tt:Enabled></tt:DHCP><tt:Manual><tt:Address>192.168.1.20</tt:Address><tt:PrefixLength>24</tt:PrefixLength></tt:Manual></tt:Config></tt:IPv4>
         </tds:NetworkInterfaces>
         <tds:NetworkInterfaces token="eth1"><tt:Info><tt:Name>WAN</tt:Name></tt:Info>
           <tt:IPv4><tt:Config><tt:DHCP>true</tt:DHCP><tt:FromDHCP><tt:Address>10.0.0.8</tt:Address><tt:PrefixLength>24</tt:PrefixLength></tt:FromDHCP></tt:Config></tt:IPv4>
