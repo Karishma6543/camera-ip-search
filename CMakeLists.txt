@@ -88,6 +88,10 @@ else()
 endif()
 
 qt_add_executable(camera-ip-search src/main.cpp)
+if(APPLE)
+    # macdeployqt expects a real .app bundle, not a loose installed executable.
+    set_target_properties(camera-ip-search PROPERTIES MACOSX_BUNDLE TRUE)
+endif()
 target_link_libraries(camera-ip-search PRIVATE camera-core)
 
 if(BUILD_TESTING)
