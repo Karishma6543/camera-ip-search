@@ -105,8 +105,8 @@ void DiscoveryService::start(const QString &interfaceName)
     }
 
     emit statusChanged(interfaceName.isEmpty()
-        ? tr("Sending ONVIF, SSDP/UPnP and project-camera discovery probes on %1 interface address(es)…").arg(sockets_.size())
-        : tr("Sending ONVIF, SSDP/UPnP and project-camera discovery probes on the selected interface (%1 address(es))…").arg(sockets_.size()));
+        ? tr("Sending ONVIF and project-camera discovery probes (including SSDP/UPnP) on %1 interface address(es)…").arg(sockets_.size())
+        : tr("Sending ONVIF and project-camera discovery probes (including SSDP/UPnP) on the selected interface (%1 address(es))…").arg(sockets_.size()));
     for (auto &entry : sockets_) {
         sendOnvifProbe(entry);
         sendProjectProbe(entry);
