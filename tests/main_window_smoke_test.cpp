@@ -160,6 +160,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(!table->isColumnHidden(4));
     QVERIFY(!table->isColumnHidden(7));
     QVERIFY(!table->isColumnHidden(11));
+    QVERIFY(!table->isColumnHidden(12));
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
