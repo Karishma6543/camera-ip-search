@@ -27,6 +27,8 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTabWidget>
+#include <QTabBar>
+#include <QStackedWidget>
 #include <QTableWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -546,16 +548,25 @@ void MainWindow::buildUi()
     inventoryEmptyState_->setMinimumHeight(88);
     leftLayout->addWidget(inventoryEmptyState_);
 
-    auto *tabs = new QTabWidget(left);
-    tabs->setObjectName(QStringLiteral("workspaceTabs"));
-    tabs->setTabPosition(QTabWidget::North);
-    tabs->setDocumentMode(true);
-    tabs->setUsesScrollButtons(true);
-    tabs->addTab(makeInfoTab(tabs), tr("Details"));
-    tabs->addTab(makeMaintenanceTab(tabs), tr("Configure"));
-    tabs->addTab(makeHistoryTab(tabs), tr("History"));
-
     leftLayout->addWidget(deviceTable_, 1);
+
+    auto *workspaceNavigation = new QFrame(central);
+    workspaceNavigation->setObjectName(QStringLiteral("workspaceNavigation"));
+    auto *navigationLayout = new QHBoxLayout(workspaceNavigation);
+    navigationLayout->setContentsMargins(10, 3, 10, 3);
+    navigationLayout->setSpacing(4);
+    auto *workspaceTabs = new QTabBar(workspaceNavigation);
+    workspaceTabs->setObjectName(QStringLiteral("workspaceTabs"));
+    workspaceTabs->setDocumentMode(true);
+    workspaceTabs->setExpanding(false);
+    workspaceTabs->setUsesScrollButtons(true);
+    workspaceTabs->setDrawBase(false);
+    workspaceTabs->addTab(tr("Device Info"));
+    workspaceTabs->addTab(tr("Configuration"));
+    workspaceTabs->addTab(tr("Operation History"));
+    navigationLayout->addWidget(workspaceTabs);
+    navigationLayout->addStretch();
+    root->addWidget(workspaceNavigation);
 
     auto *rightWorkspace = new QFrame(central);
     rightWorkspace->setObjectName(QStringLiteral("rightWorkspacePanel"));
@@ -564,7 +575,17 @@ void MainWindow::buildUi()
     auto *rightLayout = new QVBoxLayout(rightWorkspace);
     rightLayout->setContentsMargins(6, 6, 6, 6);
     rightLayout->setSpacing(8);
-    rightLayout->addWidget(tabs, 1);
+    auto *workspacePages = new QStackedWidget(rightWorkspace);
+    workspacePages->setObjectName(QStringLiteral("workspacePages"));
+    workspacePages->addWidget(makeInfoTab(workspacePages));
+    workspacePages->addWidget(makeMaintenanceTab(workspacePages));
+    workspacePages->addWidget(makeHistoryTab(workspacePages));
+    rightLayout->addWidget(workspacePages, 1);
+    connect(workspaceTabs, &QTabBar::currentChanged,
+            workspacePages, &QStackedWidget::setCurrentIndex);
+    connect(workspacePages, &QStackedWidget::currentChanged,
+            workspaceTabs, &QTabBar::setCurrentIndex);
+    workspaceTabs->setCurrentIndex(0);
 
     auto *mainWorkspace = new QSplitter(Qt::Horizontal, central);
     mainWorkspace->setObjectName(QStringLiteral("mainWorkspaceSplitter"));

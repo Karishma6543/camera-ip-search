@@ -66,11 +66,11 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QStandardPaths::setTestModeEnabled(true);
     MainWindow window;
     QVERIFY(!window.windowTitle().isEmpty());
-    const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
+    const auto tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
-        if (tabs->tabText(index) == QStringLiteral("History")) {
+        if (tabs->tabText(index) == QStringLiteral("Operation History")) {
             historyFound = true;
             break;
         }
@@ -97,7 +97,7 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
 {
     QStandardPaths::setTestModeEnabled(true);
     MainWindow window;
-    const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
+    const auto tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
         QStringLiteral("Details"), QStringLiteral("Configure"),
@@ -172,7 +172,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
-    auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
+    auto *tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     auto *workspace = window.findChild<QSplitter *>(QStringLiteral("mainWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
     auto *rightWorkspace = window.findChild<QWidget *>(QStringLiteral("rightWorkspacePanel"));
