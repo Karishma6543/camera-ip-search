@@ -2,7 +2,7 @@
 
 A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing device/network information and performing a limited set of explicitly supported operations.
 
-**Release status:** Pre-production. The latest `main` CI run (#605, commit `47b99f2`) passed the Release build and CTest suite on Windows, Ubuntu and macOS. Physical-camera interoperability, model-specific compatibility evidence, security review and signed distribution packaging are still release gates. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
+**Release status:** Pre-production. The cross-platform CI workflow builds and runs the automated test suite on Windows, Ubuntu and macOS. Check the repository Actions page for the result associated with the exact commit you intend to release. Physical-camera interoperability, model-specific compatibility evidence, security review and signed distribution packaging are still release gates. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
 
 
 > Network discovery and device-type evidence, confidence levels, filter behavior and known limitations are documented in [Network device discovery and classification](docs/network-device-discovery-and-classification.md).
@@ -13,7 +13,7 @@ A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing devi
 - Sends the project's Contract B discovery probe (UDP 9988) for Oxita firmware only.
 - Parses bounded ONVIF ProbeMatch XML and project JSON responses, including sequence/type checks, same-host endpoint validation and source-IP consistency checks.
 - Enriches compatible ONVIF devices using GetDeviceInformation, GetCapabilities, GetNetworkInterfaces and GetDNS where the device responds and authentication succeeds.
-- Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded maximum of 256 host addresses; on larger subnets the window is centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
+- Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded range: full scans are available up to 4096 hosts; larger subnets use a 256-address window centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
 - Checks reachability using known/common TCP ports.
 - Supports manual device entry, device labels, CSV export and local SQLite inventory persistence. SQLite integrity is checked on startup; invalid databases are not automatically overwritten.
 - Offers guarded single-camera and sequential bulk ONVIF static IPv4 workflows when matching ONVIF interface tokens and current device-service endpoints have been obtained. Bulk mode requires per-camera unique addresses, validates and confirms the full assignment list, applies changes one camera at a time and records each verification result. There is no automatic rollback.
@@ -52,6 +52,8 @@ ctest --test-dir build --build-config Debug --output-on-failure
 
 - [Architecture](docs/architecture.md)
 - [Security and privacy review](docs/security-and-privacy-review.md)
+- [Credential-storage design and implementation gate](docs/credential-storage.md)
+- [Release engineering and packaging](docs/release-engineering.md)
 - [Universal compatibility strategy](docs/universal-compatibility.md)
 - [Adapter development guide](docs/adapter-development.md)
 - [Implementation roadmap](docs/implementation-roadmap.md)
