@@ -163,6 +163,8 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
         merged.reachabilityCheckedAt = observation.reachabilityCheckedAt;
     if (merged.lastSuccessfulResponseAt.isEmpty())
         merged.lastSuccessfulResponseAt = observation.lastSuccessfulResponseAt;
+    if (!observation.lastSeenAt.isEmpty())
+        merged.lastSeenAt = observation.lastSeenAt;
 
     appendUnique(merged.discoverySources, observation.discoverySources);
     if (observation.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
