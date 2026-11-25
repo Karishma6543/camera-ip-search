@@ -1,6 +1,7 @@
 #include "ssdp_parser.h"
 
 #include <QHash>
+#include <QRegularExpression>
 
 bool SsdpParser::parseResponse(const QByteArray &payload,
                                const QHostAddress &sender,
