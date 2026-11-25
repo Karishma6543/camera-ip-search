@@ -185,12 +185,12 @@ void DiscoveryService::sendSsdpProbe(InterfaceSocket &entry)
     if (!entry.socket) return;
     entry.socket->setMulticastInterface(entry.interface);
     const QByteArray probe = QByteArrayLiteral(
-        "M-SEARCH * HTTP/1.1\\r\\n"
-        "HOST: 239.255.255.250:1900\\r\\n"
-        "MAN: \\"ssdp:discover\\"\\r\\n"
-        "MX: 2\\r\\n"
-        "ST: ssdp:all\\r\\n"
-        "USER-AGENT: Oxita-Camera-Device-Manager/1.0 UPnP/1.1\\r\\n\\r\\n");
+        "M-SEARCH * HTTP/1.1\r\n"
+        "HOST: 239.255.255.250:1900\r\n"
+        "MAN: \"ssdp:discover\"\r\n"
+        "MX: 2\r\n"
+        "ST: ssdp:all\r\n"
+        "USER-AGENT: Oxita-Camera-Device-Manager/1.0 UPnP/1.1\r\n\r\n");
     entry.socket->writeDatagram(probe, kOnvifGroup, kSsdpPort);
 }
 
