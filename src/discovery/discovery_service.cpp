@@ -2,6 +2,7 @@
 #include "core/device_identity.h"
 #include "onvif_network_config.h"
 #include "discovery_parser.h"
+#include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
 
 #include <QNetworkAddressEntry>
@@ -19,6 +20,7 @@
 namespace {
 constexpr quint16 kProjectPort = 9988;
 constexpr quint16 kOnvifPort = 3702;
+constexpr quint16 kSsdpPort = 1900;
 constexpr qint64 kMaxOnvifResponseBytes = 1024 * 1024;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
 
@@ -103,11 +105,12 @@ void DiscoveryService::start(const QString &interfaceName)
     }
 
     emit statusChanged(interfaceName.isEmpty()
-        ? tr("Sending ONVIF and project-camera discovery probes on %1 interface address(es)…").arg(sockets_.size())
-        : tr("Sending ONVIF and project-camera discovery probes on the selected interface (%1 address(es))…").arg(sockets_.size()));
+        ? tr("Sending ONVIF, SSDP/UPnP and project-camera discovery probes on %1 interface address(es)…").arg(sockets_.size())
+        : tr("Sending ONVIF, SSDP/UPnP and project-camera discovery probes on the selected interface (%1 address(es))…").arg(sockets_.size()));
     for (auto &entry : sockets_) {
         sendOnvifProbe(entry);
         sendProjectProbe(entry);
+        sendSsdpProbe(entry);
     }
     timeout_.start();
 }
@@ -177,6 +180,20 @@ void DiscoveryService::sendProjectProbe(InterfaceSocket &entry)
                                 QHostAddress::Broadcast, kProjectPort);
 }
 
+void DiscoveryService::sendSsdpProbe(InterfaceSocket &entry)
+{
+    if (!entry.socket) return;
+    entry.socket->setMulticastInterface(entry.interface);
+    const QByteArray probe = QByteArrayLiteral(
+        "M-SEARCH * HTTP/1.1\\r\\n"
+        "HOST: 239.255.255.250:1900\\r\\n"
+        "MAN: \\"ssdp:discover\\"\\r\\n"
+        "MX: 2\\r\\n"
+        "ST: ssdp:all\\r\\n"
+        "USER-AGENT: Oxita-Camera-Device-Manager/1.0 UPnP/1.1\\r\\n\\r\\n");
+    entry.socket->writeDatagram(probe, kOnvifGroup, kSsdpPort);
+}
+
 void DiscoveryService::processDatagram(QUdpSocket *socket)
 {
     while (socket->hasPendingDatagrams()) {
@@ -194,6 +211,11 @@ void DiscoveryService::processDatagram(QUdpSocket *socket)
                 mergeAndEmit(device);
         } else if (payload.contains("ProbeMatches") || payload.contains("ProbeMatch")) {
             if (DiscoveryParser::parseOnvifProbeMatch(payload, sender,
+                    it->interface.humanReadableName(), &device))
+                mergeAndEmit(device);
+        } else if (payload.startsWith("HTTP/1.1 200") ||
+                   payload.startsWith("HTTP/1.0 200")) {
+            if (SsdpParser::parseResponse(payload, sender,
                     it->interface.humanReadableName(), &device))
                 mergeAndEmit(device);
         }
