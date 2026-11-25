@@ -21,11 +21,10 @@ Use red with restraint. Do not use it for every button, every icon, or large pag
 ## Page hierarchy
 
 1. **Brand header:** Oxita logo and product name, with Help and Settings as secondary actions.
-2. **Discovery toolbar:** search, network interface, manufacturer/status filters and a clearly dominant Discover cameras action.
-3. **At-a-glance metrics:** discovered, reachable, ONVIF verified and needs-review counts.
-4. **Primary inventory:** a compact, readable camera table with the most useful fields visible without horizontal scrolling at the standard desktop size.
-5. **Context panel:** selected-device overview and the local network context.
-6. **Workspaces:** device details, device actions and operation history. Unimplemented workflows must not be presented as active workspaces.
+2. **Discovery toolbar:** search, network interface and filters, with one clearly dominant Discover cameras action.
+3. **Primary inventory:** the device table owns the main workspace; the default columns prioritize IP, friendly name, manufacturer/model and state.
+4. **Context workspace:** Details, Configure and History live together in a compact right-hand tabbed panel beside the inventory. Selected-device and local-network context belong inside Details, not in a second competing sidebar.
+5. **Progress and feedback:** operation progress and status stay in the footer/status bar rather than creating extra dashboard panels.
 
 Technical identifiers such as MAC, firmware, discovery source, serial and hardware ID remain searchable and available in device details/export, but should not crowd the default inventory table.
 
@@ -79,3 +78,8 @@ Backup/restore, diagnostics export, settings storage details, Help, operation hi
 - Complete keyboard-only and screen-reader review, including focus order in dialogs and the table's column menu.
 - Add automated tests for column visibility, sorting, long-value wrapping, all dialog validation paths and partial failures in a multi-camera batch.
 - Add a guided first-run walkthrough and a focused troubleshooting surface.
+
+
+## Workspace redesign (2026-11)
+
+The inventory is the primary full-height work area. Device details, local-network context, configuration actions and operation history are grouped in a single right-hand tabbed inspector. The redundant metric-card row and stacked lower workspace have been removed to reduce vertical competition. The inspector and inventory are separated by a draggable horizontal splitter. The dark Oxita palette uses graphite/navy surfaces, readable neutral text and a restrained Oxita-red action/focus accent. Existing device-capability gates and safety confirmations remain authoritative.

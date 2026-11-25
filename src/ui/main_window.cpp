@@ -317,7 +317,7 @@ void MainWindow::populateInterfaces()
 void MainWindow::buildUi()
 {
     setWindowTitle(tr("Oxita | Camera Device Manager"));
-    setMinimumSize(1100, 700);
+    setMinimumSize(1100, 680);
     resize(1440, 900);
 
     setStyleSheet(OxitaTheme::styleSheet());
@@ -443,38 +443,11 @@ void MainWindow::buildUi()
     tools->addLayout(actionRow);
     root->addWidget(toolbar);
 
-    // At-a-glance inventory metrics keep the dashboard useful before and after discovery.
-    auto *metricsRow = new QHBoxLayout();
-    metricsRow->setSpacing(10);
-    const auto addMetricCard = [central, metricsRow](const QString &caption, QLabel **valueLabel) {
-        auto *card = new QFrame(central);
-        card->setObjectName(QStringLiteral("metricCard"));
-        auto *layout = new QVBoxLayout(card);
-        layout->setContentsMargins(15, 11, 15, 12);
-        layout->setSpacing(4);
-        auto *eyebrow = new QLabel(caption, card);
-        eyebrow->setObjectName(QStringLiteral("eyebrow"));
-        auto *value = new QLabel(QStringLiteral("0"), card);
-        value->setObjectName(QStringLiteral("metric"));
-        layout->addWidget(eyebrow);
-        layout->addWidget(value);
-        metricsRow->addWidget(card, 1);
-        *valueLabel = value;
-    };
-    addMetricCard(tr("DISCOVERED DEVICES"), &discoveredMetric_);
-    addMetricCard(tr("REACHABLE"), &reachableMetric_);
-    addMetricCard(tr("ONVIF VERIFIED"), &verifiedMetric_);
-    addMetricCard(tr("NEEDS REVIEW"), &unverifiedMetric_);
-    root->addLayout(metricsRow);
-
-    auto *mainRow = new QHBoxLayout();
-    mainRow->setSpacing(12);
-
     auto *left = new QFrame(central);
     left->setObjectName(QStringLiteral("surface"));
     auto *leftLayout = new QVBoxLayout(left);
-    leftLayout->setContentsMargins(14, 13, 14, 14);
-    leftLayout->setSpacing(10);
+    leftLayout->setContentsMargins(12, 11, 12, 12);
+    leftLayout->setSpacing(8);
     auto *listHeading = new QHBoxLayout();
     auto *listTitle = new QLabel(tr("Network inventory"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
@@ -529,7 +502,7 @@ void MainWindow::buildUi()
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
     deviceTable_->setMinimumHeight(170);
-    deviceTable_->verticalHeader()->setDefaultSectionSize(48);
+    deviceTable_->verticalHeader()->setDefaultSectionSize(38);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
     deviceHeader->setSectionsClickable(true);
@@ -578,23 +551,11 @@ void MainWindow::buildUi()
     tabs->setTabPosition(QTabWidget::North);
     tabs->setDocumentMode(true);
     tabs->setUsesScrollButtons(true);
-    tabs->addTab(makeInfoTab(tabs), tr("Device details"));
-    tabs->addTab(makeMaintenanceTab(tabs), tr("Device actions"));
-    tabs->addTab(makeHistoryTab(tabs), tr("Operation history"));
+    tabs->addTab(makeInfoTab(tabs), tr("Details"));
+    tabs->addTab(makeMaintenanceTab(tabs), tr("Configure"));
+    tabs->addTab(makeHistoryTab(tabs), tr("History"));
 
-    // Keep the inventory and selected-device workspace independently usable.
-    // A vertical splitter prevents the table from consuming the space needed
-    // by the details panel on shorter displays; users can resize either area.
-    auto *deviceWorkspace = new QSplitter(Qt::Vertical, left);
-    deviceWorkspace->setObjectName(QStringLiteral("deviceWorkspaceSplitter"));
-    deviceWorkspace->setChildrenCollapsible(false);
-    deviceWorkspace->setHandleWidth(7);
-    deviceWorkspace->addWidget(deviceTable_);
-    deviceWorkspace->addWidget(tabs);
-    deviceWorkspace->setStretchFactor(0, 3);
-    deviceWorkspace->setStretchFactor(1, 2);
-    deviceWorkspace->setSizes({390, 280});
-    leftLayout->addWidget(deviceWorkspace, 1);
+    leftLayout->addWidget(deviceTable_, 1);
 
     auto *rightScroll = new QScrollArea(central);
     rightScroll->setWidgetResizable(true);
@@ -602,46 +563,25 @@ void MainWindow::buildUi()
     rightScroll->setMaximumWidth(360);
     auto *rightContent = new QWidget(rightScroll);
     auto *rightLayout = new QVBoxLayout(rightContent);
-    rightLayout->setContentsMargins(2, 2, 2, 2);
-    rightLayout->setSpacing(10);
+    rightLayout->setContentsMargins(6, 6, 6, 6);
+    rightLayout->setSpacing(8);
 
-    auto *selectedPanel = panel(tr("Device overview"), rightContent);
-    auto *selectedLayout = new QVBoxLayout(selectedPanel);
-    selectedLayout->setSpacing(7);
-    selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
-    selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
-    selectedDeviceSummary_->setWordWrap(true);
-    selectedNetworkSummary_ = mutedLabel(
-        tr("Select a device in the inventory to inspect its network and verification state."),
-        selectedPanel);
-    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
-    selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    selectedLayout->addWidget(selectedDeviceSummary_);
-    selectedLayout->addWidget(selectedNetworkSummary_);
-    rightLayout->addWidget(selectedPanel);
-
-    auto *networkPanel = panel(tr("Local network"), rightContent);
-    auto *networkLayout = new QVBoxLayout(networkPanel);
-    networkLayout->setSpacing(8);
-    networkLayout->addWidget(mutedLabel(
-        tr("Live details for the selected computer interface. Confirm which network discovery and subnet scanning are using."),
-        networkPanel));
-    localNetworkSummary_ = new QLabel(tr("Select an active IPv4 interface to inspect its address and link details."), networkPanel);
-    localNetworkSummary_->setWordWrap(true);
-    localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
-    localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
-    networkLayout->addWidget(localNetworkSummary_);
-    networkLayout->addWidget(mutedLabel(
-        tr("Camera-side IPv4 settings are shown in the Selected device panel and can be previewed or applied from the Maintenance tab."),
-        networkPanel));
-    rightLayout->addWidget(networkPanel);
-
-    rightLayout->addStretch();
+    rightLayout->addWidget(tabs, 1);
     rightScroll->setWidget(rightContent);
-    mainRow->addWidget(left, 4);
-    mainRow->addWidget(rightScroll, 1);
-    root->addLayout(mainRow, 1);
+    rightScroll->setObjectName(QStringLiteral("rightWorkspaceScrollArea"));
+    rightScroll->setMinimumWidth(340);
+    rightScroll->setMaximumWidth(470);
+
+    auto *mainWorkspace = new QSplitter(Qt::Horizontal, central);
+    mainWorkspace->setObjectName(QStringLiteral("mainWorkspaceSplitter"));
+    mainWorkspace->setChildrenCollapsible(false);
+    mainWorkspace->setHandleWidth(7);
+    mainWorkspace->addWidget(left);
+    mainWorkspace->addWidget(rightScroll);
+    mainWorkspace->setStretchFactor(0, 7);
+    mainWorkspace->setStretchFactor(1, 3);
+    mainWorkspace->setSizes({980, 420});
+    root->addWidget(mainWorkspace, 1);
 
     auto *footer = mutedLabel(tr("OXITA CAMERA DEVICE MANAGER  •  Device capabilities depend on the camera model, firmware and enabled services."), central);
     root->addWidget(footer);
@@ -961,7 +901,7 @@ void MainWindow::buildUi()
         auto *path = new QLabel(dataDirectory, &dialog);
         path->setWordWrap(true);
         path->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        path->setStyleSheet(QStringLiteral("background:#F6F7F9;border:1px solid #E7EAF0;border-radius:7px;padding:10px;"));
+        path->setStyleSheet(QStringLiteral("background:#141F2B;color:#E7EDF4;border:1px solid #344455;border-radius:7px;padding:10px;"));
         layout->addWidget(path);
         auto *databaseHeading = new QLabel(tr("Inventory database"), &dialog);
         databaseHeading->setObjectName(QStringLiteral("sectionTitle"));
@@ -1025,6 +965,38 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
         content);
     layout->addWidget(heading);
     layout->addWidget(description);
+
+    auto *selectedPanel = panel(tr("Selected device"), content);
+    auto *selectedLayout = new QVBoxLayout(selectedPanel);
+    selectedLayout->setSpacing(7);
+    selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
+    selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
+    selectedDeviceSummary_->setWordWrap(true);
+    selectedNetworkSummary_ = mutedLabel(
+        tr("Select a device in the inventory to inspect its network and verification state."),
+        selectedPanel);
+    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
+    selectedNetworkSummary_->setWordWrap(true);
+    selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    selectedLayout->addWidget(selectedDeviceSummary_);
+    selectedLayout->addWidget(selectedNetworkSummary_);
+    layout->addWidget(selectedPanel);
+
+    auto *networkPanel = panel(tr("Local network"), content);
+    auto *networkLayout = new QVBoxLayout(networkPanel);
+    networkLayout->setSpacing(6);
+    networkLayout->addWidget(mutedLabel(
+        tr("The active interface used for discovery and subnet scanning."),
+        networkPanel));
+    localNetworkSummary_ = new QLabel(
+        tr("Select an active IPv4 interface to inspect its address and link details."),
+        networkPanel);
+    localNetworkSummary_->setWordWrap(true);
+    localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
+    localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
+    networkLayout->addWidget(localNetworkSummary_);
+    layout->addWidget(networkPanel);
 
     auto *identityPanel = new QFrame(content);
     identityPanel->setObjectName(QStringLiteral("metricCard"));
@@ -1145,7 +1117,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         auto *warning = mutedLabel(
             tr("This request is sent to the camera, not just removed from this inventory. The camera may reboot, erase users/settings, disable network services or return to a different IP address. The result depends on the camera firmware and account permissions. Make sure you have physical/network recovery access."),
             &dialog);
-        warning->setStyleSheet(QStringLiteral("color:#8A3A32;background:#FBECEE;border:1px solid #EBC8CB;border-radius:7px;padding:10px;"));
+        warning->setStyleSheet(QStringLiteral("color:#FFD8DD;background:#3A2229;border:1px solid #75404A;border-radius:7px;padding:10px;"));
         form->addRow(tr("Target camera"), target);
         form->addRow(tr("Reset mode"), mode);
         form->addRow(warning);
@@ -1375,7 +1347,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
         content);
     safetyNote->setWordWrap(true);
-    safetyNote->setStyleSheet(QStringLiteral("color:#8A5B13;background:#FBF3E4;border:1px solid #F0E1BE;border-radius:7px;padding:9px;"));
+    safetyNote->setStyleSheet(QStringLiteral("color:#F5D89A;background:#382F20;border:1px solid #6A5835;border-radius:7px;padding:9px;"));
     layout->addWidget(safetyNote);
     layout->addStretch();
     connect(applyNetworkButton, &QPushButton::clicked, this, [this, applyNetworkButton] {
@@ -1795,14 +1767,14 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
     }
 
-    QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
+    QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#E7EDF4;'>"
         "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
     for (const QString &detail : details) {
         const int separator = detail.indexOf(QStringLiteral(": "));
         const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
         const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
-        html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
-            "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
+        html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#A0ADBB;border-bottom:1px solid #2B3948;font-size:12px;'>%1</td>"
+            "<td width='68%' valign='top' style='color:#E7EDF4;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
             .arg(key, value);
     }
     html += QStringLiteral("</table></body></html>");

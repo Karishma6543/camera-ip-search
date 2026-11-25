@@ -70,7 +70,7 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
-        if (tabs->tabText(index) == QStringLiteral("Operation history")) {
+        if (tabs->tabText(index) == QStringLiteral("History")) {
             historyFound = true;
             break;
         }
@@ -100,8 +100,8 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
-        QStringLiteral("Device details"), QStringLiteral("Device actions"),
-        QStringLiteral("Operation history")
+        QStringLiteral("Details"), QStringLiteral("Configure"),
+        QStringLiteral("History")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
     for (int index = 0; index < expectedTabs.size(); ++index) {
@@ -164,11 +164,15 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
-    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("deviceWorkspaceSplitter"));
+    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("mainWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
+    auto *rightWorkspace = window.findChild<QScrollArea *>(QStringLiteral("rightWorkspaceScrollArea"));
     QVERIFY(workspace);
     QVERIFY(detailsScroll);
-    QVERIFY(workspace->count() == 2);
+    QVERIFY(rightWorkspace);
+    QCOMPARE(workspace->orientation(), Qt::Horizontal);
+    QCOMPARE(workspace->count(), 2);
+    QCOMPARE(tabs->parentWidget(), rightWorkspace->widget());
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
