@@ -81,7 +81,7 @@ bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
             } else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP"))) {
                 // ONVIF implementations commonly encode DHCP as a boolean,
                 // while some return a DHCP structure containing Enabled.
-                current.info.dhcp = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+                current.info.dhcp = xml.readElementText(QXmlStreamReader::IncludeChildElements).trimmed();
                 consumed = true;
             } else if (joined.endsWith(QStringLiteral("/IPv4/Config/DHCP/Enabled"))) {
                 current.info.dhcp = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
