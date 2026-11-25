@@ -303,6 +303,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last seen (UTC)")));
     QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
     table->clearSelection();
     table->setCurrentCell(-1, -1);
@@ -333,6 +334,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     vendor->setCurrentText(QStringLiteral("ONVIF devices"));
     QVERIFY(!table->isRowHidden(0));
 
+    statusFilter->setCurrentText(QStringLiteral("Stale"));
+    QVERIFY(!table->isRowHidden(0));
     statusFilter->setCurrentText(QStringLiteral("Not activated"));
     QVERIFY(table->isRowHidden(0));
     statusFilter->setCurrentText(QStringLiteral("Activated"));
