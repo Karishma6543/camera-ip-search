@@ -367,7 +367,7 @@ void MainWindow::buildUi()
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
-    searchEdit_->setAccessibleName(tr("Search camera inventory"));
+    searchEdit_->setAccessibleName(tr("Search network inventory"));
     searchEdit_->setPlaceholderText(tr("Search devices by IP, name, MAC or model"));
     searchEdit_->setMinimumWidth(235);
     searchEdit_->setToolTip(tr("Search all inventory fields, including technical details hidden from the compact table."));
@@ -612,7 +612,7 @@ void MainWindow::buildUi()
     selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
     selectedDeviceSummary_->setWordWrap(true);
     selectedNetworkSummary_ = mutedLabel(
-        tr("Select a camera in the inventory to inspect its network and verification state."),
+        tr("Select a device in the inventory to inspect its network and verification state."),
         selectedPanel);
     selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
     selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -1021,7 +1021,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *heading = new QLabel(tr("Device information"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
-        tr("Select a camera above to review its identity, discovery evidence, ONVIF services, network configuration and reported capabilities."),
+        tr("Select a device above to review its identity, discovery evidence, available services, network configuration and reported capabilities."),
         content);
     layout->addWidget(heading);
     layout->addWidget(description);
@@ -1034,7 +1034,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *identityTitle = new QLabel(tr("DEVICE PROFILE"), identityPanel);
     identityTitle->setObjectName(QStringLiteral("eyebrow"));
     deviceDetailsLabel_ = new QLabel(
-        tr("No device selected. Select a camera in the inventory above to inspect its reported information."),
+        tr("No device selected. Select a device in the inventory above to inspect its reported information."),
         identityPanel);
     deviceDetailsLabel_->setWordWrap(true);
     deviceDetailsLabel_->setTextFormat(Qt::RichText);
@@ -1069,7 +1069,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     heading->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
-        tr("Actions are performed against the selected camera. Review the target address before opening its web interface or changing network settings."),
+        tr("Actions are performed against the selected device. Review the target address before opening its web interface or changing network settings."),
         content));
 
     auto *devicePanel = panel(tr("Device access & diagnostics"), content);
@@ -1325,7 +1325,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             return;
         }
         const QString path = QFileDialog::getSaveFileName(
-            this, tr("Back up camera inventory"), QStringLiteral("oxita-camera-inventory.sqlite"),
+            this, tr("Back up device inventory"), QStringLiteral("oxita-device-inventory.sqlite"),
             tr("SQLite database (*.sqlite *.db)"));
         if (path.isEmpty()) return;
         QString error;
@@ -1346,12 +1346,12 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             return;
         }
         const QString path = QFileDialog::getOpenFileName(
-            this, tr("Restore camera inventory"), QString(),
+            this, tr("Restore device inventory"), QString(),
             tr("SQLite database (*.sqlite *.db)"));
         if (path.isEmpty()) return;
         const auto answer = QMessageBox::warning(
             this, tr("Confirm inventory restore"),
-            tr("Replace the current camera inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
+            tr("Replace the current device inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
             QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
         if (answer != QMessageBox::Yes) return;
         QString error;
