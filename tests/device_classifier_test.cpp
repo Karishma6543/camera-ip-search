@@ -10,6 +10,9 @@ private slots:
     void identifiesNvrFromExplicitModel();
     void identifiesPrinterFromMultipleServices();
     void identifiesRouterFromGatewayFingerprintAsProbable();
+    void identifiesUpnpGatewayAsHighConfidenceRouter();
+    void identifiesUpnpPrinterAsHighConfidencePrinter();
+    void identifiesSwitchFromExplicitModel();
     void identifiesComputerFromNetworkServicesAsProbable();
     void leavesAmbiguousHostUnknown();
     void doesNotTreatSingleWebPortAsCamera();
@@ -52,6 +55,35 @@ void DeviceClassifierTest::identifiesRouterFromGatewayFingerprintAsProbable()
     const auto result = DeviceClassifier::classify(device);
     QCOMPARE(result.key(), QStringLiteral("router"));
     QCOMPARE(result.confidence, DeviceClassifier::Confidence::Probable);
+}
+
+void DeviceClassifierTest::identifiesUpnpGatewayAsHighConfidenceRouter()
+{
+    DeviceRecord device;
+    device.discoverySources << QStringLiteral("SSDP/UPnP");
+    device.model = QStringLiteral("urn:schemas-upnp-org:device:InternetGatewayDevice:1");
+    const auto result = DeviceClassifier::classify(device);
+    QCOMPARE(result.key(), QStringLiteral("router"));
+    QCOMPARE(result.confidence, DeviceClassifier::Confidence::High);
+}
+
+void DeviceClassifierTest::identifiesUpnpPrinterAsHighConfidencePrinter()
+{
+    DeviceRecord device;
+    device.discoverySources << QStringLiteral("SSDP/UPnP");
+    device.model = QStringLiteral("urn:schemas-upnp-org:device:Printer:1");
+    const auto result = DeviceClassifier::classify(device);
+    QCOMPARE(result.key(), QStringLiteral("printer"));
+    QCOMPARE(result.confidence, DeviceClassifier::Confidence::High);
+}
+
+void DeviceClassifierTest::identifiesSwitchFromExplicitModel()
+{
+    DeviceRecord device;
+    device.model = QStringLiteral("PoE Switch 16-Port");
+    const auto result = DeviceClassifier::classify(device);
+    QCOMPARE(result.key(), QStringLiteral("switch"));
+    QCOMPARE(result.confidence, DeviceClassifier::Confidence::High);
 }
 
 void DeviceClassifierTest::identifiesComputerFromNetworkServicesAsProbable()
