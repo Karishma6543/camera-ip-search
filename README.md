@@ -42,7 +42,7 @@ The desktop client is written in C++/Qt. It is **not** a Flutter application, an
 1. Start the application and choose **All active IPv4 interfaces** or a specific Ethernet/Wi-Fi adapter from the interface selector.
 2. Select **Discover cameras** to send ONVIF WS-Discovery and the supported Oxita Contract B discovery probe. This is the preferred first step.
 3. If you also need to find hosts that did not answer those discovery protocols, choose **Scan subnet**. This is an opt-in TCP port scan; candidates are unverified and are not automatically proven cameras.
-4. Select a row to inspect **Details**. Open **Configure → Device → Refresh device info** to request additional ONVIF information from a compatible camera. Use **Configure → Network** for supported IP workflows and **Configure → Storage** for local inventory backup/restore.
+4. Select a row to inspect it in the right-hand **Device Info** workspace. Use **Configuration** for the available device, network and local-storage workflows, and **Operation History** to review recorded activity.
 5. Use filters/search to narrow the inventory, **Rename** to set a local friendly label, and **Export CSV** to save an inventory snapshot.
 6. Use **Check reachability** to test selected/checked devices or the whole inventory.
 7. Only use network configuration or factory reset after verifying the selected device, its credentials/permissions and your recovery access. Read the [UI user guide](docs/ui-user-guide.md) before using destructive or network-changing actions.
