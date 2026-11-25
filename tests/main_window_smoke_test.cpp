@@ -7,6 +7,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTabWidget>
+#include <QTabBar>
+#include <QStackedWidget>
 #include <QLineEdit>
 #include <QComboBox>
 #include <QPushButton>
@@ -66,11 +68,11 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QStandardPaths::setTestModeEnabled(true);
     MainWindow window;
     QVERIFY(!window.windowTitle().isEmpty());
-    const auto tabs = window.findChild<QTabWidget *>();
+    const auto tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
-        if (tabs->tabText(index) == QStringLiteral("Operation history")) {
+        if (tabs->tabText(index) == QStringLiteral("Operation History")) {
             historyFound = true;
             break;
         }
@@ -97,18 +99,30 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
 {
     QStandardPaths::setTestModeEnabled(true);
     MainWindow window;
-    const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
+    const auto tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
-        QStringLiteral("Device details"), QStringLiteral("Device actions"),
-        QStringLiteral("Operation history")
+        QStringLiteral("Device Info"), QStringLiteral("Configuration"),
+        QStringLiteral("Operation History")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
+    auto *workspacePages = window.findChild<QStackedWidget *>(QStringLiteral("workspacePages"));
+    QVERIFY(workspacePages);
+    QCOMPARE(workspacePages->count(), expectedTabs.size());
+    auto *configurationTabs = window.findChild<QTabWidget *>(QStringLiteral("configurationTabs"));
+    QVERIFY(configurationTabs);
+    const QStringList expectedConfigurationTabs{
+        QStringLiteral("Device"), QStringLiteral("Network"), QStringLiteral("Storage")
+    };
+    QCOMPARE(configurationTabs->count(), expectedConfigurationTabs.size());
+    for (int index = 0; index < expectedConfigurationTabs.size(); ++index)
+        QCOMPARE(configurationTabs->tabText(index), expectedConfigurationTabs.at(index));
     for (int index = 0; index < expectedTabs.size(); ++index) {
         QCOMPARE(tabs->tabText(index), expectedTabs.at(index));
         tabs->setCurrentIndex(index);
         QCOMPARE(tabs->currentIndex(), index);
-        QVERIFY(tabs->widget(index));
+        QCOMPARE(workspacePages->currentIndex(), index);
+        QVERIFY(workspacePages->widget(index));
     }
 
     QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("deviceSearch")));
@@ -164,11 +178,20 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
-    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("deviceWorkspaceSplitter"));
+    auto *tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
+    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("mainWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
+    auto *rightWorkspace = window.findChild<QWidget *>(QStringLiteral("rightWorkspacePanel"));
+    QVERIFY(tabs);
     QVERIFY(workspace);
     QVERIFY(detailsScroll);
-    QVERIFY(workspace->count() == 2);
+    QVERIFY(rightWorkspace);
+    QCOMPARE(workspace->orientation(), Qt::Horizontal);
+    QCOMPARE(workspace->count(), 2);
+    QCOMPARE(tabs->parentWidget()->objectName(), QStringLiteral("workspaceNavigation"));
+    auto *workspacePages = window.findChild<QStackedWidget *>(QStringLiteral("workspacePages"));
+    QVERIFY(workspacePages);
+    QCOMPARE(workspacePages->parentWidget(), rightWorkspace);
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 

@@ -27,6 +27,8 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTabWidget>
+#include <QTabBar>
+#include <QStackedWidget>
 #include <QTableWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -317,7 +319,7 @@ void MainWindow::populateInterfaces()
 void MainWindow::buildUi()
 {
     setWindowTitle(tr("Oxita | Camera Device Manager"));
-    setMinimumSize(1100, 700);
+    setMinimumSize(1100, 680);
     resize(1440, 900);
 
     setStyleSheet(OxitaTheme::styleSheet());
@@ -443,38 +445,11 @@ void MainWindow::buildUi()
     tools->addLayout(actionRow);
     root->addWidget(toolbar);
 
-    // At-a-glance inventory metrics keep the dashboard useful before and after discovery.
-    auto *metricsRow = new QHBoxLayout();
-    metricsRow->setSpacing(10);
-    const auto addMetricCard = [central, metricsRow](const QString &caption, QLabel **valueLabel) {
-        auto *card = new QFrame(central);
-        card->setObjectName(QStringLiteral("metricCard"));
-        auto *layout = new QVBoxLayout(card);
-        layout->setContentsMargins(15, 11, 15, 12);
-        layout->setSpacing(4);
-        auto *eyebrow = new QLabel(caption, card);
-        eyebrow->setObjectName(QStringLiteral("eyebrow"));
-        auto *value = new QLabel(QStringLiteral("0"), card);
-        value->setObjectName(QStringLiteral("metric"));
-        layout->addWidget(eyebrow);
-        layout->addWidget(value);
-        metricsRow->addWidget(card, 1);
-        *valueLabel = value;
-    };
-    addMetricCard(tr("DISCOVERED DEVICES"), &discoveredMetric_);
-    addMetricCard(tr("REACHABLE"), &reachableMetric_);
-    addMetricCard(tr("ONVIF VERIFIED"), &verifiedMetric_);
-    addMetricCard(tr("NEEDS REVIEW"), &unverifiedMetric_);
-    root->addLayout(metricsRow);
-
-    auto *mainRow = new QHBoxLayout();
-    mainRow->setSpacing(12);
-
     auto *left = new QFrame(central);
     left->setObjectName(QStringLiteral("surface"));
     auto *leftLayout = new QVBoxLayout(left);
-    leftLayout->setContentsMargins(14, 13, 14, 14);
-    leftLayout->setSpacing(10);
+    leftLayout->setContentsMargins(12, 11, 12, 12);
+    leftLayout->setSpacing(8);
     auto *listHeading = new QHBoxLayout();
     auto *listTitle = new QLabel(tr("Network inventory"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
@@ -529,7 +504,7 @@ void MainWindow::buildUi()
     deviceTable_->setAlternatingRowColors(true);
     deviceTable_->setShowGrid(false);
     deviceTable_->setMinimumHeight(170);
-    deviceTable_->verticalHeader()->setDefaultSectionSize(48);
+    deviceTable_->verticalHeader()->setDefaultSectionSize(38);
     deviceTable_->setWordWrap(false);
     deviceTable_->setCornerButtonEnabled(false);
     deviceHeader->setSectionsClickable(true);
@@ -573,75 +548,55 @@ void MainWindow::buildUi()
     inventoryEmptyState_->setMinimumHeight(88);
     leftLayout->addWidget(inventoryEmptyState_);
 
-    auto *tabs = new QTabWidget(left);
-    tabs->setObjectName(QStringLiteral("workspaceTabs"));
-    tabs->setTabPosition(QTabWidget::North);
-    tabs->setDocumentMode(true);
-    tabs->setUsesScrollButtons(true);
-    tabs->addTab(makeInfoTab(tabs), tr("Device details"));
-    tabs->addTab(makeMaintenanceTab(tabs), tr("Device actions"));
-    tabs->addTab(makeHistoryTab(tabs), tr("Operation history"));
+    leftLayout->addWidget(deviceTable_, 1);
 
-    // Keep the inventory and selected-device workspace independently usable.
-    // A vertical splitter prevents the table from consuming the space needed
-    // by the details panel on shorter displays; users can resize either area.
-    auto *deviceWorkspace = new QSplitter(Qt::Vertical, left);
-    deviceWorkspace->setObjectName(QStringLiteral("deviceWorkspaceSplitter"));
-    deviceWorkspace->setChildrenCollapsible(false);
-    deviceWorkspace->setHandleWidth(7);
-    deviceWorkspace->addWidget(deviceTable_);
-    deviceWorkspace->addWidget(tabs);
-    deviceWorkspace->setStretchFactor(0, 3);
-    deviceWorkspace->setStretchFactor(1, 2);
-    deviceWorkspace->setSizes({390, 280});
-    leftLayout->addWidget(deviceWorkspace, 1);
+    auto *workspaceNavigation = new QFrame(central);
+    workspaceNavigation->setObjectName(QStringLiteral("workspaceNavigation"));
+    auto *navigationLayout = new QHBoxLayout(workspaceNavigation);
+    navigationLayout->setContentsMargins(10, 3, 10, 3);
+    navigationLayout->setSpacing(4);
+    auto *workspaceTabs = new QTabBar(workspaceNavigation);
+    workspaceTabs->setObjectName(QStringLiteral("workspaceTabs"));
+    workspaceTabs->setDocumentMode(true);
+    workspaceTabs->setExpanding(false);
+    workspaceTabs->setUsesScrollButtons(true);
+    workspaceTabs->setDrawBase(false);
+    workspaceTabs->addTab(tr("Device Info"));
+    workspaceTabs->addTab(tr("Configuration"));
+    workspaceTabs->addTab(tr("Operation History"));
+    navigationLayout->addWidget(workspaceTabs);
+    navigationLayout->addStretch();
+    root->addWidget(workspaceNavigation);
 
-    auto *rightScroll = new QScrollArea(central);
-    rightScroll->setWidgetResizable(true);
-    rightScroll->setMinimumWidth(290);
-    rightScroll->setMaximumWidth(360);
-    auto *rightContent = new QWidget(rightScroll);
-    auto *rightLayout = new QVBoxLayout(rightContent);
-    rightLayout->setContentsMargins(2, 2, 2, 2);
-    rightLayout->setSpacing(10);
+    auto *rightWorkspace = new QFrame(central);
+    rightWorkspace->setObjectName(QStringLiteral("rightWorkspacePanel"));
+    rightWorkspace->setMinimumWidth(340);
+    rightWorkspace->setMaximumWidth(470);
+    auto *rightLayout = new QVBoxLayout(rightWorkspace);
+    rightLayout->setContentsMargins(6, 6, 6, 6);
+    rightLayout->setSpacing(8);
+    auto *workspacePages = new QStackedWidget(rightWorkspace);
+    workspacePages->setObjectName(QStringLiteral("workspacePages"));
+    workspacePages->addWidget(makeInfoTab(workspacePages));
+    workspacePages->addWidget(makeMaintenanceTab(workspacePages));
+    workspacePages->addWidget(makeHistoryTab(workspacePages));
+    rightLayout->addWidget(workspacePages, 1);
+    connect(workspaceTabs, &QTabBar::currentChanged,
+            workspacePages, &QStackedWidget::setCurrentIndex);
+    connect(workspacePages, &QStackedWidget::currentChanged,
+            workspaceTabs, &QTabBar::setCurrentIndex);
+    workspaceTabs->setCurrentIndex(0);
 
-    auto *selectedPanel = panel(tr("Device overview"), rightContent);
-    auto *selectedLayout = new QVBoxLayout(selectedPanel);
-    selectedLayout->setSpacing(7);
-    selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
-    selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
-    selectedDeviceSummary_->setWordWrap(true);
-    selectedNetworkSummary_ = mutedLabel(
-        tr("Select a device in the inventory to inspect its network and verification state."),
-        selectedPanel);
-    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
-    selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    selectedLayout->addWidget(selectedDeviceSummary_);
-    selectedLayout->addWidget(selectedNetworkSummary_);
-    rightLayout->addWidget(selectedPanel);
-
-    auto *networkPanel = panel(tr("Local network"), rightContent);
-    auto *networkLayout = new QVBoxLayout(networkPanel);
-    networkLayout->setSpacing(8);
-    networkLayout->addWidget(mutedLabel(
-        tr("Live details for the selected computer interface. Confirm which network discovery and subnet scanning are using."),
-        networkPanel));
-    localNetworkSummary_ = new QLabel(tr("Select an active IPv4 interface to inspect its address and link details."), networkPanel);
-    localNetworkSummary_->setWordWrap(true);
-    localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
-    localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
-    networkLayout->addWidget(localNetworkSummary_);
-    networkLayout->addWidget(mutedLabel(
-        tr("Camera-side IPv4 settings are shown in the Selected device panel and can be previewed or applied from the Maintenance tab."),
-        networkPanel));
-    rightLayout->addWidget(networkPanel);
-
-    rightLayout->addStretch();
-    rightScroll->setWidget(rightContent);
-    mainRow->addWidget(left, 4);
-    mainRow->addWidget(rightScroll, 1);
-    root->addLayout(mainRow, 1);
+    auto *mainWorkspace = new QSplitter(Qt::Horizontal, central);
+    mainWorkspace->setObjectName(QStringLiteral("mainWorkspaceSplitter"));
+    mainWorkspace->setChildrenCollapsible(false);
+    mainWorkspace->setHandleWidth(7);
+    mainWorkspace->addWidget(left);
+    mainWorkspace->addWidget(rightWorkspace);
+    mainWorkspace->setStretchFactor(0, 7);
+    mainWorkspace->setStretchFactor(1, 3);
+    mainWorkspace->setSizes({980, 420});
+    root->addWidget(mainWorkspace, 1);
 
     auto *footer = mutedLabel(tr("OXITA CAMERA DEVICE MANAGER  •  Device capabilities depend on the camera model, firmware and enabled services."), central);
     root->addWidget(footer);
@@ -961,7 +916,7 @@ void MainWindow::buildUi()
         auto *path = new QLabel(dataDirectory, &dialog);
         path->setWordWrap(true);
         path->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        path->setStyleSheet(QStringLiteral("background:#F6F7F9;border:1px solid #E7EAF0;border-radius:7px;padding:10px;"));
+        path->setStyleSheet(QStringLiteral("background:#141F2B;color:#E7EDF4;border:1px solid #344455;border-radius:7px;padding:10px;"));
         layout->addWidget(path);
         auto *databaseHeading = new QLabel(tr("Inventory database"), &dialog);
         databaseHeading->setObjectName(QStringLiteral("sectionTitle"));
@@ -1026,6 +981,38 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     layout->addWidget(heading);
     layout->addWidget(description);
 
+    auto *selectedPanel = panel(tr("Selected device"), content);
+    auto *selectedLayout = new QVBoxLayout(selectedPanel);
+    selectedLayout->setSpacing(7);
+    selectedDeviceSummary_ = new QLabel(tr("No device selected"), selectedPanel);
+    selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
+    selectedDeviceSummary_->setWordWrap(true);
+    selectedNetworkSummary_ = mutedLabel(
+        tr("Select a device in the inventory to inspect its network and verification state."),
+        selectedPanel);
+    selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
+    selectedNetworkSummary_->setWordWrap(true);
+    selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    selectedLayout->addWidget(selectedDeviceSummary_);
+    selectedLayout->addWidget(selectedNetworkSummary_);
+    layout->addWidget(selectedPanel);
+
+    auto *networkPanel = panel(tr("Local network"), content);
+    auto *networkLayout = new QVBoxLayout(networkPanel);
+    networkLayout->setSpacing(6);
+    networkLayout->addWidget(mutedLabel(
+        tr("The active interface used for discovery and subnet scanning."),
+        networkPanel));
+    localNetworkSummary_ = new QLabel(
+        tr("Select an active IPv4 interface to inspect its address and link details."),
+        networkPanel);
+    localNetworkSummary_->setWordWrap(true);
+    localNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    localNetworkSummary_->setObjectName(QStringLiteral("localNetworkDetails"));
+    localNetworkSummary_->setAccessibleName(tr("Local network interface details"));
+    networkLayout->addWidget(localNetworkSummary_);
+    layout->addWidget(networkPanel);
+
     auto *identityPanel = new QFrame(content);
     identityPanel->setObjectName(QStringLiteral("metricCard"));
     auto *identityLayout = new QVBoxLayout(identityPanel);
@@ -1057,22 +1044,49 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
 }
 QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 {
-    auto *page = new QScrollArea(parent);
-    page->setWidgetResizable(true);
-    page->setFrameShape(QFrame::NoFrame);
-    auto *content = new QWidget(page);
-    auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(16, 14, 16, 14);
-    layout->setSpacing(12);
+    auto *page = new QWidget(parent);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(9);
+    auto *content = page;
 
-    auto *heading = new QLabel(tr("Device actions"), content);
+    auto *heading = new QLabel(tr("Device configuration"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
-        tr("Actions are performed against the selected device. Review the target address before opening its web interface or changing network settings."),
+        tr("Choose a focused workspace below. Controls appear only for operations implemented and verified by the selected device adapter."),
         content));
 
-    auto *devicePanel = panel(tr("Device access & diagnostics"), content);
+    auto *configurationTabs = new QTabWidget(page);
+    configurationTabs->setObjectName(QStringLiteral("configurationTabs"));
+    configurationTabs->setDocumentMode(true);
+    configurationTabs->setUsesScrollButtons(true);
+    const auto createSectionPage = [configurationTabs](QWidget **sectionContent,
+                                                        QVBoxLayout **sectionLayout) {
+        auto *scroll = new QScrollArea(configurationTabs);
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        auto *inner = new QWidget(scroll);
+        auto *innerLayout = new QVBoxLayout(inner);
+        innerLayout->setContentsMargins(10, 10, 10, 10);
+        innerLayout->setSpacing(10);
+        scroll->setWidget(inner);
+        *sectionContent = inner;
+        *sectionLayout = innerLayout;
+        return scroll;
+    };
+    QWidget *deviceContent = nullptr;
+    QWidget *networkContent = nullptr;
+    QWidget *storageContent = nullptr;
+    QVBoxLayout *devicePageLayout = nullptr;
+    QVBoxLayout *networkPageLayout = nullptr;
+    QVBoxLayout *storagePageLayout = nullptr;
+    configurationTabs->addTab(createSectionPage(&deviceContent, &devicePageLayout), tr("Device"));
+    configurationTabs->addTab(createSectionPage(&networkContent, &networkPageLayout), tr("Network"));
+    configurationTabs->addTab(createSectionPage(&storageContent, &storagePageLayout), tr("Storage"));
+    layout->addWidget(configurationTabs, 1);
+
+    auto *devicePanel = panel(tr("Device access & diagnostics"), deviceContent);
     auto *deviceLayout = new QVBoxLayout(devicePanel);
     deviceLayout->setSpacing(8);
     auto *deviceDescription = mutedLabel(
@@ -1089,9 +1103,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     deviceActions->addWidget(refreshDeviceButton_, 0, 0);
     deviceActions->addWidget(openWebButton_, 0, 1);
     deviceLayout->addLayout(deviceActions);
-    layout->addWidget(devicePanel);
+    devicePageLayout->addWidget(devicePanel);
 
-    auto *maintenancePanel = panel(tr("Camera maintenance"), content);
+    auto *maintenancePanel = panel(tr("Camera maintenance"), deviceContent);
     auto *maintenanceLayout = new QVBoxLayout(maintenancePanel);
     maintenanceLayout->setSpacing(8);
     maintenanceLayout->addWidget(mutedLabel(
@@ -1103,7 +1117,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     factoryResetButton->setAccessibleName(tr("Factory reset selected camera"));
     factoryResetButton->setToolTip(tr("Send an ONVIF factory-default request to the selected camera. This may erase configuration and change its IP address."));
     maintenanceLayout->addWidget(factoryResetButton);
-    layout->addWidget(maintenancePanel);
+    devicePageLayout->addWidget(maintenancePanel);
     connect(factoryResetButton, &QPushButton::clicked, this, [this, factoryResetButton] {
         const int row = deviceTable_ ? selectedDeviceRow() : -1;
         if (row < 0) {
@@ -1145,7 +1159,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         auto *warning = mutedLabel(
             tr("This request is sent to the camera, not just removed from this inventory. The camera may reboot, erase users/settings, disable network services or return to a different IP address. The result depends on the camera firmware and account permissions. Make sure you have physical/network recovery access."),
             &dialog);
-        warning->setStyleSheet(QStringLiteral("color:#8A3A32;background:#FBECEE;border:1px solid #EBC8CB;border-radius:7px;padding:10px;"));
+        warning->setStyleSheet(QStringLiteral("color:#FFD8DD;background:#3A2229;border:1px solid #75404A;border-radius:7px;padding:10px;"));
         form->addRow(tr("Target camera"), target);
         form->addRow(tr("Reset mode"), mode);
         form->addRow(warning);
@@ -1165,7 +1179,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     });
 
 
-    auto *networkPanel = panel(tr("IPv4 network configuration"), content);
+    auto *networkPanel = panel(tr("IPv4 network configuration"), networkContent);
     auto *networkLayout = new QVBoxLayout(networkPanel);
     networkLayout->setSpacing(8);
     networkLayout->addWidget(mutedLabel(
@@ -1182,15 +1196,15 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkActions->addWidget(previewNetworkButton, 0, 0);
     networkActions->addWidget(applyNetworkButton, 0, 1);
     networkLayout->addLayout(networkActions);
-    layout->addWidget(networkPanel);
+    networkPageLayout->addWidget(networkPanel);
 
-    auto *bulkPanel = panel(tr("Bulk IPv4 configuration"), content);
+    auto *bulkPanel = panel(tr("Bulk IPv4 configuration"), networkContent);
     auto *bulkLayout = new QVBoxLayout(bulkPanel);
     bulkLayout->addWidget(mutedLabel(tr("Configure checked cameras with a different static IPv4 address per device. Each camera must first be refreshed so its ONVIF interface token and current subnet are verified. Devices are changed sequentially and verified individually."), bulkPanel));
     auto *bulkButton = actionButton(tr("Configure checked cameras"), bulkPanel, true);
     bulkButton->setObjectName(QStringLiteral("bulkIpv4ConfigureButton"));
     bulkLayout->addWidget(bulkButton);
-    layout->addWidget(bulkPanel);
+    networkPageLayout->addWidget(bulkPanel);
     connect(bulkButton, &QPushButton::clicked, this, [this, bulkButton] {
         if (bulkIpv4Running_) return;
         QVector<int> rows;
@@ -1289,7 +1303,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         startNextBulkIpv4Configuration();
     });
 
-    auto *firmwarePanel = panel(tr("Firmware information"), content);
+    auto *firmwarePanel = panel(tr("Firmware information"), deviceContent);
     auto *firmwareLayout = new QVBoxLayout(firmwarePanel);
     firmwareStatusSummary_ = new QLabel(
         tr("Select a camera to inspect its reported firmware version."),
@@ -1300,9 +1314,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     firmwareLayout->addWidget(mutedLabel(
         tr("This workspace displays firmware details reported by the camera. Firmware installation is not available in this release."),
         firmwarePanel));
-    layout->addWidget(firmwarePanel);
+    devicePageLayout->addWidget(firmwarePanel);
 
-    auto *backupPanel = panel(tr("Inventory backup & recovery"), content);
+    auto *backupPanel = panel(tr("Inventory backup & recovery"), storageContent);
     auto *backupLayout = new QVBoxLayout(backupPanel);
     backupLayout->addWidget(mutedLabel(
         tr("Create a consistent SQLite snapshot or restore a previously validated backup. Restoring keeps a separate pre-restore recovery snapshot beside the active inventory."),
@@ -1316,7 +1330,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     backupActions->addWidget(restoreButton);
     backupActions->addStretch();
     backupLayout->addLayout(backupActions);
-    layout->addWidget(backupPanel);
+    storagePageLayout->addWidget(backupPanel);
 
     connect(backupButton, &QPushButton::clicked, this, [this] {
         if (!inventoryDb_.isOpen()) {
@@ -1373,11 +1387,13 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
 
     auto *safetyNote = new QLabel(
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
-        content);
+        networkContent);
     safetyNote->setWordWrap(true);
-    safetyNote->setStyleSheet(QStringLiteral("color:#8A5B13;background:#FBF3E4;border:1px solid #F0E1BE;border-radius:7px;padding:9px;"));
-    layout->addWidget(safetyNote);
-    layout->addStretch();
+    safetyNote->setStyleSheet(QStringLiteral("color:#F5D89A;background:#382F20;border:1px solid #6A5835;border-radius:7px;padding:9px;"));
+    networkPageLayout->addWidget(safetyNote);
+    devicePageLayout->addStretch();
+    networkPageLayout->addStretch();
+    storagePageLayout->addStretch();
     connect(applyNetworkButton, &QPushButton::clicked, this, [this, applyNetworkButton] {
         const int row = selectedDeviceRow();
         if (row < 0) {
@@ -1541,7 +1557,6 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         refreshOperationHistory();
         discovery_->refreshDeviceInfo(device);
     });
-    page->setWidget(content);
     return page;
 }
 
@@ -1795,14 +1810,14 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
     }
 
-    QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#252A32;'>"
+    QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#E7EDF4;'>"
         "<table width='100%' cellspacing='0' cellpadding='8' style='table-layout:fixed;'>");
     for (const QString &detail : details) {
         const int separator = detail.indexOf(QStringLiteral(": "));
         const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
         const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
-        html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#737A84;border-bottom:1px solid #ECEEF1;font-size:12px;'>%1</td>"
-            "<td width='68%' valign='top' style='color:#252A32;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
+        html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#A0ADBB;border-bottom:1px solid #2B3948;font-size:12px;'>%1</td>"
+            "<td width='68%' valign='top' style='color:#E7EDF4;border-bottom:1px solid #2B3948;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
             .arg(key, value);
     }
     html += QStringLiteral("</table></body></html>");
@@ -1943,35 +1958,8 @@ void MainWindow::updateStatus(const QString &message)
 void MainWindow::updateDeviceSummary()
 {
     const int count = deviceTable_ ? deviceTable_->rowCount() : 0;
-    int reachable = 0;
-    int verified = 0;
-    int needsReview = 0;
-    for (int row = 0; row < count; ++row) {
-        const auto *reachability = deviceTable_->item(row, 11);
-        if (reachability && reachability->text() == QStringLiteral("Reachable"))
-            ++reachable;
-        const auto *ipItem = deviceTable_->item(row, 1);
-        const auto *sourceItem = deviceTable_->item(row, 8);
-        const QStringList sources = sourceItem
-            ? sourceItem->text().split(QStringLiteral(", "), Qt::SkipEmptyParts)
-            : QStringList{};
-        // The ONVIF card counts only devices with an ONVIF endpoint. Project
-        // firmware discovery is also valid protocol evidence and should not be
-        // mislabeled as an unverified candidate.
-        if (ipItem && (!ipItem->data(Qt::UserRole + 2).toString().isEmpty() ||
-                       !ipItem->data(Qt::UserRole + 3).toString().isEmpty()))
-            ++verified;
-        const bool protocolVerified =
-            sources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
-            sources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
-            sources.contains(QStringLiteral("Project UDP 9988"));
-        if (!protocolVerified) ++needsReview;
-    }
-    if (deviceCountValue_) deviceCountValue_->setText(tr("%1 devices").arg(count));
-    if (discoveredMetric_) discoveredMetric_->setText(QString::number(count));
-    if (reachableMetric_) reachableMetric_->setText(QString::number(reachable));
-    if (verifiedMetric_) verifiedMetric_->setText(QString::number(verified));
-    if (unverifiedMetric_) unverifiedMetric_->setText(QString::number(needsReview));
+    if (deviceCountValue_)
+        deviceCountValue_->setText(tr("%1 devices").arg(count));
     if (summaryLabel_) {
         int checked = 0;
         for (int row = 0; row < count; ++row) {
@@ -1986,6 +1974,7 @@ void MainWindow::updateDeviceSummary()
         inventoryEmptyState_->show();
     }
 }
+
 void MainWindow::upsertDevice(DeviceRecord device)
 {
     int row = -1;
