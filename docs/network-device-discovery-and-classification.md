@@ -43,6 +43,7 @@ Device type, manufacturer/discovery source, reachability/activation status and f
 - SSDP LOCATION values are parsed only as untrusted metadata and are never fetched by discovery.
 - Discovery responses do not establish that the device is safe, authenticated or manageable.
 - Manual inventory entry is not identity verification.
+- Static IPv4 UI preflight rejects addresses already used by another inventory device, reported gateway or local interface. It does not perform an active ARP duplicate-address probe before every write.
 - Reachability is based on TCP checks; a failed check is not definitive proof that a host is offline.
 - Cross-VLAN discovery requires a routed discovery design or scanning each authorized VLAN from a host attached to that VLAN.
 - Do not claim that the application finds every device on every network. Firewalls, ACLs, VLANs, disabled services, host isolation and unsupported protocols can hide devices.
