@@ -33,4 +33,5 @@ struct DeviceRecord
     QString reachabilityStatus{QStringLiteral("Not checked")};
     QString reachabilityCheckedAt;
     QString lastSuccessfulResponseAt;
+    QString lastSeenAt;
 };
