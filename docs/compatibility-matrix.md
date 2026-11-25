@@ -2,6 +2,25 @@
 
 This file is the source of truth for tested model-level compatibility. Do not mark a vendor or model as supported without evidence.
 
+## Multi-brand ONVIF support
+
+The application uses standards-based ONVIF WS-Discovery and Device-service requests. A CP Plus, Prama, Hikvision or other manufacturer's camera can be discovered and queried when its model/firmware exposes compatible ONVIF services and the network permits discovery traffic. Manufacturer names are taken from the camera's ONVIF GetDeviceInformation response; they are not inferred from an IP address or port fingerprint.
+
+| Operation | Current implementation | Compatibility qualification |
+|---|---|---|
+| Discovery | ONVIF WS-Discovery | Depends on ONVIF being enabled and multicast being permitted |
+| Manufacturer/model/firmware/serial | ONVIF GetDeviceInformation | Fields depend on the device response |
+| Device capabilities | ONVIF GetCapabilities | Service categories are reported; not every operation is guaranteed |
+| Read network interfaces | ONVIF GetNetworkInterfaces | Interface token and IPv4 match required |
+| Static IPv4 and gateway | ONVIF SetNetworkInterfaces / SetNetworkDefaultGateway | Requires authenticated permission and verified interface; model/firmware validation still required |
+| DHCP configuration | Not implemented in this release | Not advertised as supported |
+| DNS configuration | Read via ONVIF GetDNS; write not implemented | Not advertised as supported |
+| Reboot, time and user management | Not implemented in this release | Not advertised as supported |
+| Vendor-specific APIs | Adapter extension point exists; no CP Plus/Prama/Hikvision proprietary adapter is currently validated | Add only against official SDK/protocol documentation and physical model tests |
+| Factory reset | Request code exists, but UI action is disabled pending model/firmware support verification | ONVIF discovery alone is not sufficient proof |
+
+No physical CP Plus, Prama or Hikvision model/firmware combination is certified by CI. The compatibility matrix must be updated only after testing exact hardware and firmware versions.
+
 ## Status legend
 
 - Not assessed
