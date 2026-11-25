@@ -34,3 +34,7 @@ For each tested device, record:
 - Sanitized logs or packet fixtures, with secrets removed.
 
 A successful ONVIF probe does not prove activation, network configuration or firmware upgrade support. A successful port probe does not prove that the endpoint is a camera.
+
+## In-progress protocol foundations (not user-facing support)
+
+The development branch `feat/onvif-operations-foundation` adds validated SOAP request builders and unit tests for ONVIF DHCP enable/disable, manual/DHCP DNS selection, and SystemReboot. These builders are not yet connected to the desktop operation workflow, do not establish model-level support, and must not be exposed as working UI actions until authenticated request execution, capability checks, response verification, error handling, and hardware tests are complete. Date/time and user-management operations remain unimplemented.
