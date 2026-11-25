@@ -11,8 +11,8 @@ QLabel#productName { color:#D0D0D0; font-size:10px; font-weight:800; letter-spac
 QLabel#brandTagline { color:#B8B8B8; font-size:10px; font-weight:700; }
 QLabel#muted { color:#BDBDBD; font-size:12px; }
 QLabel#sectionTitle { color:#FFFFFF; font-size:15px; font-weight:800; }
-QLabel#deviceDetails,QLabel#selectedDeviceDetails { background:#141F2B; border:1px solid #454545; border-radius:8px; padding:10px; color:#E5E5E5; }
-QLabel#inventoryEmptyState { background:#141F2B; color:#BDBDBD; border:1px dashed #626262; border-radius:9px; padding:18px; font-size:13px; }
+QLabel#deviceDetails,QLabel#selectedDeviceDetails { background:#292929; border:1px solid #454545; border-radius:8px; padding:10px; color:#E5E5E5; }
+QLabel#inventoryEmptyState { background:#292929; color:#BDBDBD; border:1px dashed #626262; border-radius:9px; padding:18px; font-size:13px; }
 QFrame#topBar,QFrame#surface,QFrame#toolbar,QFrame#metricCard,QFrame#rightWorkspacePanel { background:#292929; border:1px solid #454545; border-radius:10px; }
 QFrame#topBar { border-radius:11px; }
 QGroupBox#actionPanel { background:#292929; border:1px solid #454545; border-radius:9px; margin-top:13px; padding:14px 11px 11px; color:#F4F4F4; font-weight:750; }
@@ -39,10 +39,10 @@ QPushButton#primaryButton:pressed { background:#8F1722; border-color:#8F1722; }
 QPushButton:disabled { color:#888888; background:#303030; border-color:#454545; }
 QTableWidget { background:#202020; alternate-background-color:#292929; color:#E6E6E6; border:0; gridline-color:transparent; selection-background-color:#5A252B; selection-color:#FFFFFF; font-size:12px; outline:0; }
 QTableWidget::item { padding:7px 8px; border-bottom:1px solid #3B3B3B; }
-QTableWidget::item:hover { background:#263747; }
+QTableWidget::item:hover { background:#3A3A3A; }
 QTableWidget::item:selected { background:#5A252B; color:#FFFFFF; }
 QHeaderView { background:#343434; }
-QHeaderView::section { background:#343434; color:#C7C7C7; border:0; border-bottom:1px solid #344455; padding:9px 8px; font-size:10px; font-weight:800; letter-spacing:.3px; }
+QHeaderView::section { background:#343434; color:#C7C7C7; border:0; border-bottom:1px solid #555555; padding:9px 8px; font-size:10px; font-weight:800; letter-spacing:.3px; }
 QFrame#workspaceNavigation { background:#222222; border:1px solid #454545; border-radius:9px; }
 QTabWidget::pane { border:1px solid #454545; background:#292929; border-radius:8px; top:-1px; }
 QTabBar#workspaceTabs::tab { background:transparent; color:#BDBDBD; padding:12px 19px; border:0; border-bottom:3px solid transparent; margin-right:4px; font-weight:750; min-width:105px; }
