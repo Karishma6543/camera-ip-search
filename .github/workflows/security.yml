@@ -21,13 +21,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [cpp, python]
+        include:
+          - language: cpp
+            build-mode: manual
+          - language: python
+            build-mode: none
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          build-mode: autobuild
+          build-mode: ${{ matrix.build-mode }}
+      - name: Install Qt for C++ analysis
+        if: matrix.language == 'cpp'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.1'
+          cache: true
       - name: Build C++ application
         if: matrix.language == 'cpp'
         run: |
@@ -36,8 +46,8 @@ jobs:
       - uses: github/codeql-action/analyze@v3
 
   dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
+    name: Dependency review (requires dependency graph)
+    if: github.event_name == 'pull_request' && vars.ENABLE_DEPENDENCY_REVIEW == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
