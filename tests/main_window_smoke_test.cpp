@@ -167,7 +167,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     auto *workspace = window.findChild<QSplitter *>(QStringLiteral("mainWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
-    auto *rightWorkspace = window.findChild<QScrollArea *>(QStringLiteral("rightWorkspaceScrollArea"));
+    auto *rightWorkspace = window.findChild<QWidget *>(QStringLiteral("rightWorkspacePanel"));
     QVERIFY(tabs);
     QVERIFY(workspace);
     QVERIFY(detailsScroll);

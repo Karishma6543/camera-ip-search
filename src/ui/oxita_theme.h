@@ -15,7 +15,7 @@ QLabel#metric { color:#F4F6F8; font-size:21px; font-weight:850; }
 QLabel#eyebrow { color:#9EACBA; font-size:10px; font-weight:800; letter-spacing:1px; }
 QLabel#deviceDetails,QLabel#selectedDeviceDetails { background:#141F2B; border:1px solid #2B3948; border-radius:8px; padding:10px; color:#D8E1EA; }
 QLabel#inventoryEmptyState { background:#141F2B; color:#AAB7C5; border:1px dashed #3A4A5C; border-radius:9px; padding:18px; font-size:13px; }
-QFrame#topBar,QFrame#surface,QFrame#toolbar,QFrame#metricCard { background:#192431; border:1px solid #2B3948; border-radius:10px; }
+QFrame#topBar,QFrame#surface,QFrame#toolbar,QFrame#metricCard,QFrame#rightWorkspacePanel { background:#192431; border:1px solid #2B3948; border-radius:10px; }
 QFrame#topBar { border-radius:11px; }
 QGroupBox#actionPanel { background:#192431; border:1px solid #2B3948; border-radius:9px; margin-top:13px; padding:14px 11px 11px; color:#E7EDF4; font-weight:750; }
 QGroupBox#actionPanel::title { subcontrol-origin:margin; left:12px; padding:0 7px; color:#E7EDF4; background:#192431; font-size:12px; font-weight:800; }

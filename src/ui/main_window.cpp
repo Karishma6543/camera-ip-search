@@ -557,27 +557,21 @@ void MainWindow::buildUi()
 
     leftLayout->addWidget(deviceTable_, 1);
 
-    auto *rightScroll = new QScrollArea(central);
-    rightScroll->setWidgetResizable(true);
-    rightScroll->setMinimumWidth(290);
-    rightScroll->setMaximumWidth(360);
-    auto *rightContent = new QWidget(rightScroll);
-    auto *rightLayout = new QVBoxLayout(rightContent);
+    auto *rightWorkspace = new QFrame(central);
+    rightWorkspace->setObjectName(QStringLiteral("rightWorkspacePanel"));
+    rightWorkspace->setMinimumWidth(340);
+    rightWorkspace->setMaximumWidth(470);
+    auto *rightLayout = new QVBoxLayout(rightWorkspace);
     rightLayout->setContentsMargins(6, 6, 6, 6);
     rightLayout->setSpacing(8);
-
     rightLayout->addWidget(tabs, 1);
-    rightScroll->setWidget(rightContent);
-    rightScroll->setObjectName(QStringLiteral("rightWorkspaceScrollArea"));
-    rightScroll->setMinimumWidth(340);
-    rightScroll->setMaximumWidth(470);
 
     auto *mainWorkspace = new QSplitter(Qt::Horizontal, central);
     mainWorkspace->setObjectName(QStringLiteral("mainWorkspaceSplitter"));
     mainWorkspace->setChildrenCollapsible(false);
     mainWorkspace->setHandleWidth(7);
     mainWorkspace->addWidget(left);
-    mainWorkspace->addWidget(rightScroll);
+    mainWorkspace->addWidget(rightWorkspace);
     mainWorkspace->setStretchFactor(0, 7);
     mainWorkspace->setStretchFactor(1, 3);
     mainWorkspace->setSizes({980, 420});
