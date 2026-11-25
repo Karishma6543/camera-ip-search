@@ -56,6 +56,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/ssdp_parser.cpp
     src/discovery/onvif_network_config.h
     src/discovery/onvif_network_config.cpp
+    src/discovery/onvif_maintenance_operations.h
+    src/discovery/onvif_maintenance_operations.cpp
     src/discovery/subnet_scanner.h
     src/discovery/subnet_scanner.cpp
     src/discovery/reachability_checker.h
@@ -106,6 +108,7 @@ if(BUILD_TESTING)
     add_camera_test(ssdp-parser-tests tests/ssdp_parser_test.cpp)
     add_camera_test(adapter-registry-tests tests/adapter_registry_test.cpp)
     add_camera_test(onvif-network-config-tests tests/onvif_network_config_test.cpp)
+    add_camera_test(onvif-maintenance-operations-tests tests/onvif_maintenance_operations_test.cpp)
     add_camera_test(network-config-validator-tests tests/network_config_validator_test.cpp)
     add_camera_test(subnet-scanner-tests tests/subnet_scanner_test.cpp)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
