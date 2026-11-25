@@ -1206,7 +1206,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         tr("Select a camera to inspect its reported firmware version."),
         firmwarePanel);
     firmwareStatusSummary_->setWordWrap(true);
-    firmwareStatusSummary_->setObjectName(QStringLiteral("deviceDetails"));
+    firmwareStatusSummary_->setObjectName(QStringLiteral("firmwareDetailsSummary"));
     firmwareLayout->addWidget(firmwareStatusSummary_);
     firmwareLayout->addWidget(mutedLabel(
         tr("This workspace displays firmware details reported by the camera. Firmware installation is not available in this release."),
