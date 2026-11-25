@@ -54,7 +54,7 @@ bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
             }
             if (name == QStringLiteral("GetNetworkInterfacesResponse"))
                 responseSeen = true;
-            if (name == QStringLiteral("NetworkInterface")) {
+            if (name == QStringLiteral("NetworkInterface") || name == QStringLiteral("NetworkInterfaces")) {
                 inInterface = true;
                 current = ParsedInterface{};
                 current.info.token = xml.attributes().value(QStringLiteral("token")).toString();
@@ -105,7 +105,7 @@ bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
             }
             if (consumed) path.removeLast();
         } else if (xml.isEndElement()) {
-            if (xml.name() == QStringLiteral("NetworkInterface") && inInterface) {
+            if ((xml.name() == QStringLiteral("NetworkInterface") || xml.name() == QStringLiteral("NetworkInterfaces")) && inInterface) {
                 const bool dhcpEnabled =
                     current.info.dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
                     current.info.dhcp == QStringLiteral("1");
@@ -127,7 +127,7 @@ bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
         }
     }
 
-    if (xml.hasError() || !responseSeen) {
+    if (xml.hasError() || !responseSeen || interfaces.isEmpty()) {
         setError(error, QStringLiteral("Malformed or incomplete GetNetworkInterfaces response."));
         return false;
     }
@@ -152,6 +152,10 @@ bool OnvifNetworkConfig::parseNetworkInterfaces(const QByteArray &payload,
             reported.protocol() == QAbstractSocket::IPv4Protocol &&
             reported == preferred)
             *selected = entry.info;
+    }
+    if (selected->token.isEmpty()) {
+        setError(error, QStringLiteral("No ONVIF network interface matches the discovered IPv4 address."));
+        return false;
     }
     if (error) error->clear();
     return true;
@@ -224,14 +228,14 @@ bool OnvifNetworkConfig::verifyInterfaceIpv4Address(const QByteArray &payload,
             }
             if (name == QStringLiteral("GetNetworkInterfacesResponse"))
                 responseSeen = true;
-            else if (name == QStringLiteral("NetworkInterface"))
+            else if (name == QStringLiteral("NetworkInterface") || name == QStringLiteral("NetworkInterfaces"))
                 currentToken = xml.attributes().value(QStringLiteral("token")).toString();
             else if ((name == QStringLiteral("Address") || name == QStringLiteral("IPv4Address")) &&
                      currentToken == interfaceToken) {
                 if (xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed() == address)
                     matched = true;
             }
-        } else if (xml.isEndElement() && xml.name() == QStringLiteral("NetworkInterface")) {
+        } else if (xml.isEndElement() && (xml.name() == QStringLiteral("NetworkInterface") || xml.name() == QStringLiteral("NetworkInterfaces"))) {
             currentToken.clear();
         }
     }
