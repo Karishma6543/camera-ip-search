@@ -79,6 +79,19 @@ DeviceClassifier::Result DeviceClassifier::classify(const DeviceRecord &device)
         device.discoverySources.contains(QStringLiteral("Oxita UDP discovery")) ||
         device.discoverySources.contains(QStringLiteral("Project UDP 9988"));
 
+    const bool ssdp = device.discoverySources.contains(QStringLiteral("SSDP/UPnP"));
+    if (ssdp && hasAny(identity, {QStringLiteral("internetgatewaydevice"),
+                                  QStringLiteral("wanconnectiondevice"),
+                                  QStringLiteral("wandevice")})) {
+        return {Type::Router, Confidence::High,
+                QStringLiteral("SSDP identifies an Internet Gateway Device")};
+    }
+    if (ssdp && hasAny(identity, {QStringLiteral(":printer"),
+                                  QStringLiteral("urn:schemas-upnp-org:device:printer")})) {
+        return {Type::Printer, Confidence::High,
+                QStringLiteral("SSDP identifies a UPnP printer")};
+    }
+
     if (hasAny(identity, {QStringLiteral("nvr"), QStringLiteral("dvr"),
                           QStringLiteral("xvr"), QStringLiteral("video recorder"),
                           QStringLiteral("network video recorder")})) {
