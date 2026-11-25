@@ -281,6 +281,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(table && search && vendor && statusFilter && deviceTypeFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
+    QCOMPARE(table->item(0, 11)->text(), QStringLiteral("Stale"));
     table->selectRow(0);
     table->setCurrentCell(0, 1);
     // A saved ONVIF source label is not proof of a currently reachable service
