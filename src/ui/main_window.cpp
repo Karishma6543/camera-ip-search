@@ -264,6 +264,7 @@ void MainWindow::populateInterfaces()
 {
     if (!interfaceSelector_) return;
     interfaceSelector_->clear();
+    bool foundInterface = false;
     for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
@@ -273,9 +274,14 @@ void MainWindow::populateInterfaces()
         for (const auto &entry : interface.addressEntries())
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
                 !entry.ip().isLoopback() && entry.prefixLength() >= 1) hasIpv4 = true;
-        if (hasIpv4) interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
+        if (hasIpv4) {
+            if (!foundInterface)
+                interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
+            interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
+            foundInterface = true;
+        }
     }
-    if (interfaceSelector_->count() == 0)
+    if (!foundInterface)
         interfaceSelector_->addItem(tr("No active IPv4 interface"), QString());
 }
 
@@ -761,6 +767,11 @@ void MainWindow::buildUi()
             return;
         }
         const QString selectedName = interfaceSelector_->currentData().toString();
+        if (selectedName.isEmpty()) {
+            QMessageBox::information(this, tr("Select a network interface"),
+                tr("Choose one specific IPv4 interface to scan its subnet. Discover cameras can run across all active interfaces."));
+            return;
+        }
         const QNetworkInterface interface = QNetworkInterface::interfaceFromName(selectedName);
         for (const auto &entry : interface.addressEntries()) {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
@@ -1807,6 +1818,30 @@ void MainWindow::updateLocalNetworkSummary()
 {
     if (!localNetworkSummary_ || !interfaceSelector_) return;
     const QString interfaceName = interfaceSelector_->currentData().toString();
+    if (interfaceName.isEmpty()) {
+        QStringList details{tr("Discovery scope: all active IPv4 interfaces")};
+        int interfaceCount = 0;
+        for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+            const auto flags = interface.flags();
+            if (!flags.testFlag(QNetworkInterface::IsUp) ||
+                !flags.testFlag(QNetworkInterface::IsRunning) ||
+                flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+            QStringList addresses;
+            for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+                if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol && !entry.ip().isLoopback())
+                    addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
+            }
+            if (addresses.isEmpty()) continue;
+            ++interfaceCount;
+            details << tr("%1 (%2): %3")
+                .arg(interface.humanReadableName(), interface.name(), addresses.join(QStringLiteral(", ")));
+        }
+        details << tr("Subnet scanning requires selecting one specific interface.");
+        localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
+        if (interfaceCount == 0)
+            localNetworkSummary_->setText(tr("No active IPv4 interfaces are available."));
+        return;
+    }
     const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
     if (!interface.isValid()) {
         localNetworkSummary_->setText(tr("No active network interface is selected."));
