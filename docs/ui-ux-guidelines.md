@@ -6,24 +6,25 @@ This document defines the visual and interaction contract for the Qt desktop app
 
 | Token | Value | Use |
 |---|---|---|
-| Oxita red | `#C62836` | Primary action, selected navigation, keyboard focus and important brand accents |
+| Oxita red | `#C62836` | Primary action, selected navigation and keyboard focus |
 | Deep red | `#AD202D` | Primary action hover |
-| Charcoal | `#202329` | Headings and high-emphasis text |
-| Body text | `#24272D` | Default readable content |
-| Secondary text | `#737A84` | Supporting copy and metadata |
-| Page grey | `#F2F3F5` | Main application background |
-| Surface white | `#FFFFFF` | Tables, cards, dialogs and working areas |
-| Border grey | `#E1E4E8` | Card boundaries and separators |
-| Soft grey | `#F7F8F9` | Secondary surfaces and hover states |
+| App background | `#101720` | Main application canvas |
+| Panel surface | `#192431` | Header, inspector and primary panels |
+| Table surface | `#131E29` | Device inventory and dense data areas |
+| Raised surface | `#1D2A37` | Table headers and secondary controls |
+| Primary text | `#E7EDF4` | Headings and readable content |
+| Secondary text | `#A0ADBB` | Supporting copy and metadata |
+| Border | `#2B3948` | Panel boundaries and separators |
+| Hover surface | `#263747` | Table and control hover states |
 
-Use red with restraint. Do not use it for every button, every icon, or large page backgrounds. White is the primary working surface; greys establish hierarchy; charcoal provides readable contrast. Status colors may use semantic colors, but every state must also have a text label.
+Use red with restraint. Do not use it for every button, every icon, or large page backgrounds. Graphite/navy surfaces establish hierarchy; high-contrast neutral text carries content; red marks the primary action and focus state. Status colors remain semantic and always include a text label.
 
 ## Page hierarchy
 
 1. **Brand header:** Oxita logo and product name, with Help and Settings as secondary actions.
 2. **Discovery toolbar:** search, network interface and filters, with one clearly dominant Discover cameras action.
 3. **Primary inventory:** the device table owns the main workspace; the default columns prioritize IP, friendly name, manufacturer/model and state.
-4. **Context workspace:** Details, Configure and History live together in a compact right-hand tabbed panel beside the inventory. Selected-device and local-network context belong inside Details, not in a second competing sidebar.
+4. **Context workspace:** Details, Configure and History live together in a compact right-hand tabbed panel beside the inventory. Configure is subdivided into Device, Network and Storage so access/maintenance, IP provisioning and inventory recovery stay separate. Selected-device and local-network context belong inside Details, not in a second competing sidebar.
 5. **Progress and feedback:** operation progress and status stay in the footer/status bar rather than creating extra dashboard panels.
 
 Technical identifiers such as MAC, firmware, discovery source, serial and hardware ID remain searchable and available in device details/export, but should not crowd the default inventory table.
@@ -61,7 +62,7 @@ Technical identifiers such as MAC, firmware, discovery source, serial and hardwa
 
 ## Current implementation
 
-The current desktop workspace includes the Oxita neutral/red theme, a resizable inventory/details split, scrollable device profiles and action workspaces, searchable technical metadata, explicit empty states, row sorting, a header context menu for column visibility, and a shared progress indicator for discovery, subnet scanning and reachability.
+The current desktop workspace uses a dark graphite/navy Oxita theme with a restrained red accent, a draggable horizontal inventory/inspector split, scrollable Details and Configure sub-workspaces, searchable technical metadata, explicit empty states, row sorting, a header context menu for column visibility, and a shared progress indicator for discovery, subnet scanning and reachability.
 
 Camera network configuration supports a guarded single-camera static IPv4 workflow and a sequential bulk IPv4 workflow. Bulk mode requires checked or selected cameras, refreshed ONVIF interface details, a unique new address per camera, local validation and per-camera result/history reporting. The selected camera's discovered service host is kept separate from the ONVIF-reported interface address to avoid sending requests to a mismatched endpoint.
 
