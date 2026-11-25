@@ -66,7 +66,7 @@ QScrollBar:horizontal { background:transparent; height:9px; margin:3px; }
 QScrollBar::handle:horizontal { background:#777777; border-radius:4px; min-width:24px; }
 QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical { height:0; }
 QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal { width:0; }
-QStatusBar { background:#242424; color:#AEBAC7; border-top:1px solid #454545; padding:5px 10px; }
+QStatusBar { background:#242424; color:#D0D0D0; border-top:1px solid #454545; padding:5px 10px; }
 QMenuBar { background:#292929; color:#E6E6E6; border-bottom:1px solid #454545; }
 QMenuBar::item { padding:8px 12px; background:transparent; }
 QMenuBar::item:selected { background:#5A252B; color:#FFFFFF; }
