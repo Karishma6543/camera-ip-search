@@ -706,7 +706,7 @@ void MainWindow::buildUi()
         if (operationProgress_) operationProgress_->hide();
         recordOperation(tr("Reachability batch"), QString(), tr("Completed"), tr("%1 device(s) checked").arg(checked));
         refreshOperationHistory();
-        updateStatus(tr("Reachability check complete — %1 device(s). No response does not prove a device is offline.").arg(checked));
+        updateStatus(tr("Reachability check complete — %1 device(s). No TCP response does not prove a device is offline.").arg(checked));
     });
     connect(reachabilityChecker_, &ReachabilityChecker::progressChanged, this,
             [this](int checked, int total, const QString &ip) {
@@ -1749,12 +1749,21 @@ void MainWindow::startNextBulkIpv4Configuration()
     if (bulkIpv4Next_ >= bulkIpv4Queue_.size()) {
         bulkIpv4Running_ = false;
         if (auto *button = findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton"))) button->setEnabled(true);
-        for (auto *button : findChildren<QPushButton *>()) {
-            if (button->text() == tr("Apply static IPv4 (ONVIF)") ||
-                button->objectName() == QStringLiteral("factoryResetCameraButton") ||
-                button->objectName() == QStringLiteral("previewStaticIpv4Button"))
-                button->setEnabled(selectedDeviceRow() >= 0);
-        }
+        const int selected = selectedDeviceRow();
+        const auto *selectedIp = selected >= 0 ? deviceTable_->item(selected, 1) : nullptr;
+        const bool selectedOnvif = selected >= 0 && selectedIp &&
+            deviceTable_->item(selected, 8) &&
+            deviceTable_->item(selected, 8)->text().contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
+            !selectedIp->data(Qt::UserRole + 3).toString().isEmpty();
+        const bool selectedIpv4Ready = selectedOnvif &&
+            !selectedIp->data(Qt::UserRole + 7).toString().isEmpty() &&
+            selectedIp->data(Qt::UserRole + 16).toBool();
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
+            button->setEnabled(selectedIpv4Ready);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
+            button->setEnabled(selectedOnvif);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")))
+            button->setEnabled(selected >= 0);
         if (operationProgress_) operationProgress_->hide();
         const QString summary = tr("Bulk IPv4 configuration finished: %1 verified, %2 failed, %3 total.")
             .arg(bulkIpv4Succeeded_).arg(bulkIpv4Failed_).arg(bulkIpv4Queue_.size());
