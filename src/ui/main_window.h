@@ -16,6 +16,7 @@ class DiscoveryService;
 class SubnetScanner;
 class ReachabilityChecker;
 class QWidget;
+class DeviceClassifier;
 
 class MainWindow final : public QMainWindow
 {
@@ -62,6 +63,7 @@ private:
     QLineEdit *searchEdit_{nullptr};
     QComboBox *interfaceSelector_{nullptr};
     QComboBox *manufacturerFilter_{nullptr};
+    QComboBox *deviceTypeFilter_{nullptr};
     QComboBox *statusFilter_{nullptr};
     bool loadingInventory_{false};
     int sortColumn_{-1};
