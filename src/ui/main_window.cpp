@@ -1774,7 +1774,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         const QString key = (separator >= 0 ? detail.left(separator) : detail).toHtmlEscaped();
         const QString value = (separator >= 0 ? detail.mid(separator + 2) : QString()).toHtmlEscaped();
         html += QStringLiteral("<tr><td width='32%' valign='top' style='color:#A0ADBB;border-bottom:1px solid #2B3948;font-size:12px;'>%1</td>"
-            "<td width='68%' valign='top' style='color:#E7EDF4;border-bottom:1px solid #ECEEF1;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
+            "<td width='68%' valign='top' style='color:#E7EDF4;border-bottom:1px solid #2B3948;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-all;'>%2</td></tr>")
             .arg(key, value);
     }
     html += QStringLiteral("</table></body></html>");

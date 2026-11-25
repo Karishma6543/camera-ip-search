@@ -164,9 +164,11 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
+    auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     auto *workspace = window.findChild<QSplitter *>(QStringLiteral("mainWorkspaceSplitter"));
     auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
     auto *rightWorkspace = window.findChild<QScrollArea *>(QStringLiteral("rightWorkspaceScrollArea"));
+    QVERIFY(tabs);
     QVERIFY(workspace);
     QVERIFY(detailsScroll);
     QVERIFY(rightWorkspace);
