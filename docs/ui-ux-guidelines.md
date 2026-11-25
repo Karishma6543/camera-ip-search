@@ -62,7 +62,7 @@ Technical identifiers such as MAC, firmware, discovery source, serial and hardwa
 
 ## Current implementation
 
-The current desktop workspace uses a dark graphite/navy Oxita theme with a restrained red accent, a draggable horizontal inventory/inspector split, scrollable Details and Configure sub-workspaces, searchable technical metadata, explicit empty states, row sorting, a header context menu for column visibility, and a shared progress indicator for discovery, subnet scanning and reachability.
+The current desktop workspace uses the Oxita black, charcoal-grey, white and red palette with a restrained red accent, a draggable horizontal inventory/inspector split, scrollable Details and Configure sub-workspaces, searchable technical metadata, explicit empty states, row sorting, a header context menu for column visibility, and a shared progress indicator for discovery, subnet scanning and reachability.
 
 Camera network configuration supports a guarded single-camera static IPv4 workflow and a sequential bulk IPv4 workflow. Bulk mode requires checked or selected cameras, refreshed ONVIF interface details, a unique new address per camera, local validation and per-camera result/history reporting. The selected camera's discovered service host is kept separate from the ONVIF-reported interface address to avoid sending requests to a mismatched endpoint.
 

@@ -100,8 +100,8 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto tabs = window.findChild<QTabBar *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
-        QStringLiteral("Details"), QStringLiteral("Configure"),
-        QStringLiteral("History")
+        QStringLiteral("Device Info"), QStringLiteral("Configuration"),
+        QStringLiteral("Operation History")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
     auto *configurationTabs = window.findChild<QTabWidget *>(QStringLiteral("configurationTabs"));

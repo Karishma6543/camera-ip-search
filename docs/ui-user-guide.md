@@ -42,7 +42,7 @@ Use discovery first. Subnet scanning can take longer and a TCP response does not
 
 ## 4. Lower device workspace
 
-The right-hand inspector uses three tabs: **Details**, **Configure** and **History**. Configure is further divided into **Device**, **Network** and **Storage**, so camera access/maintenance, IP provisioning and local inventory recovery do not compete in one long panel.
+The top workspace navigation has three tabs: **Device Info**, **Configuration** and **Operation History**. Selecting a tab updates the right-hand inspector while keeping the camera inventory visible. Configure is further divided into **Device**, **Network** and **Storage**, so camera access/maintenance, IP provisioning and local inventory recovery do not compete in one long panel.
 
 ### Device details
 
