@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
+#include "core/device_classifier.h"
 #include "core/inventory_backup.h"
 
 #include "discovery/discovery_service.h"
@@ -341,6 +342,18 @@ void MainWindow::buildUi()
     interfaceSelector_->setAccessibleName(tr("Network interface for discovery and scanning"));
     interfaceSelector_->setMinimumWidth(165);
     interfaceSelector_->setToolTip(tr("Choose the active network adapter used for discovery and subnet scanning."));
+    deviceTypeFilter_ = new QComboBox(toolbar);
+    deviceTypeFilter_->setObjectName(QStringLiteral("deviceTypeFilter"));
+    deviceTypeFilter_->setAccessibleName(tr("Filter by device type"));
+    deviceTypeFilter_->setToolTip(tr("Show cameras, NVRs, routers, switches, printers, computers or devices that cannot yet be identified."));
+    deviceTypeFilter_->addItem(tr("All device types"), QStringLiteral("all"));
+    deviceTypeFilter_->addItem(tr("Cameras"), QStringLiteral("camera"));
+    deviceTypeFilter_->addItem(tr("NVRs"), QStringLiteral("nvr"));
+    deviceTypeFilter_->addItem(tr("Routers"), QStringLiteral("router"));
+    deviceTypeFilter_->addItem(tr("Switches"), QStringLiteral("switch"));
+    deviceTypeFilter_->addItem(tr("Printers"), QStringLiteral("printer"));
+    deviceTypeFilter_->addItem(tr("Computers"), QStringLiteral("computer"));
+    deviceTypeFilter_->addItem(tr("Unknown"), QStringLiteral("unknown"));
     manufacturerFilter_ = new QComboBox(toolbar);
     manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
     manufacturerFilter_->setAccessibleName(tr("Filter by manufacturer or discovery protocol"));
@@ -357,6 +370,7 @@ void MainWindow::buildUi()
     filterRow->addWidget(interfaceSelector_);
     connect(interfaceSelector_, &QComboBox::currentIndexChanged, this,
             [this](int) { updateLocalNetworkSummary(); });
+    filterRow->addWidget(deviceTypeFilter_);
     filterRow->addWidget(vendorFilter);
     filterRow->addWidget(statusFilter);
     filterRow->addStretch();
@@ -516,7 +530,7 @@ void MainWindow::buildUi()
 
     deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
     inventoryEmptyState_ = new QLabel(
-        tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."), left);
+        tr("No devices in your inventory yet.\nChoose a network interface above and scan or discover devices on your LAN."), left);
     inventoryEmptyState_->setObjectName(QStringLiteral("inventoryEmptyState"));
     inventoryEmptyState_->setAlignment(Qt::AlignCenter);
     inventoryEmptyState_->setWordWrap(true);
@@ -780,6 +794,7 @@ void MainWindow::buildUi()
         updateLocalNetworkSummary();
     });
     connect(searchEdit_, &QLineEdit::textChanged, this, &MainWindow::applyFilters);
+    connect(deviceTypeFilter_, &QComboBox::currentIndexChanged, this, &MainWindow::applyFilters);
     connect(vendorFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
     connect(statusFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
     connect(renameButton, &QPushButton::clicked, this, &MainWindow::editSelectedLabel);
@@ -1991,6 +2006,11 @@ void MainWindow::upsertDevice(DeviceRecord device)
         ? device.ipv4ConfigurationKnown
         : (device.ipv4ConfigurationKnown ||
            (previousIpItem && previousIpItem->data(Qt::UserRole + 16).toBool())));
+    const DeviceClassifier::Result classification = DeviceClassifier::classify(device);
+    ipItem->setData(Qt::UserRole + 17, classification.key());
+    ipItem->setData(Qt::UserRole + 18, classification.confidenceLabel());
+    ipItem->setToolTip(tr("Device type: %1 (%2)\n%3")
+        .arg(classification.displayLabel(), classification.confidenceLabel(), classification.reason));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
@@ -2386,6 +2406,8 @@ void MainWindow::applyFilters()
     const QString needle = searchEdit_ ? searchEdit_->text().trimmed() : QString();
     const QString vendor = manufacturerFilter_ ? manufacturerFilter_->currentText() : tr("All manufacturers");
     const QString status = statusFilter_ ? statusFilter_->currentText() : tr("All statuses");
+    const QString deviceType = deviceTypeFilter_ ? deviceTypeFilter_->currentData().toString()
+                                                  : QStringLiteral("all");
     int visible = 0;
     for (int row = 0; row < deviceTable_->rowCount(); ++row) {
         bool textMatch = needle.isEmpty();
@@ -2401,11 +2423,15 @@ void MainWindow::applyFilters()
             (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
              !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
         const QString reachability = deviceTable_->item(row, 11) ? deviceTable_->item(row, 11)->text() : QStringLiteral("Not checked");
+        const QString classifiedType = deviceTable_->item(row, 1)
+            ? deviceTable_->item(row, 1)->data(Qt::UserRole + 17).toString()
+            : QStringLiteral("unknown");
+        const bool typeMatch = deviceType == QStringLiteral("all") || classifiedType == deviceType;
         const bool statusMatch = status == tr("All statuses") ||
             (status == tr("Online") && reachability == QStringLiteral("Reachable")) ||
             (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
             (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
-        const bool show = textMatch && vendorMatch && statusMatch;
+        const bool show = textMatch && vendorMatch && typeMatch && statusMatch;
         deviceTable_->setRowHidden(row, !show);
         if (show) ++visible;
     }
@@ -2422,7 +2448,7 @@ void MainWindow::applyFilters()
             inventoryEmptyState_->show();
         } else if (visible == 0) {
             inventoryEmptyState_->setText(
-                tr("No devices match these filters.\nClear your search or choose different manufacturer and status filters."));
+                tr("No devices match these filters.\nClear your search or choose different device type, manufacturer or status filters."));
             inventoryEmptyState_->show();
         } else {
             inventoryEmptyState_->hide();
