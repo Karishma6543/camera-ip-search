@@ -3,6 +3,7 @@
 #include <QHostAddress>
 #include <QXmlStreamWriter>
 #include <QAbstractSocket>
+#include <functional>
 
 namespace {
 bool validToken(const QString &token)
