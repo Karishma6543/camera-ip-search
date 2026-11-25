@@ -684,6 +684,8 @@ void MainWindow::buildUi()
                 if (auto *ipItem = deviceTable_->item(row, 1)) {
                     ipItem->setData(Qt::UserRole + 14, checkedAt);
                     ipItem->setData(Qt::UserRole + 15, lastSuccessAt);
+                    if (status == QStringLiteral("Reachable"))
+                        ipItem->setData(Qt::UserRole + 19, checkedAt);
                 }
                 if (row == selectedDeviceRow()) {
                     updateDeviceDetailsProfile(row);
@@ -692,10 +694,11 @@ void MainWindow::buildUi()
                 const QString mac = deviceTable_->item(row, 5) ? deviceTable_->item(row, 5)->text() : QString();
                 if (inventoryDb_.isOpen()) {
                     QSqlQuery query(inventoryDb_);
-                    query.prepare(QStringLiteral("UPDATE devices SET reachability_status=:status, reachability_checked_at=:checked, last_successful_response_at=:success WHERE device_key=:key"));
+                    query.prepare(QStringLiteral("UPDATE devices SET reachability_status=:status, reachability_checked_at=:checked, last_successful_response_at=:success, last_seen=CASE WHEN :status_seen='Reachable' THEN CURRENT_TIMESTAMP ELSE last_seen END WHERE device_key=:key"));
                     query.bindValue(":status", status);
                     query.bindValue(":checked", checkedAt);
                     query.bindValue(":success", lastSuccessAt);
+                    query.bindValue(":status_seen", status);
                     query.bindValue(":key", !mac.isEmpty() ? mac : ip);
                     if (!query.exec()) updateStatus(tr("Could not save reachability result: %1").arg(query.lastError().text()));
                 }
@@ -2050,13 +2053,13 @@ void MainWindow::upsertDevice(DeviceRecord device)
         }
     }
     if (!loadingInventory_) {
-        device.lastSeenAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
-        const bool verifiedResponse = !device.isCandidate &&
-            (device.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
-             device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
-             device.discoverySources.contains(QStringLiteral("Project UDP 9988")) ||
-             device.discoverySources.contains(QStringLiteral("SSDP/UPnP")));
-        if (device.isCandidate || verifiedResponse) {
+        const bool observedOnNetwork = device.isCandidate ||
+            device.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
+            device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
+            device.discoverySources.contains(QStringLiteral("Project UDP 9988")) ||
+            device.discoverySources.contains(QStringLiteral("SSDP/UPnP"));
+        if (observedOnNetwork) {
+            device.lastSeenAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
             device.reachabilityStatus = QStringLiteral("Reachable");
             device.reachabilityCheckedAt = device.lastSeenAt;
             device.lastSuccessfulResponseAt = device.lastSeenAt;
