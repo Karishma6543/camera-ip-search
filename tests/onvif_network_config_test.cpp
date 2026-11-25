@@ -140,7 +140,7 @@ void OnvifNetworkConfigTest::leavesInterfaceUnselectedWhenAddressDoesNotMatch()
 
     OnvifNetworkConfig::InterfaceIpv4Info selected;
     QStringList summaries;
-    QVERIFY(OnvifNetworkConfig::parseNetworkInterfaces(
+    QVERIFY(!OnvifNetworkConfig::parseNetworkInterfaces(
         xml, QStringLiteral("192.168.1.20"), &selected, &summaries));
     QVERIFY(selected.token.isEmpty());
     QCOMPARE(summaries.size(), 1);
