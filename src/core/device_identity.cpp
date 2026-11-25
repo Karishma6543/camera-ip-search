@@ -156,15 +156,25 @@ DeviceRecord mergeObservations(const DeviceRecord &existing,
         merged.onvifEndpoint = observation.onvifEndpoint;
     if (verifiedObservation && !observation.interfaceName.isEmpty())
         merged.interfaceName = observation.interfaceName;
-    if (merged.reachabilityStatus == QStringLiteral("Not checked") &&
-        observation.reachabilityStatus != QStringLiteral("Not checked"))
-        merged.reachabilityStatus = observation.reachabilityStatus;
-    if (merged.reachabilityCheckedAt.isEmpty())
-        merged.reachabilityCheckedAt = observation.reachabilityCheckedAt;
-    if (merged.lastSuccessfulResponseAt.isEmpty())
-        merged.lastSuccessfulResponseAt = observation.lastSuccessfulResponseAt;
-    if (!observation.lastSeenAt.isEmpty())
+    if (!observation.lastSeenAt.isEmpty()) {
+        // A timestamp supplied by the current observation supersedes the
+        // historical/stale reachability state loaded from persistent inventory.
         merged.lastSeenAt = observation.lastSeenAt;
+        if (!observation.reachabilityStatus.isEmpty())
+            merged.reachabilityStatus = observation.reachabilityStatus;
+        if (!observation.reachabilityCheckedAt.isEmpty())
+            merged.reachabilityCheckedAt = observation.reachabilityCheckedAt;
+        if (!observation.lastSuccessfulResponseAt.isEmpty())
+            merged.lastSuccessfulResponseAt = observation.lastSuccessfulResponseAt;
+    } else {
+        if (merged.reachabilityStatus == QStringLiteral("Not checked") &&
+            observation.reachabilityStatus != QStringLiteral("Not checked"))
+            merged.reachabilityStatus = observation.reachabilityStatus;
+        if (merged.reachabilityCheckedAt.isEmpty())
+            merged.reachabilityCheckedAt = observation.reachabilityCheckedAt;
+        if (merged.lastSuccessfulResponseAt.isEmpty())
+            merged.lastSuccessfulResponseAt = observation.lastSuccessfulResponseAt;
+    }
 
     appendUnique(merged.discoverySources, observation.discoverySources);
     if (observation.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
