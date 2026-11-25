@@ -18,6 +18,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QScrollArea>
+#include <QHeaderView>
 #include <QProgressBar>
 #include <QSplitter>
 #include <QTcpServer>
