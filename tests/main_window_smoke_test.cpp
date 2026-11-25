@@ -283,8 +283,10 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(!table->isRowHidden(0));
     table->selectRow(0);
     table->setCurrentCell(0, 1);
-    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
-    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
+    // A saved ONVIF source label is not proof of a currently reachable service
+    // endpoint or a verified network interface. Keep write actions disabled.
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
     const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
     QVERIFY(deviceDetails);
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
