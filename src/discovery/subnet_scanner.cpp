@@ -7,7 +7,12 @@
 namespace {
 constexpr int kMaxHosts = 256;
 constexpr int kConnectTimeoutMs = 450;
-const QVector<quint16> kCameraPorts{80, 443, 554, 8000, 8080, 8899, 34567};
+// Common management, printing, file-sharing and camera services. A positive
+// TCP response only creates an unverified candidate; it does not identify it.
+const QVector<quint16> kCommonDevicePorts{
+    22, 23, 53, 80, 135, 139, 443, 445, 515, 554, 631, 1900,
+    2869, 3389, 5000, 5357, 7547, 8000, 8080, 8443, 8899, 9100, 34567
+};
 }
 
 SubnetScanner::SubnetScanner(QObject *parent) : QObject(parent)
@@ -48,7 +53,8 @@ bool SubnetScanner::isUsableSubnet(const QNetworkAddressEntry &entry)
 }
 
 bool SubnetScanner::start(const QNetworkInterface &interface,
-                          const QNetworkAddressEntry &entry)
+                          const QNetworkAddressEntry &entry,
+                          quint32 maxHosts)
 {
     const auto flags = interface.flags();
     if (running_ || !interface.isValid() ||
@@ -89,28 +95,34 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     const quint32 first = network + 1;
     const quint32 last = broadcast - 1;
     const quint32 hostCount = last - first + 1;
+    const quint32 scanLimit = maxHosts == 0 ? 4096U : qMin(maxHosts, 4096U);
+    if (maxHosts == 0 && hostCount > scanLimit) {
+        emit statusChanged(tr("Subnet contains %1 hosts. Full scans are limited to 4096 hosts; choose a smaller subnet or use the bounded scan.")
+                               .arg(hostCount));
+        return false;
+    }
     quint32 scanFirst = first;
     quint32 scanLast = last;
-    if (hostCount > kMaxHosts) {
-        // Keep the bounded scan useful on larger subnets by centering the
-        // address window around the selected interface's own IPv4 address.
-        const quint32 halfWindow = static_cast<quint32>(kMaxHosts / 2);
+    if (hostCount > scanLimit) {
+        // Keep a bounded scan useful on larger subnets by centering its window
+        // around the selected interface's own IPv4 address.
+        const quint32 halfWindow = scanLimit / 2;
         if (ip > first + halfWindow)
             scanFirst = ip - halfWindow;
-        if (scanFirst > last - static_cast<quint32>(kMaxHosts) + 1)
-            scanFirst = last - static_cast<quint32>(kMaxHosts) + 1;
-        scanLast = scanFirst + static_cast<quint32>(kMaxHosts) - 1;
-        emit statusChanged(tr("Subnet contains %1 hosts; scanning a bounded %2-address window around %3.")
-                               .arg(hostCount).arg(kMaxHosts).arg(entry.ip().toString()));
+        if (scanFirst > last - scanLimit + 1)
+            scanFirst = last - scanLimit + 1;
+        scanLast = scanFirst + scanLimit - 1;
+        emit statusChanged(tr("Subnet contains %1 hosts; scanning a bounded %2-address window around %3 across common device services.")
+                               .arg(hostCount).arg(scanLimit).arg(entry.ip().toString()));
     } else {
-        emit statusChanged(tr("Scanning %1 local IPv4 host(s) on %2.")
+        emit statusChanged(tr("Scanning %1 local IPv4 host(s) across common device services on %2.")
                                .arg(hostCount).arg(interface.humanReadableName()));
     }
 
     for (quint32 host = scanFirst;; ++host) {
         if (host != ip) {
             const QString address = QHostAddress(host).toString();
-            for (quint16 port : kCameraPorts)
+            for (quint16 port : kCommonDevicePorts)
                 pending_.append(qMakePair(address, port));
         }
         // Avoid unsigned wraparound when a bounded window ends at 255.255.255.255.

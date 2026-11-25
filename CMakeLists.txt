@@ -35,6 +35,8 @@ set(CAMERA_CORE_SOURCES
     src/app/batch_operation_runner.h
     src/app/batch_operation_runner.cpp
     src/core/device_record.h
+    src/core/device_classifier.h
+    src/core/device_classifier.cpp
     src/core/device_identity.h
     src/core/device_identity.cpp
     src/core/inventory_backup.h
@@ -50,6 +52,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/discovery_service.cpp
     src/discovery/discovery_parser.h
     src/discovery/discovery_parser.cpp
+    src/discovery/ssdp_parser.h
+    src/discovery/ssdp_parser.cpp
     src/discovery/onvif_network_config.h
     src/discovery/onvif_network_config.cpp
     src/discovery/subnet_scanner.h
@@ -95,12 +99,14 @@ if(BUILD_TESTING)
     endfunction()
 
     add_camera_test(discovery-parser-tests tests/discovery_parser_test.cpp)
+    add_camera_test(ssdp-parser-tests tests/ssdp_parser_test.cpp)
     add_camera_test(adapter-registry-tests tests/adapter_registry_test.cpp)
     add_camera_test(onvif-network-config-tests tests/onvif_network_config_test.cpp)
     add_camera_test(network-config-validator-tests tests/network_config_validator_test.cpp)
     add_camera_test(subnet-scanner-tests tests/subnet_scanner_test.cpp)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
     add_camera_test(device-identity-tests tests/device_identity_test.cpp)
+    add_camera_test(device-classifier-tests tests/device_classifier_test.cpp)
     add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
     add_camera_test(onvif-dns-parser-tests tests/onvif_dns_parser_test.cpp)

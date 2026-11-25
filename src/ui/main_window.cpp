@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
+#include "core/device_classifier.h"
 #include "core/inventory_backup.h"
 
 #include "discovery/discovery_service.h"
@@ -86,6 +87,35 @@ QGroupBox *panel(const QString &title, QWidget *parent)
     auto *box = new QGroupBox(title, parent);
     box->setObjectName(QStringLiteral("actionPanel"));
     return box;
+}
+
+QString reservedIpv4Reason(const QString &candidate, const QTableWidget *table,
+                           int excludedRow)
+{
+    QHostAddress parsed;
+    if (!parsed.setAddress(candidate.trimmed()) ||
+        parsed.protocol() != QAbstractSocket::IPv4Protocol)
+        return {};
+    const QString normalized = parsed.toString();
+    if (table) {
+        for (int row = 0; row < table->rowCount(); ++row) {
+            if (row == excludedRow) continue;
+            const auto *ipItem = table->item(row, 1);
+            if (ipItem && QHostAddress(ipItem->text()).toString() == normalized)
+                return QObject::tr("Address %1 is already assigned to another inventory device.").arg(normalized);
+            if (ipItem && QHostAddress(ipItem->data(Qt::UserRole + 10).toString()).toString() == normalized)
+                return QObject::tr("Address %1 is reported as another device's default gateway.").arg(normalized);
+        }
+    }
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                entry.ip().toString() == normalized)
+                return QObject::tr("Address %1 is already assigned to this computer's %2 interface.")
+                    .arg(normalized, interface.humanReadableName());
+        }
+    }
+    return {};
 }
 }
 
@@ -263,6 +293,7 @@ void MainWindow::populateInterfaces()
 {
     if (!interfaceSelector_) return;
     interfaceSelector_->clear();
+    bool foundInterface = false;
     for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
@@ -272,9 +303,14 @@ void MainWindow::populateInterfaces()
         for (const auto &entry : interface.addressEntries())
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
                 !entry.ip().isLoopback() && entry.prefixLength() >= 1) hasIpv4 = true;
-        if (hasIpv4) interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
+        if (hasIpv4) {
+            if (!foundInterface)
+                interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
+            interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
+            foundInterface = true;
+        }
     }
-    if (interfaceSelector_->count() == 0)
+    if (!foundInterface)
         interfaceSelector_->addItem(tr("No active IPv4 interface"), QString());
 }
 
@@ -331,7 +367,7 @@ void MainWindow::buildUi()
     filterRow->setSpacing(9);
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setObjectName(QStringLiteral("deviceSearch"));
-    searchEdit_->setAccessibleName(tr("Search camera inventory"));
+    searchEdit_->setAccessibleName(tr("Search network inventory"));
     searchEdit_->setPlaceholderText(tr("Search devices by IP, name, MAC or model"));
     searchEdit_->setMinimumWidth(235);
     searchEdit_->setToolTip(tr("Search all inventory fields, including technical details hidden from the compact table."));
@@ -341,6 +377,18 @@ void MainWindow::buildUi()
     interfaceSelector_->setAccessibleName(tr("Network interface for discovery and scanning"));
     interfaceSelector_->setMinimumWidth(165);
     interfaceSelector_->setToolTip(tr("Choose the active network adapter used for discovery and subnet scanning."));
+    deviceTypeFilter_ = new QComboBox(toolbar);
+    deviceTypeFilter_->setObjectName(QStringLiteral("deviceTypeFilter"));
+    deviceTypeFilter_->setAccessibleName(tr("Filter by device type"));
+    deviceTypeFilter_->setToolTip(tr("Show cameras, NVRs, routers, switches, printers, computers or devices that cannot yet be identified."));
+    deviceTypeFilter_->addItem(tr("All device types"), QStringLiteral("all"));
+    deviceTypeFilter_->addItem(tr("Cameras"), QStringLiteral("camera"));
+    deviceTypeFilter_->addItem(tr("NVRs"), QStringLiteral("nvr"));
+    deviceTypeFilter_->addItem(tr("Routers"), QStringLiteral("router"));
+    deviceTypeFilter_->addItem(tr("Switches"), QStringLiteral("switch"));
+    deviceTypeFilter_->addItem(tr("Printers"), QStringLiteral("printer"));
+    deviceTypeFilter_->addItem(tr("Computers"), QStringLiteral("computer"));
+    deviceTypeFilter_->addItem(tr("Unknown"), QStringLiteral("unknown"));
     manufacturerFilter_ = new QComboBox(toolbar);
     manufacturerFilter_->setObjectName(QStringLiteral("manufacturerFilter"));
     manufacturerFilter_->setAccessibleName(tr("Filter by manufacturer or discovery protocol"));
@@ -348,15 +396,16 @@ void MainWindow::buildUi()
     vendorFilter->addItems({tr("All manufacturers"), tr("ONVIF devices"), tr("Oxita devices"), tr("Other / unknown")});
     statusFilter_ = new QComboBox(toolbar);
     statusFilter_->setObjectName(QStringLiteral("statusFilter"));
-    statusFilter_->setAccessibleName(tr("Filter by camera status"));
+    statusFilter_->setAccessibleName(tr("Filter by reachability and activation state"));
     auto *statusFilter = statusFilter_;
-    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Activated"), tr("Not activated")});
+    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Offline"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("muted"));
     filterRow->addWidget(searchEdit_, 2);
     filterRow->addWidget(interfaceSelector_);
     connect(interfaceSelector_, &QComboBox::currentIndexChanged, this,
             [this](int) { updateLocalNetworkSummary(); });
+    filterRow->addWidget(deviceTypeFilter_);
     filterRow->addWidget(vendorFilter);
     filterRow->addWidget(statusFilter);
     filterRow->addStretch();
@@ -427,7 +476,7 @@ void MainWindow::buildUi()
     leftLayout->setContentsMargins(14, 13, 14, 14);
     leftLayout->setSpacing(10);
     auto *listHeading = new QHBoxLayout();
-    auto *listTitle = new QLabel(tr("Camera inventory"), left);
+    auto *listTitle = new QLabel(tr("Network inventory"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
     summaryLabel_ = mutedLabel(tr("Discover cameras on your selected network"), left);
     auto *selectAllChecks = actionButton(tr("Select all"), left);
@@ -442,9 +491,9 @@ void MainWindow::buildUi()
     listHeading->addWidget(clearChecks);
     leftLayout->addLayout(listHeading);
 
-    deviceTable_ = new QTableWidget(0, 12, left);
+    deviceTable_ = new QTableWidget(0, 13, left);
     deviceTable_->setObjectName(QStringLiteral("deviceTable"));
-    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DEVICE NAME"), tr("MANUFACTURER"), tr("MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("ACTIVATION"), tr("DISCOVERY SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
+    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DEVICE NAME"), tr("MANUFACTURER"), tr("MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("ACTIVATION"), tr("DISCOVERY SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY"), tr("DEVICE TYPE")});
     auto *deviceHeader = deviceTable_->horizontalHeader();
     deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
     deviceHeader->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -460,6 +509,7 @@ void MainWindow::buildUi()
     deviceHeader->resizeSection(9, 126);
     deviceHeader->resizeSection(10, 118);
     deviceHeader->resizeSection(11, 118);
+    deviceHeader->resizeSection(12, 112);
     deviceHeader->setMinimumSectionSize(72);
     // Keep the primary inventory view scannable; technical identifiers remain
     // searchable and are available in Device details and CSV export.
@@ -472,8 +522,8 @@ void MainWindow::buildUi()
     deviceTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->verticalHeader()->setVisible(false);
     deviceTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    deviceTable_->setAccessibleName(tr("Camera inventory table"));
-    deviceTable_->setAccessibleDescription(tr("Select a row to inspect camera details. Use the first column to include cameras in bulk operations."));
+    deviceTable_->setAccessibleName(tr("Network device inventory table"));
+    deviceTable_->setAccessibleDescription(tr("Select a row to inspect device details. Use the first column to include compatible cameras in bulk operations."));
     deviceTable_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     deviceTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     deviceTable_->setAlternatingRowColors(true);
@@ -514,9 +564,9 @@ void MainWindow::buildUi()
         menu.exec(deviceHeader->mapToGlobal(position));
     });
 
-    deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
+    deviceTable_->setToolTip(tr("Select a row to inspect device details. The type column includes a confidence level in its tooltip. Check the first column to include devices in reachability checks."));
     inventoryEmptyState_ = new QLabel(
-        tr("No cameras in your inventory yet.\nChoose a network interface above and select Discover cameras to find devices on your LAN."), left);
+        tr("No devices in your inventory yet.\nChoose a network interface above and scan or discover devices on your LAN."), left);
     inventoryEmptyState_->setObjectName(QStringLiteral("inventoryEmptyState"));
     inventoryEmptyState_->setAlignment(Qt::AlignCenter);
     inventoryEmptyState_->setWordWrap(true);
@@ -562,7 +612,7 @@ void MainWindow::buildUi()
     selectedDeviceSummary_->setObjectName(QStringLiteral("sectionTitle"));
     selectedDeviceSummary_->setWordWrap(true);
     selectedNetworkSummary_ = mutedLabel(
-        tr("Select a camera in the inventory to inspect its network and verification state."),
+        tr("Select a device in the inventory to inspect its network and verification state."),
         selectedPanel);
     selectedNetworkSummary_->setObjectName(QStringLiteral("selectedDeviceDetails"));
     selectedNetworkSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -746,19 +796,51 @@ void MainWindow::buildUi()
             return;
         }
         const QString selectedName = interfaceSelector_->currentData().toString();
+        if (selectedName.isEmpty()) {
+            QMessageBox::information(this, tr("Select a network interface"),
+                tr("Choose one specific IPv4 interface to scan its subnet. Discover cameras can run across all active interfaces."));
+            return;
+        }
         const QNetworkInterface interface = QNetworkInterface::interfaceFromName(selectedName);
         for (const auto &entry : interface.addressEntries()) {
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
-                if (subnetScanner_->start(interface, entry)) {
-                    subnetScanButton_->setText(tr("Cancel subnet scan"));
-                    if (operationProgress_) {
-                        operationProgress_->setRange(0, 0);
-                        operationProgress_->setFormat(tr("Scanning subnet…"));
-                        operationProgress_->show();
-                    }
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                entry.ip().isLoopback() || entry.prefixLength() < 1)
+                continue;
+
+            const quint32 ip = entry.ip().toIPv4Address();
+            const quint32 mask = 0xffffffffU << (32 - entry.prefixLength());
+            const quint32 network = ip & mask;
+            const quint32 broadcast = network | ~mask;
+            const quint32 hostCount = broadcast - network - 1U;
+            quint32 scanLimit = 256;
+            if (hostCount > 256 && hostCount <= 4096) {
+                QMessageBox scope(this);
+                scope.setIcon(QMessageBox::Information);
+                scope.setWindowTitle(tr("Choose subnet scan scope"));
+                scope.setText(tr("This subnet contains %1 usable host addresses.").arg(hostCount));
+                scope.setInformativeText(tr("A full scan checks common TCP services on every host and may take longer. You can also scan a 256-address window around this computer."));
+                auto *fullScan = scope.addButton(tr("Scan entire subnet"), QMessageBox::AcceptRole);
+                auto *boundedScan = scope.addButton(tr("Scan 256-address window"), QMessageBox::ActionRole);
+                scope.addButton(QMessageBox::Cancel);
+                scope.exec();
+                if (scope.clickedButton() == fullScan)
+                    scanLimit = 0;
+                else if (scope.clickedButton() != boundedScan)
                     return;
+            } else if (hostCount > 4096) {
+                QMessageBox::warning(this, tr("Large subnet"),
+                    tr("This subnet contains %1 usable hosts. To avoid an extremely large scan, this build limits one full scan to 4096 hosts. A 256-address window will be scanned around this computer.")
+                        .arg(hostCount));
+            }
+
+            if (subnetScanner_->start(interface, entry, scanLimit)) {
+                subnetScanButton_->setText(tr("Cancel subnet scan"));
+                if (operationProgress_) {
+                    operationProgress_->setRange(0, 0);
+                    operationProgress_->setFormat(tr("Scanning subnet…"));
+                    operationProgress_->show();
                 }
+                return;
             }
         }
         updateStatus(tr("Could not start subnet scan. Select an active IPv4 interface."));
@@ -780,6 +862,7 @@ void MainWindow::buildUi()
         updateLocalNetworkSummary();
     });
     connect(searchEdit_, &QLineEdit::textChanged, this, &MainWindow::applyFilters);
+    connect(deviceTypeFilter_, &QComboBox::currentIndexChanged, this, &MainWindow::applyFilters);
     connect(vendorFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
     connect(statusFilter, &QComboBox::currentTextChanged, this, &MainWindow::applyFilters);
     connect(renameButton, &QPushButton::clicked, this, &MainWindow::editSelectedLabel);
@@ -938,7 +1021,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *heading = new QLabel(tr("Device information"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
-        tr("Select a camera above to review its identity, discovery evidence, ONVIF services, network configuration and reported capabilities."),
+        tr("Select a device above to review its identity, discovery evidence, available services, network configuration and reported capabilities."),
         content);
     layout->addWidget(heading);
     layout->addWidget(description);
@@ -951,7 +1034,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *identityTitle = new QLabel(tr("DEVICE PROFILE"), identityPanel);
     identityTitle->setObjectName(QStringLiteral("eyebrow"));
     deviceDetailsLabel_ = new QLabel(
-        tr("No device selected. Select a camera in the inventory above to inspect its reported information."),
+        tr("No device selected. Select a device in the inventory above to inspect its reported information."),
         identityPanel);
     deviceDetailsLabel_->setWordWrap(true);
     deviceDetailsLabel_->setTextFormat(Qt::RichText);
@@ -986,7 +1069,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     heading->setObjectName(QStringLiteral("sectionTitle"));
     layout->addWidget(heading);
     layout->addWidget(mutedLabel(
-        tr("Actions are performed against the selected camera. Review the target address before opening its web interface or changing network settings."),
+        tr("Actions are performed against the selected device. Review the target address before opening its web interface or changing network settings."),
         content));
 
     auto *devicePanel = panel(tr("Device access & diagnostics"), content);
@@ -1171,12 +1254,18 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
                 if (!NetworkConfigValidator::validateStaticIpv4(address, mask, gateway, QString(), &error)) {
                     QMessageBox::warning(&dialog, tr("Invalid IPv4 assignment"), error); table->setCurrentCell(i, 1); return;
                 }
+                if (address == targets.at(i).device.ipAddress) {
+                    QMessageBox::warning(&dialog, tr("No IP change"), tr("Enter a new address for camera %1.").arg(address));
+                    table->setCurrentCell(i, 1);
+                    return;
+                }
                 if (addresses.contains(address)) { QMessageBox::warning(&dialog, tr("Duplicate address"), tr("Each camera must have a unique new IPv4 address.")); table->setCurrentCell(i, 1); return; }
                 addresses.insert(address);
-                for (int existingRow = 0; existingRow < deviceTable_->rowCount(); ++existingRow) {
-                    if (existingRow == rows.at(i)) continue;
-                    const auto *existing = deviceTable_->item(existingRow, 1);
-                    if (existing && existing->text().trimmed() == address) { QMessageBox::warning(&dialog, tr("Address already in use"), tr("The address %1 belongs to another inventory device.").arg(address)); table->setCurrentCell(i, 1); return; }
+                const QString reservation = reservedIpv4Reason(address, deviceTable_, rows.at(i));
+                if (!reservation.isEmpty()) {
+                    QMessageBox::warning(&dialog, tr("Address is already reserved"), reservation);
+                    table->setCurrentCell(i, 1);
+                    return;
                 }
                 targets[i].address = address; targets[i].subnetMask = mask; targets[i].gateway = gateway;
             }
@@ -1236,7 +1325,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             return;
         }
         const QString path = QFileDialog::getSaveFileName(
-            this, tr("Back up camera inventory"), QStringLiteral("oxita-camera-inventory.sqlite"),
+            this, tr("Back up device inventory"), QStringLiteral("oxita-device-inventory.sqlite"),
             tr("SQLite database (*.sqlite *.db)"));
         if (path.isEmpty()) return;
         QString error;
@@ -1257,12 +1346,12 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             return;
         }
         const QString path = QFileDialog::getOpenFileName(
-            this, tr("Restore camera inventory"), QString(),
+            this, tr("Restore device inventory"), QString(),
             tr("SQLite database (*.sqlite *.db)"));
         if (path.isEmpty()) return;
         const auto answer = QMessageBox::warning(
             this, tr("Confirm inventory restore"),
-            tr("Replace the current camera inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
+            tr("Replace the current device inventory with the selected backup? A separate recovery snapshot of the current database will be kept beside it."),
             QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
         if (answer != QMessageBox::Yes) return;
         QString error;
@@ -1344,6 +1433,11 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
             }
             if (address->text().trimmed() == device.ipAddress) {
                 QMessageBox::information(&dialog, tr("No IP change"), tr("The new address is the same as the current address."));
+                return;
+            }
+            const QString reservation = reservedIpv4Reason(address->text(), deviceTable_, row);
+            if (!reservation.isEmpty()) {
+                QMessageBox::warning(&dialog, tr("Address is already reserved"), reservation);
                 return;
             }
             const auto answer = QMessageBox::warning(&dialog, tr("Confirm camera IP change"),
@@ -1733,9 +1827,26 @@ void MainWindow::updateSelectedDevicePanel()
         return item ? item->text().trimmed() : QString();
     };
     const auto *ipItem = deviceTable_->item(row, 1);
+    const QString deviceType = ipItem
+        ? ipItem->data(Qt::UserRole + 17).toString() : QStringLiteral("unknown");
+    const QString typeConfidence = ipItem
+        ? ipItem->data(Qt::UserRole + 18).toString() : QStringLiteral("Unverified");
+    DeviceRecord selectedDevice;
+    selectedDevice.manufacturer = cell(3);
+    selectedDevice.model = cell(4);
+    selectedDevice.discoverySources = cell(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+    selectedDevice.openPorts = ipItem
+        ? ipItem->data(Qt::UserRole + 6).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts)
+        : QStringList{};
+    selectedDevice.isCandidate = deviceType == QStringLiteral("unknown");
+    const DeviceClassifier::Result classification = DeviceClassifier::classify(selectedDevice);
     selectedDeviceSummary_->setText(
-        cell(2).isEmpty() ? cell(1) : cell(2) + QStringLiteral("\n") + cell(1));
+        tr("%1  ·  %2 (%3)\n%4")
+            .arg(cell(2).isEmpty() ? cell(1) : cell(2),
+                 classification.displayLabel(), typeConfidence, cell(1)));
     QStringList details;
+    details << tr("Device type: %1 (%2)").arg(classification.displayLabel(), typeConfidence);
+    details << tr("Classification evidence: %1").arg(classification.reason);
     details << tr("Manufacturer: %1").arg(cell(3).isEmpty() ? tr("Not reported") : cell(3));
     details << tr("Model: %1").arg(cell(4).isEmpty() ? tr("Not reported") : cell(4));
     details << tr("Reachability: %1").arg(cell(11).isEmpty() ? tr("Not checked") : cell(11));
@@ -1774,6 +1885,30 @@ void MainWindow::updateLocalNetworkSummary()
 {
     if (!localNetworkSummary_ || !interfaceSelector_) return;
     const QString interfaceName = interfaceSelector_->currentData().toString();
+    if (interfaceName.isEmpty()) {
+        QStringList details{tr("Discovery scope: all active IPv4 interfaces")};
+        int interfaceCount = 0;
+        for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+            const auto flags = interface.flags();
+            if (!flags.testFlag(QNetworkInterface::IsUp) ||
+                !flags.testFlag(QNetworkInterface::IsRunning) ||
+                flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+            QStringList addresses;
+            for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+                if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol && !entry.ip().isLoopback())
+                    addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
+            }
+            if (addresses.isEmpty()) continue;
+            ++interfaceCount;
+            details << tr("%1 (%2): %3")
+                .arg(interface.humanReadableName(), interface.name(), addresses.join(QStringLiteral(", ")));
+        }
+        details << tr("Subnet scanning requires selecting one specific interface.");
+        localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
+        if (interfaceCount == 0)
+            localNetworkSummary_->setText(tr("No active IPv4 interfaces are available."));
+        return;
+    }
     const QNetworkInterface interface = QNetworkInterface::interfaceFromName(interfaceName);
     if (!interface.isValid()) {
         localNetworkSummary_->setText(tr("No active network interface is selected."));
@@ -1991,13 +2126,19 @@ void MainWindow::upsertDevice(DeviceRecord device)
         ? device.ipv4ConfigurationKnown
         : (device.ipv4ConfigurationKnown ||
            (previousIpItem && previousIpItem->data(Qt::UserRole + 16).toBool())));
+    const DeviceClassifier::Result classification = DeviceClassifier::classify(device);
+    ipItem->setData(Qt::UserRole + 17, classification.key());
+    ipItem->setData(Qt::UserRole + 18, classification.confidenceLabel());
+    ipItem->setToolTip(tr("Device type: %1 (%2)\n%3")
+        .arg(classification.displayLabel(), classification.confidenceLabel(), classification.reason));
     const QStringList values = {
         device.ipAddress, !device.userLabel.isEmpty() ? device.userLabel : (oldLabel.isEmpty() && device.isCandidate ? QStringLiteral("Unverified candidate") : oldLabel),
         device.manufacturer, device.model, device.macAddress,
         device.firmwareVersion, device.activationState,
         device.discoverySources.join(QStringLiteral(", ")), device.serialNumber, device.hardwareId,
         (device.reachabilityStatus == QStringLiteral("Not checked") && deviceTable_->item(row, 11)
-            ? deviceTable_->item(row, 11)->text() : device.reachabilityStatus)
+            ? deviceTable_->item(row, 11)->text() : device.reachabilityStatus),
+        classification.displayLabel()
     };
     for (int col = 0; col < values.size(); ++col)
         deviceTable_->setItem(row, col + 1, col == 0 ? ipItem : new QTableWidgetItem(values.at(col)));
@@ -2386,6 +2527,8 @@ void MainWindow::applyFilters()
     const QString needle = searchEdit_ ? searchEdit_->text().trimmed() : QString();
     const QString vendor = manufacturerFilter_ ? manufacturerFilter_->currentText() : tr("All manufacturers");
     const QString status = statusFilter_ ? statusFilter_->currentText() : tr("All statuses");
+    const QString deviceType = deviceTypeFilter_ ? deviceTypeFilter_->currentData().toString()
+                                                  : QStringLiteral("all");
     int visible = 0;
     for (int row = 0; row < deviceTable_->rowCount(); ++row) {
         bool textMatch = needle.isEmpty();
@@ -2395,17 +2538,27 @@ void MainWindow::applyFilters()
         }
         const QString source = deviceTable_->item(row, 8) ? deviceTable_->item(row, 8)->text() : QString();
         const QString activation = deviceTable_->item(row, 7) ? deviceTable_->item(row, 7)->text() : QString();
+        const QString manufacturer = deviceTable_->item(row, 3)
+            ? deviceTable_->item(row, 3)->text() : QString();
+        const bool isOnvif = source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive);
+        const bool isOxita = manufacturer.compare(QStringLiteral("Oxita"), Qt::CaseInsensitive) == 0 ||
+            source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive) ||
+            source.contains(QStringLiteral("Project UDP 9988"), Qt::CaseInsensitive);
         const bool vendorMatch = vendor == tr("All manufacturers") ||
-            (vendor == tr("ONVIF devices") && source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Oxita devices") && source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive)) ||
-            (vendor == tr("Other / unknown") && !source.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
-             !source.contains(QStringLiteral("Oxita"), Qt::CaseInsensitive));
+            (vendor == tr("ONVIF devices") && isOnvif) ||
+            (vendor == tr("Oxita devices") && isOxita) ||
+            (vendor == tr("Other / unknown") && !isOnvif && !isOxita);
         const QString reachability = deviceTable_->item(row, 11) ? deviceTable_->item(row, 11)->text() : QStringLiteral("Not checked");
+        const QString classifiedType = deviceTable_->item(row, 1)
+            ? deviceTable_->item(row, 1)->data(Qt::UserRole + 17).toString()
+            : QStringLiteral("unknown");
+        const bool typeMatch = deviceType == QStringLiteral("all") || classifiedType == deviceType;
         const bool statusMatch = status == tr("All statuses") ||
             (status == tr("Online") && reachability == QStringLiteral("Reachable")) ||
+            (status == tr("Offline") && reachability == QStringLiteral("Unreachable")) ||
             (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
             (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
-        const bool show = textMatch && vendorMatch && statusMatch;
+        const bool show = textMatch && vendorMatch && typeMatch && statusMatch;
         deviceTable_->setRowHidden(row, !show);
         if (show) ++visible;
     }
@@ -2422,7 +2575,7 @@ void MainWindow::applyFilters()
             inventoryEmptyState_->show();
         } else if (visible == 0) {
             inventoryEmptyState_->setText(
-                tr("No devices match these filters.\nClear your search or choose different manufacturer and status filters."));
+                tr("No devices match these filters.\nClear your search or choose different device type, manufacturer or status filters."));
             inventoryEmptyState_->show();
         } else {
             inventoryEmptyState_->hide();

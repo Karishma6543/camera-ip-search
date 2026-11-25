@@ -4,6 +4,8 @@ A cross-platform Qt 6 desktop utility for discovering IP cameras, reviewing devi
 
 **Release status:** Pre-production. The latest `main` CI run (#605, commit `47b99f2`) passed the Release build and CTest suite on Windows, Ubuntu and macOS. Physical-camera interoperability, model-specific compatibility evidence, security review and signed distribution packaging are still release gates. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
 
+
+> Network discovery and device-type evidence, confidence levels, filter behavior and known limitations are documented in [Network device discovery and classification](docs/network-device-discovery-and-classification.md).
 ## Implemented in this build
 
 - Enumerates active, non-loopback IPv4 network interfaces and lets the user choose the interface for discovery.

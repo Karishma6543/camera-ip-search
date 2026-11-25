@@ -13,6 +13,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Basic device record and adapter registry.
 - [x] Stable device identity matching across MAC, ONVIF endpoint, serial/manufacturer and guarded IP fallback.
 - [x] Require protocol evidence before promoting a TCP-only candidate.
+- [x] Add conservative device-type classification and confidence labels for Camera, NVR, Router, Switch, Printer, Computer and Unknown.
+- [x] Add combined device-type, manufacturer/discovery-source, reachability/activation and text filters; expose classification in the inventory.
 - [ ] Separate application coordinator and normalized observation/error models.
 - [ ] Move all persistence out of the UI layer into a testable repository.
 - [x] Add rotating application logs with best-effort secret redaction and regression tests.
@@ -23,11 +25,13 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 ## Milestone 2 — Discovery
 - [x] ONVIF WS-Discovery probe and ProbeMatch parser.
 - [x] Project UDP 9988 Contract B discovery codec.
-- [x] Bounded opt-in IPv4 TCP candidate scanner (maximum 256 host addresses).
+- [x] Opt-in IPv4 TCP candidate scanner across common camera, management, printer and computer ports; user can choose full scans up to 4096 hosts or a 256-address window on larger subnets.
+- [x] Allow ONVIF, Oxita and SSDP discovery across all active IPv4 interfaces or one selected interface.
+- [x] SSDP/UPnP M-SEARCH discovery with bounded response parsing; LOCATION URLs are not fetched.
 - [x] Basic duplicate merging and discovery provenance.
 - [x] Add unit tests for invalid interfaces, IPv4 mask/prefix mismatch and unusable /31-/32 scan ranges.
 - [x] Add cancellation for in-flight ONVIF enrichment and reject stale replies after cancellation/restart.
-- [ ] Add end-to-end integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts.
+- [ ] Add end-to-end integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts. SSDP response parsing has focused unit tests; multicast delivery still requires physical-network validation.
 - [x] Add a local Contract B/ONVIF simulator and deterministic Python fixture tests; full C++ socket integration remains pending.
 - [ ] Verify broadcast/multicast behavior on Windows, macOS and Linux.
 - [ ] Test VLAN, multiple NIC, Wi-Fi/Ethernet, firewall and routed-network limitations.

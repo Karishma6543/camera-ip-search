@@ -17,7 +17,9 @@ class SubnetScanner final : public QObject
     Q_OBJECT
 public:
     explicit SubnetScanner(QObject *parent = nullptr);
-    bool start(const QNetworkInterface &interface, const QNetworkAddressEntry &entry);
+    // maxHosts=256 keeps large scans bounded; maxHosts=0 requests a full subnet scan (up to 4096 hosts).
+    bool start(const QNetworkInterface &interface, const QNetworkAddressEntry &entry,
+               quint32 maxHosts = 256);
     static bool isUsableSubnet(const QNetworkAddressEntry &entry);
     // Adds a discovered TCP port once; useful when several probes identify one host.
     static bool appendOpenPort(DeviceRecord &device, quint16 port);

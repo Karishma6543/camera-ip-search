@@ -114,6 +114,7 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("deviceSearch")));
     QVERIFY(window.findChild<QComboBox *>(QStringLiteral("interfaceSelector")));
     QVERIFY(window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter")));
+    QVERIFY(window.findChild<QComboBox *>(QStringLiteral("deviceTypeFilter")));
     QVERIFY(window.findChild<QComboBox *>(QStringLiteral("statusFilter")));
     QVERIFY(window.findChild<QTableWidget *>(QStringLiteral("deviceTable")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("addDeviceButton")));
@@ -159,6 +160,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(!table->isColumnHidden(4));
     QVERIFY(!table->isColumnHidden(7));
     QVERIFY(!table->isColumnHidden(11));
+    QVERIFY(!table->isColumnHidden(12));
     QVERIFY(table->horizontalHeader()->sectionsClickable());
     QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
     QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
@@ -252,7 +254,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     auto *search = window.findChild<QLineEdit *>(QStringLiteral("deviceSearch"));
     auto *vendor = window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter"));
     auto *statusFilter = window.findChild<QComboBox *>(QStringLiteral("statusFilter"));
-    QVERIFY(table && search && vendor && statusFilter);
+    auto *deviceTypeFilter = window.findChild<QComboBox *>(QStringLiteral("deviceTypeFilter"));
+    QVERIFY(table && search && vendor && statusFilter && deviceTypeFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
     table->selectRow(0);
@@ -292,6 +295,12 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     search->clear();
     QVERIFY(!table->isRowHidden(0));
     QVERIFY(!!emptyState->isHidden());
+
+    deviceTypeFilter->setCurrentText(QStringLiteral("Printers"));
+    QVERIFY(table->isRowHidden(0));
+    deviceTypeFilter->setCurrentText(QStringLiteral("Cameras"));
+    QVERIFY(!table->isRowHidden(0));
+    deviceTypeFilter->setCurrentText(QStringLiteral("All device types"));
 
     vendor->setCurrentText(QStringLiteral("Oxita devices"));
     QVERIFY(table->isRowHidden(0));

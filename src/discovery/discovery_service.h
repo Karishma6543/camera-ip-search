@@ -51,6 +51,7 @@ private:
     void addInterfaceSocket(const QNetworkInterface &interface, const QHostAddress &localAddress);
     void sendOnvifProbe(InterfaceSocket &entry);
     void sendProjectProbe(InterfaceSocket &entry);
+    void sendSsdpProbe(InterfaceSocket &entry);
     void processDatagram(QUdpSocket *socket);
     void mergeAndEmit(DeviceRecord device);
     QString storageKeyForDevice(const DeviceRecord &device) const;
