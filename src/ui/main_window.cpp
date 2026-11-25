@@ -162,7 +162,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             [this](const DeviceRecord &device, const QString &operation, bool succeeded,
                    const QString &message) {
         if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
-            button->setEnabled(selectedDeviceRow() >= 0);
+            button->setEnabled(selectedDeviceRow() >= 0 && deviceTable_->item(selectedDeviceRow(), 8) && deviceTable_->item(selectedDeviceRow(), 8)->text().contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) && !deviceTable_->item(selectedDeviceRow(), 1)->data(Qt::UserRole + 3).toString().isEmpty());
         recordOperation(operation, device.ipAddress,
                         succeeded ? tr("Accepted") : tr("Failed"), message);
         refreshOperationHistory();
@@ -871,14 +871,27 @@ void MainWindow::buildUi()
     connect(deviceTable_, &QTableWidget::itemSelectionChanged, this, [this] {
         const int row = selectedDeviceRow();
         const bool hasSelection = row >= 0;
+        const auto *ipItem = hasSelection ? deviceTable_->item(row, 1) : nullptr;
+        const QString sources = hasSelection && deviceTable_->item(row, 8)
+            ? deviceTable_->item(row, 8)->text() : QString();
+        const bool hasOnvifService = hasSelection && ipItem &&
+            sources.contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
+            !ipItem->data(Qt::UserRole + 3).toString().isEmpty();
+        const bool hasVerifiedIpv4Interface = hasOnvifService &&
+            !ipItem->data(Qt::UserRole + 7).toString().isEmpty() &&
+            ipItem->data(Qt::UserRole + 16).toBool();
         openWebButton_->setEnabled(hasSelection);
-        refreshDeviceButton_->setEnabled(hasSelection);
+        refreshDeviceButton_->setEnabled(hasOnvifService);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("renameLabelButton")))
             button->setEnabled(hasSelection);
-        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
-            button->setEnabled(hasSelection);
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))) {
+            button->setEnabled(hasOnvifService);
+            button->setToolTip(hasOnvifService
+                ? tr("Send an ONVIF factory-default request. Camera support and permissions are still required.")
+                : tr("Available only for a device with a discovered ONVIF device service."));
+        }
         if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
-            button->setEnabled(hasSelection);
+            button->setEnabled(hasVerifiedIpv4Interface);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")))
             button->setEnabled(hasSelection);
         updateDeviceDetailsProfile(row);
@@ -916,7 +929,7 @@ void MainWindow::buildUi()
         auto *path = new QLabel(dataDirectory, &dialog);
         path->setWordWrap(true);
         path->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        path->setStyleSheet(QStringLiteral("background:#141F2B;color:#E7EDF4;border:1px solid #344455;border-radius:7px;padding:10px;"));
+        path->setStyleSheet(QStringLiteral("background:#1D1D1D;color:#F4F4F4;border:1px solid #626262;border-radius:7px;padding:10px;"));
         layout->addWidget(path);
         auto *databaseHeading = new QLabel(tr("Inventory database"), &dialog);
         databaseHeading->setObjectName(QStringLiteral("sectionTitle"));
@@ -1389,7 +1402,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         tr("Network changes can interrupt camera connectivity. Confirm the new address is reachable from this computer before applying. This build does not provide automatic rollback."),
         networkContent);
     safetyNote->setWordWrap(true);
-    safetyNote->setStyleSheet(QStringLiteral("color:#F5D89A;background:#382F20;border:1px solid #6A5835;border-radius:7px;padding:9px;"));
+    safetyNote->setStyleSheet(QStringLiteral("color:#F5D89A;background:#302A20;border:1px solid #665538;border-radius:7px;padding:9px;"));
     networkPageLayout->addWidget(safetyNote);
     devicePageLayout->addStretch();
     networkPageLayout->addStretch();
