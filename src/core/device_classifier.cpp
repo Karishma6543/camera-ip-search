@@ -115,7 +115,7 @@ DeviceClassifier::Result DeviceClassifier::classify(const DeviceRecord &device)
                 QStringLiteral("Manufacturer or model identifies a router or gateway")};
     }
     if (hasAny(identity, {QStringLiteral("network switch"), QStringLiteral("ethernet switch"),
-                          QStringLiteral("poe switch"), QStringLiteral("switch ")})) {
+                          QStringLiteral("poe switch"), QStringLiteral("switch")})) {
         return {Type::Switch, Confidence::High,
                 QStringLiteral("Manufacturer or model identifies a network switch")};
     }
