@@ -400,7 +400,7 @@ void MainWindow::buildUi()
     statusFilter_->setObjectName(QStringLiteral("statusFilter"));
     statusFilter_->setAccessibleName(tr("Filter by reachability and activation state"));
     auto *statusFilter = statusFilter_;
-    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Offline"), tr("Activated"), tr("Not activated")});
+    statusFilter->addItems({tr("All statuses"), tr("Online"), tr("Offline"), tr("Stale"), tr("Activated"), tr("Not activated")});
     deviceCountValue_ = new QLabel(QStringLiteral("0 devices"), toolbar);
     deviceCountValue_->setObjectName(QStringLiteral("muted"));
     filterRow->addWidget(searchEdit_, 2);
@@ -1830,6 +1830,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         addDetail(Qt::UserRole + 14, tr("Last reachability check"));
         addDetail(Qt::UserRole + 15, tr("Last successful response"));
         addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
+        addDetail(Qt::UserRole + 19, tr("Last seen (UTC)"));
     }
 
     QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#E7EDF4;'>"
@@ -1887,6 +1888,10 @@ void MainWindow::updateSelectedDevicePanel()
     details << tr("Manufacturer: %1").arg(cell(3).isEmpty() ? tr("Not reported") : cell(3));
     details << tr("Model: %1").arg(cell(4).isEmpty() ? tr("Not reported") : cell(4));
     details << tr("Reachability: %1").arg(cell(11).isEmpty() ? tr("Not checked") : cell(11));
+    if (ipItem) {
+        const QString lastSeen = ipItem->data(Qt::UserRole + 19).toString();
+        details << tr("Last seen (UTC): %1").arg(lastSeen.isEmpty() ? tr("Never") : lastSeen);
+    }
     details << tr("Discovery: %1").arg(cell(8).isEmpty() ? tr("Manual / unknown") : cell(8));
     if (ipItem) {
         const QString interfaceToken = ipItem->data(Qt::UserRole + 7).toString();
@@ -2039,6 +2044,19 @@ void MainWindow::upsertDevice(DeviceRecord device)
             break;
         }
     }
+    if (!loadingInventory_) {
+        device.lastSeenAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+        const bool verifiedResponse = !device.isCandidate &&
+            (device.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
+             device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation")) ||
+             device.discoverySources.contains(QStringLiteral("Project UDP 9988")) ||
+             device.discoverySources.contains(QStringLiteral("SSDP/UPnP")));
+        if (device.isCandidate || verifiedResponse) {
+            device.reachabilityStatus = QStringLiteral("Reachable");
+            device.reachabilityCheckedAt = device.lastSeenAt;
+            device.lastSuccessfulResponseAt = device.lastSeenAt;
+        }
+    }
     if (row >= 0) {
         DeviceRecord existing;
         const auto *ipItem = deviceTable_->item(row, 1);
@@ -2123,6 +2141,7 @@ void MainWindow::upsertDevice(DeviceRecord device)
     keepExistingWhenEmpty(Qt::UserRole + 11, device.ipv4DnsServer);
     keepExistingWhenEmpty(Qt::UserRole + 14, device.reachabilityCheckedAt);
     keepExistingWhenEmpty(Qt::UserRole + 15, device.lastSuccessfulResponseAt);
+    ipItem->setData(Qt::UserRole + 19, device.lastSeenAt);
     if (networkInterfacesUpdated) {
         ipItem->setData(Qt::UserRole + 12, device.ipv4ConfigurationKnown
             ? (device.ipv4DhcpEnabled ? QStringLiteral("true") : QStringLiteral("false"))
@@ -2421,7 +2440,7 @@ void MainWindow::loadInventory()
 {
     if (!inventoryDb_.isOpen()) return;
     QSqlQuery query(inventoryDb_);
-    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,network_interface_token,ipv4_address,ipv4_subnet_mask,ipv4_gateway,ipv4_dns_server,ipv4_dhcp_enabled,ipv4_config_known FROM devices ORDER BY last_seen DESC"))) return;
+    if (!query.exec(QStringLiteral("SELECT ip,mac,manufacturer,model,firmware,serial,hardware,activation,source,is_candidate,user_label,reachability_status,reachability_checked_at,last_successful_response_at,interface_name,onvif_endpoint,device_service_url,network_summary,capabilities,open_ports,network_interface_token,ipv4_address,ipv4_subnet_mask,ipv4_gateway,ipv4_dns_server,ipv4_dhcp_enabled,ipv4_config_known,last_seen FROM devices ORDER BY last_seen DESC"))) return;
     loadingInventory_ = true;
     while (query.next()) {
         DeviceRecord device;
@@ -2432,10 +2451,11 @@ void MainWindow::loadInventory()
         device.discoverySources=query.value(8).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         device.isCandidate=query.value(9).toInt()!=0;
         device.userLabel=query.value(10).toString();
-        device.reachabilityStatus=query.value(11).toString();
-        if (device.reachabilityStatus.isEmpty()) device.reachabilityStatus=QStringLiteral("Not checked");
+        // Persisted reachability is historical, never proof of current status.
+        device.reachabilityStatus=QStringLiteral("Stale");
         device.reachabilityCheckedAt=query.value(12).toString();
         device.lastSuccessfulResponseAt=query.value(13).toString();
+        device.lastSeenAt=query.value(27).toString();
         device.interfaceName=query.value(14).toString();
         device.onvifEndpoint=query.value(15).toString();
         device.deviceServiceUrl=query.value(16).toString();
@@ -2567,6 +2587,7 @@ void MainWindow::applyFilters()
         const bool statusMatch = status == tr("All statuses") ||
             (status == tr("Online") && reachability == QStringLiteral("Reachable")) ||
             (status == tr("Offline") && reachability == QStringLiteral("Unreachable")) ||
+            (status == tr("Stale") && reachability == QStringLiteral("Stale")) ||
             (status == tr("Activated") && activation.compare(QStringLiteral("Activated"), Qt::CaseInsensitive) == 0) ||
             (status == tr("Not activated") && activation.compare(QStringLiteral("Not activated"), Qt::CaseInsensitive) == 0);
         const bool show = textMatch && vendorMatch && typeMatch && statusMatch;
