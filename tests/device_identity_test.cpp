@@ -17,6 +17,7 @@ private slots:
     void refreshesDnsFromOnvifObservation();
     void manualEntryDoesNotUpgradeUnverifiedCandidate();
     void replacesOnvifUnknownManufacturerPlaceholder();
+    void freshObservationReplacesStaleInventoryStatus();
 };
 
 void DeviceIdentityTest::mergesScannerCandidateWithProtocolObservation()
@@ -235,6 +236,28 @@ void DeviceIdentityTest::refreshesDnsFromOnvifObservation()
 
     const DeviceRecord merged = DeviceIdentity::mergeObservations(existing, updated);
     QCOMPARE(merged.ipv4DnsServer, QStringLiteral("8.8.8.8"));
+}
+
+void DeviceIdentityTest::freshObservationReplacesStaleInventoryStatus()
+{
+    DeviceRecord saved;
+    saved.ipAddress = QStringLiteral("192.168.1.20");
+    saved.reachabilityStatus = QStringLiteral("Stale");
+    saved.lastSeenAt = QStringLiteral("2026-11-24T10:00:00Z");
+
+    DeviceRecord live;
+    live.ipAddress = saved.ipAddress;
+    live.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    live.reachabilityStatus = QStringLiteral("Reachable");
+    live.lastSeenAt = QStringLiteral("2026-11-25T10:00:00Z");
+    live.reachabilityCheckedAt = live.lastSeenAt;
+    live.lastSuccessfulResponseAt = live.lastSeenAt;
+
+    const DeviceRecord merged = DeviceIdentity::mergeObservations(saved, live);
+    QCOMPARE(merged.reachabilityStatus, QStringLiteral("Reachable"));
+    QCOMPARE(merged.lastSeenAt, live.lastSeenAt);
+    QCOMPARE(merged.reachabilityCheckedAt, live.reachabilityCheckedAt);
+    QCOMPARE(merged.lastSuccessfulResponseAt, live.lastSuccessfulResponseAt);
 }
 
 QTEST_GUILESS_MAIN(DeviceIdentityTest)
