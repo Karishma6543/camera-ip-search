@@ -9,12 +9,14 @@ Implemented in source:
 - Active IPv4 interface selection.
 - ONVIF WS-Discovery and project Contract B UDP 9988 discovery.
 - ONVIF device information, capability, network-interface and DNS enrichment.
-- Bounded TCP candidate scan (up to 256 addresses around the selected interface address on larger subnets).
+- Bounded TCP candidate scan across common camera, management, printing and computer service ports (up to 256 addresses around the selected interface address on larger subnets).
+- SSDP/UPnP M-SEARCH discovery and bounded response parsing for gateway, printer and other UPnP advertisements.
+- Evidence-based device classification (Camera, NVR, Router, Switch, Printer, Computer, Unknown) with confidence labels and combined type/manufacturer/reachability filters.
 - TCP reachability checks.
 - Local SQLite inventory, manual entry, labels and CSV export.
 - SQLite online backup with integrity validation and guarded restore that retains a pre-restore recovery snapshot.
 - Guarded ONVIF static IPv4 request, confirmation and post-change verification path.
-- Unsupported activation, firmware, reboot, NVR and batch operations remain unavailable.
+- Unsupported activation, firmware, reboot and vendor-specific provisioning remain unavailable. Bulk static IPv4 configuration is present but still requires physical-camera validation.
 
 Not implemented:
 - CP Plus, Hikvision or Prama vendor adapters.
@@ -67,9 +69,9 @@ Not implemented:
 
 ## Known operational limitations
 
-- Discovery is local-link IPv4 only; multicast and limited broadcast do not cross routers.
-- The fallback scanner is user-initiated, tests TCP ports only, and reports unverified candidates. On a subnet larger than 256 host addresses it checks a 256-address window around the selected interface address, not every host.
-- An open port does not prove a device is a camera or that ONVIF is supported.
+- Discovery is local-link IPv4 only; ONVIF, SSDP multicast and limited broadcast do not cross routers. Scan each authorized VLAN from a host attached to that VLAN.
+- The fallback scanner is user-initiated, tests a defined set of TCP service ports only, and reports unverified candidates. On a subnet larger than 256 host addresses it checks a 256-address window around the selected interface address, not every host. SSDP/UPnP and ONVIF discovery remain link-local.
+- An open port does not prove a device type or that ONVIF is supported. Port-based classifications are marked Probable; explicit protocol/model evidence is preferred. Switches and devices without recognizable descriptors may remain Unknown.
 - ONVIF operation availability and write permissions vary by model, firmware and account role.
 - Static IPv4 changes can disconnect a device. There is no automatic rollback.
 - Project Contract B currently defines discovery only; activation/configuration/firmware commands must not be guessed.
