@@ -1748,9 +1748,26 @@ void MainWindow::updateSelectedDevicePanel()
         return item ? item->text().trimmed() : QString();
     };
     const auto *ipItem = deviceTable_->item(row, 1);
+    const QString deviceType = ipItem
+        ? ipItem->data(Qt::UserRole + 17).toString() : QStringLiteral("unknown");
+    const QString typeConfidence = ipItem
+        ? ipItem->data(Qt::UserRole + 18).toString() : QStringLiteral("Unverified");
+    DeviceRecord selectedDevice;
+    selectedDevice.manufacturer = cell(3);
+    selectedDevice.model = cell(4);
+    selectedDevice.discoverySources = cell(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+    selectedDevice.openPorts = ipItem
+        ? ipItem->data(Qt::UserRole + 6).toString().split(QStringLiteral(", "), Qt::SkipEmptyParts)
+        : QStringList{};
+    selectedDevice.isCandidate = deviceType == QStringLiteral("unknown");
+    const DeviceClassifier::Result classification = DeviceClassifier::classify(selectedDevice);
     selectedDeviceSummary_->setText(
-        cell(2).isEmpty() ? cell(1) : cell(2) + QStringLiteral("\n") + cell(1));
+        tr("%1  ·  %2 (%3)\n%4")
+            .arg(cell(2).isEmpty() ? cell(1) : cell(2),
+                 classification.displayLabel(), typeConfidence, cell(1)));
     QStringList details;
+    details << tr("Device type: %1 (%2)").arg(classification.displayLabel(), typeConfidence);
+    details << tr("Classification evidence: %1").arg(classification.reason);
     details << tr("Manufacturer: %1").arg(cell(3).isEmpty() ? tr("Not reported") : cell(3));
     details << tr("Model: %1").arg(cell(4).isEmpty() ? tr("Not reported") : cell(4));
     details << tr("Reachability: %1").arg(cell(11).isEmpty() ? tr("Not checked") : cell(11));
