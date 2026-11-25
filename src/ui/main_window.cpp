@@ -774,17 +774,44 @@ void MainWindow::buildUi()
         }
         const QNetworkInterface interface = QNetworkInterface::interfaceFromName(selectedName);
         for (const auto &entry : interface.addressEntries()) {
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
-                if (subnetScanner_->start(interface, entry)) {
-                    subnetScanButton_->setText(tr("Cancel subnet scan"));
-                    if (operationProgress_) {
-                        operationProgress_->setRange(0, 0);
-                        operationProgress_->setFormat(tr("Scanning subnet…"));
-                        operationProgress_->show();
-                    }
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol ||
+                entry.ip().isLoopback() || entry.prefixLength() < 1)
+                continue;
+
+            const quint32 ip = entry.ip().toIPv4Address();
+            const quint32 mask = 0xffffffffU << (32 - entry.prefixLength());
+            const quint32 network = ip & mask;
+            const quint32 broadcast = network | ~mask;
+            const quint32 hostCount = broadcast - network - 1U;
+            quint32 scanLimit = 256;
+            if (hostCount > 256 && hostCount <= 4096) {
+                QMessageBox scope(this);
+                scope.setIcon(QMessageBox::Information);
+                scope.setWindowTitle(tr("Choose subnet scan scope"));
+                scope.setText(tr("This subnet contains %1 usable host addresses.").arg(hostCount));
+                scope.setInformativeText(tr("A full scan checks common TCP services on every host and may take longer. You can also scan a 256-address window around this computer."));
+                auto *fullScan = scope.addButton(tr("Scan entire subnet"), QMessageBox::AcceptRole);
+                auto *boundedScan = scope.addButton(tr("Scan 256-address window"), QMessageBox::ActionRole);
+                scope.addButton(QMessageBox::Cancel);
+                scope.exec();
+                if (scope.clickedButton() == fullScan)
+                    scanLimit = 0;
+                else if (scope.clickedButton() != boundedScan)
                     return;
+            } else if (hostCount > 4096) {
+                QMessageBox::warning(this, tr("Large subnet"),
+                    tr("This subnet contains %1 usable hosts. To avoid an extremely large scan, this build limits one full scan to 4096 hosts. A 256-address window will be scanned around this computer.")
+                        .arg(hostCount));
+            }
+
+            if (subnetScanner_->start(interface, entry, scanLimit)) {
+                subnetScanButton_->setText(tr("Cancel subnet scan"));
+                if (operationProgress_) {
+                    operationProgress_->setRange(0, 0);
+                    operationProgress_->setFormat(tr("Scanning subnet…"));
+                    operationProgress_->show();
                 }
+                return;
             }
         }
         updateStatus(tr("Could not start subnet scan. Select an active IPv4 interface."));
