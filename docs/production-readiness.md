@@ -9,7 +9,8 @@ Implemented in source:
 - Active IPv4 interface selection.
 - ONVIF WS-Discovery and project Contract B UDP 9988 discovery.
 - ONVIF device information, capability, network-interface and DNS enrichment.
-- Bounded TCP candidate scan across common camera, management, printing and computer service ports (up to 256 addresses around the selected interface address on larger subnets).
+- TCP candidate scan across common camera, management, printing and computer service ports; offers full scans up to 4096 hosts and a 256-address window for larger subnets.
+- Discovery can target all active IPv4 interfaces or one selected interface.
 - SSDP/UPnP M-SEARCH discovery and bounded response parsing for gateway, printer and other UPnP advertisements.
 - Evidence-based device classification (Camera, NVR, Router, Switch, Printer, Computer, Unknown) with confidence labels and combined type/manufacturer/reachability filters.
 - TCP reachability checks.
@@ -70,7 +71,7 @@ Not implemented:
 ## Known operational limitations
 
 - Discovery is local-link IPv4 only; ONVIF, SSDP multicast and limited broadcast do not cross routers. Scan each authorized VLAN from a host attached to that VLAN.
-- The fallback scanner is user-initiated, tests a defined set of TCP service ports only, and reports unverified candidates. On a subnet larger than 256 host addresses it checks a 256-address window around the selected interface address, not every host. SSDP/UPnP and ONVIF discovery remain link-local.
+- The fallback scanner is user-initiated, tests a defined set of TCP service ports only, and reports unverified candidates. Full scans are available only up to 4096 hosts; larger subnets use a 256-address window. SSDP/UPnP and ONVIF discovery remain link-local.
 - An open port does not prove a device type or that ONVIF is supported. Port-based classifications are marked Probable; explicit protocol/model evidence is preferred. Switches and devices without recognizable descriptors may remain Unknown.
 - ONVIF operation availability and write permissions vary by model, firmware and account role.
 - Static IPv4 changes can disconnect a device. There is no automatic rollback.
