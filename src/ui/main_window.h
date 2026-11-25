@@ -52,10 +52,6 @@ private:
     QLabel *summaryLabel_{nullptr};
     QLabel *inventoryEmptyState_{nullptr};
     QLabel *deviceCountValue_{nullptr};
-    QLabel *discoveredMetric_{nullptr};
-    QLabel *reachableMetric_{nullptr};
-    QLabel *verifiedMetric_{nullptr};
-    QLabel *unverifiedMetric_{nullptr};
     QPushButton *scanButton_{nullptr};
     QPushButton *subnetScanButton_{nullptr};
     QPushButton *reachabilityButton_{nullptr};
