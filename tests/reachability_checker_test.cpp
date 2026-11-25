@@ -12,6 +12,7 @@ private slots:
     void reportsMissingAddressAsNotChecked();
     void cancelsAnActiveCheck();
     void ignoresOverlappingStartAndChecksOriginalDevice();
+    void reportsFailedTcpProbesAsUnreachable();
 };
 
 void ReachabilityCheckerTest::completesEmptyInput()
@@ -79,6 +80,26 @@ void ReachabilityCheckerTest::ignoresOverlappingStartAndChecksOriginalDevice()
     QCOMPARE(checked.first().at(0).toString(), QStringLiteral("127.0.0.1"));
     QCOMPARE(checked.first().at(1).toString(), QStringLiteral("Reachable"));
     QVERIFY(!checker.isRunning());
+}
+
+
+void ReachabilityCheckerTest::reportsFailedTcpProbesAsUnreachable()
+{
+    QTcpServer temporary;
+    QVERIFY(temporary.listen(QHostAddress::LocalHost, quint16(0)));
+    const quint16 unusedPort = temporary.serverPort();
+    temporary.close();
+
+    ReachabilityChecker checker;
+    QSignalSpy checked(&checker, &ReachabilityChecker::deviceChecked);
+    DeviceRecord device;
+    // Use a documentation-only TEST-NET address. Loopback can have unrelated
+    // services listening on common camera ports, which would make this test flaky.
+    device.ipAddress = QStringLiteral("192.0.2.10");
+    device.openPorts << QString::number(unusedPort);
+    checker.start(QVector<DeviceRecord>{device});
+    QTRY_COMPARE_WITH_TIMEOUT(checked.count(), 1, 5000);
+    QCOMPARE(checked.first().at(1).toString(), QStringLiteral("Unreachable"));
 }
 
 QTEST_GUILESS_MAIN(ReachabilityCheckerTest)

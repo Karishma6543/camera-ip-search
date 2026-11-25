@@ -125,14 +125,34 @@ bool InventoryBackup::restore(QSqlDatabase &database, const QString &backupPath,
         return false;
     }
 
+    // Do not replace the database unless SQLite has successfully checkpointed
+    // every WAL page and switched out of WAL mode. Removing sidecars before this
+    // point can discard committed data.
     QSqlQuery checkpoint(database);
-    checkpoint.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)"));
-    QSqlQuery journal(database);
-    journal.exec(QStringLiteral("PRAGMA journal_mode=DELETE"));
-    database.close();
+    if (!checkpoint.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)")) ||
+        !checkpoint.next()) {
+        QFile::remove(stagedPath);
+        setError(error, QStringLiteral("Could not checkpoint the active inventory before restore: %1")
+            .arg(checkpoint.lastError().text()));
+        return false;
+    }
+    const int busy = checkpoint.value(0).toInt();
+    const int logFrames = checkpoint.value(1).toInt();
+    const int checkpointedFrames = checkpoint.value(2).toInt();
+    if (busy != 0 || (logFrames >= 0 && checkpointedFrames < logFrames)) {
+        QFile::remove(stagedPath);
+        setError(error, QStringLiteral("SQLite could not checkpoint the complete inventory WAL; restore was cancelled."));
+        return false;
+    }
 
-    QFile::remove(targetPath + QStringLiteral("-wal"));
-    QFile::remove(targetPath + QStringLiteral("-shm"));
+    QSqlQuery journal(database);
+    if (!journal.exec(QStringLiteral("PRAGMA journal_mode=DELETE")) || !journal.next() ||
+        journal.value(0).toString().compare(QStringLiteral("delete"), Qt::CaseInsensitive) != 0) {
+        QFile::remove(stagedPath);
+        setError(error, QStringLiteral("SQLite could not leave WAL mode; restore was cancelled."));
+        return false;
+    }
+    database.close();
     if (!QFile::rename(targetPath, replacedPath)) {
         QFile::remove(stagedPath);
         database.open();
