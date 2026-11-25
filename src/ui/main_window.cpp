@@ -441,7 +441,7 @@ void MainWindow::buildUi()
     leftLayout->setContentsMargins(14, 13, 14, 14);
     leftLayout->setSpacing(10);
     auto *listHeading = new QHBoxLayout();
-    auto *listTitle = new QLabel(tr("Camera inventory"), left);
+    auto *listTitle = new QLabel(tr("Network inventory"), left);
     listTitle->setObjectName(QStringLiteral("sectionTitle"));
     summaryLabel_ = mutedLabel(tr("Discover cameras on your selected network"), left);
     auto *selectAllChecks = actionButton(tr("Select all"), left);
@@ -456,9 +456,9 @@ void MainWindow::buildUi()
     listHeading->addWidget(clearChecks);
     leftLayout->addLayout(listHeading);
 
-    deviceTable_ = new QTableWidget(0, 12, left);
+    deviceTable_ = new QTableWidget(0, 13, left);
     deviceTable_->setObjectName(QStringLiteral("deviceTable"));
-    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DEVICE NAME"), tr("MANUFACTURER"), tr("MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("ACTIVATION"), tr("DISCOVERY SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY")});
+    deviceTable_->setHorizontalHeaderLabels({tr(""), tr("IP ADDRESS"), tr("DEVICE NAME"), tr("MANUFACTURER"), tr("MODEL"), tr("MAC ADDRESS"), tr("FIRMWARE"), tr("ACTIVATION"), tr("DISCOVERY SOURCE"), tr("SERIAL NUMBER"), tr("HARDWARE ID"), tr("REACHABILITY"), tr("DEVICE TYPE")});
     auto *deviceHeader = deviceTable_->horizontalHeader();
     deviceHeader->setSectionResizeMode(QHeaderView::Interactive);
     deviceHeader->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -474,6 +474,7 @@ void MainWindow::buildUi()
     deviceHeader->resizeSection(9, 126);
     deviceHeader->resizeSection(10, 118);
     deviceHeader->resizeSection(11, 118);
+    deviceHeader->resizeSection(12, 112);
     deviceHeader->setMinimumSectionSize(72);
     // Keep the primary inventory view scannable; technical identifiers remain
     // searchable and are available in Device details and CSV export.
@@ -486,8 +487,8 @@ void MainWindow::buildUi()
     deviceTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     deviceTable_->verticalHeader()->setVisible(false);
     deviceTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    deviceTable_->setAccessibleName(tr("Camera inventory table"));
-    deviceTable_->setAccessibleDescription(tr("Select a row to inspect camera details. Use the first column to include cameras in bulk operations."));
+    deviceTable_->setAccessibleName(tr("Network device inventory table"));
+    deviceTable_->setAccessibleDescription(tr("Select a row to inspect device details. Use the first column to include compatible cameras in bulk operations."));
     deviceTable_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     deviceTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     deviceTable_->setAlternatingRowColors(true);
@@ -528,7 +529,7 @@ void MainWindow::buildUi()
         menu.exec(deviceHeader->mapToGlobal(position));
     });
 
-    deviceTable_->setToolTip(tr("Select a row to inspect device details. Check the first column to include specific cameras in reachability checks."));
+    deviceTable_->setToolTip(tr("Select a row to inspect device details. The type column includes a confidence level in its tooltip. Check the first column to include devices in reachability checks."));
     inventoryEmptyState_ = new QLabel(
         tr("No devices in your inventory yet.\nChoose a network interface above and scan or discover devices on your LAN."), left);
     inventoryEmptyState_->setObjectName(QStringLiteral("inventoryEmptyState"));
