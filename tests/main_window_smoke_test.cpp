@@ -7,6 +7,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTabWidget>
+#include <QTabBar>
+#include <QStackedWidget>
 #include <QLineEdit>
 #include <QComboBox>
 #include <QPushButton>
@@ -104,6 +106,9 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
         QStringLiteral("Operation History")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
+    auto *workspacePages = window.findChild<QStackedWidget *>(QStringLiteral("workspacePages"));
+    QVERIFY(workspacePages);
+    QCOMPARE(workspacePages->count(), expectedTabs.size());
     auto *configurationTabs = window.findChild<QTabWidget *>(QStringLiteral("configurationTabs"));
     QVERIFY(configurationTabs);
     const QStringList expectedConfigurationTabs{
@@ -116,7 +121,8 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
         QCOMPARE(tabs->tabText(index), expectedTabs.at(index));
         tabs->setCurrentIndex(index);
         QCOMPARE(tabs->currentIndex(), index);
-        QVERIFY(tabs->widget(index));
+        QCOMPARE(workspacePages->currentIndex(), index);
+        QVERIFY(workspacePages->widget(index));
     }
 
     QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("deviceSearch")));
@@ -182,7 +188,10 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(rightWorkspace);
     QCOMPARE(workspace->orientation(), Qt::Horizontal);
     QCOMPARE(workspace->count(), 2);
-    QCOMPARE(tabs->parentWidget(), rightWorkspace);
+    QCOMPARE(tabs->parentWidget()->objectName(), QStringLiteral("workspaceNavigation"));
+    auto *workspacePages = window.findChild<QStackedWidget *>(QStringLiteral("workspacePages"));
+    QVERIFY(workspacePages);
+    QCOMPARE(workspacePages->parentWidget(), rightWorkspace);
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
