@@ -2,6 +2,7 @@
 
 #include "core/device_record.h"
 
+#include <QByteArray>
 #include <QHostAddress>
 
 class SsdpParser final
