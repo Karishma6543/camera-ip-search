@@ -42,13 +42,13 @@ Use discovery first. Subnet scanning can take longer and a TCP response does not
 
 ## 4. Lower device workspace
 
-The lower workspace has three tabs.
+The right-hand inspector uses three tabs: **Details**, **Configure** and **History**. Configure is further divided into **Device**, **Network** and **Storage**, so camera access/maintenance, IP provisioning and local inventory recovery do not compete in one long panel.
 
 ### Device details
 
 Select a row in the inventory to see the device-reported profile, identity, discovery evidence, services, network configuration and capabilities. Empty values usually mean the camera did not report that field during the latest query; they do not automatically mean a fault.
 
-### Device actions
+### Configure → Device / Network / Storage
 
 | Action / panel | Purpose and safe usage |
 |---|---|

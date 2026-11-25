@@ -104,6 +104,14 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
         QStringLiteral("History")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
+    auto *configurationTabs = window.findChild<QTabWidget *>(QStringLiteral("configurationTabs"));
+    QVERIFY(configurationTabs);
+    const QStringList expectedConfigurationTabs{
+        QStringLiteral("Device"), QStringLiteral("Network"), QStringLiteral("Storage")
+    };
+    QCOMPARE(configurationTabs->count(), expectedConfigurationTabs.size());
+    for (int index = 0; index < expectedConfigurationTabs.size(); ++index)
+        QCOMPARE(configurationTabs->tabText(index), expectedConfigurationTabs.at(index));
     for (int index = 0; index < expectedTabs.size(); ++index) {
         QCOMPARE(tabs->tabText(index), expectedTabs.at(index));
         tabs->setCurrentIndex(index);
