@@ -74,8 +74,10 @@ DeviceClassifier::Result DeviceClassifier::classify(const DeviceRecord &device)
     const bool onvif = device.discoverySources.contains(QStringLiteral("ONVIF")) ||
         device.discoverySources.contains(QStringLiteral("ONVIF WS-Discovery")) ||
         device.discoverySources.contains(QStringLiteral("ONVIF GetDeviceInformation"));
-    const bool oxita = device.discoverySources.contains(QStringLiteral("Oxita")) ||
-        device.discoverySources.contains(QStringLiteral("Oxita UDP discovery"));
+    const bool oxita = normalized(device.manufacturer) == QStringLiteral("oxita") ||
+        device.discoverySources.contains(QStringLiteral("Oxita")) ||
+        device.discoverySources.contains(QStringLiteral("Oxita UDP discovery")) ||
+        device.discoverySources.contains(QStringLiteral("Project UDP 9988"));
 
     if (hasAny(identity, {QStringLiteral("nvr"), QStringLiteral("dvr"),
                           QStringLiteral("xvr"), QStringLiteral("video recorder"),
