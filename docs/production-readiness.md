@@ -24,15 +24,19 @@ Not implemented:
 - Project-camera activation or network configuration commands.
 - Firmware upload/update and recovery.
 - DHCP toggle, DNS configuration and general network provisioning.
-- Secure OS credential-vault integration and ONVIF WS-Security authentication.
+- Persistent OS credential-vault integration (Windows Credential Manager, macOS Keychain and Linux Secret Service) and validated ONVIF WS-Security UsernameToken support.
 - Cross-platform release installers and signed update distribution.
+
+## Address-conflict preflight status
+
+The repository contains an interface-scoped IPv4 conflict probe (`IpConflictProbe`). On Windows it uses `SendARP` to report a conflict only when a MAC address is resolved; a missing response remains Unknown. On Linux it invokes `arping -D` without a shell and reports Clear only when the expected zero-response summary is present. Other or ambiguous results fail closed. The current macOS implementation returns Unknown because a validated native duplicate-address-detection backend is not present. This is a preflight aid, not a reservation: another host can claim the address after the probe, and a quiet host/firewall can make a probe inconclusive. Do not describe it as a universal guarantee that an address is unused.
 
 ## Release gates
 
 ### P0 — Must pass before any production release
 
-- [x] Latest main CI run #605 (`47b99f2`) completed a clean Release build on Windows, Ubuntu and macOS using Qt 6.10.1.
-- [x] All CTest targets passed on all three operating systems in main CI run #605. This is automated CI evidence, not physical-camera acceptance.
+- [x] The main CI workflow builds Release and runs CTest on Windows, Ubuntu and macOS using Qt 6.10.1. Verify the exact workflow run for each release candidate; CI success is not physical-camera acceptance.
+- [ ] Keep a release evidence record linking the exact source commit, CI run, security scan, SBOM and hardware matrix.
 - [ ] Run discovery against real ONVIF cameras and the project's own Contract B firmware; attach sanitized logs/packet evidence.
 - [ ] Validate ONVIF static IPv4 changes on each specifically supported camera model/firmware, including authentication, rejected writes, address change, gateway failure and reboot-required response.
 - [ ] Verify multi-NIC cameras never expose a configuration token unless the interface IPv4 address matches the discovered camera address.
@@ -45,7 +49,7 @@ Not implemented:
 - [ ] Add scanner tests for full-subnet and capped-window selection, progress, cancellation, real host probing and no-camera false positives. [x] Add validation coverage for network/broadcast boundaries and /30 host boundaries. [x] Add deterministic multi-port aggregation and duplicate suppression coverage; live multi-port host probing still requires a controlled LAN fixture.
 - [ ] Expand UI tests beyond the startup smoke test: [x] verify all five workspaces, stable automation selectors, empty-inventory reachability error, search filtering, ONVIF/Oxita manufacturer filtering, official Oxita logo resource/display, selected-device manufacturer/model detail rendering and backup/restore controls. Still required: manual-entry and rename dialogs, CSV export, static-IP confirmation/recovery dialogs, scan cancellation and persistence/error states.
 - [ ] Complete SQLite failure testing for read-only directories, disk-full and abrupt process interruption. [x] Add transactional SQLite online backup, read-only backup integrity validation, guarded restore, retained pre-restore recovery snapshot and automated backup/restore/corruption tests. [x] Add legacy-schema migration, forced-failure rollback and corrupt-database preservation tests. The startup migration is transactional and versioned with SQLite `user_version`.
-- [ ] Add an explicit scan-range/CIDR control or clearly retain the current 256-address window limitation in the UI. A bounded scan is not a full scan of a larger subnet.
+- [x] Document the scanner bounds: full scans up to 4096 hosts; larger subnets use a 256-address window centered on the selected interface. A larger-subnet full scan is not supported.
 - [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
 - [x] Add per-device progress and user-visible cancellation for reachability checks.
@@ -60,7 +64,7 @@ Not implemented:
 
 ### P2 — Distribution and maintainability
 
-- [ ] Produce Windows installer/portable package, macOS app bundle and Linux package/AppImage.
+- [ ] Validate the new CI artifact workflow: Windows ZIP with Qt runtime, macOS Qt-deployed app ZIP, and Linux runtime-required tarball. These are not signed installers; a self-contained Linux AppImage/package remains pending.
 - [ ] Test clean install, upgrade, uninstall, application-data preservation and rollback.
 - [ ] Sign Windows artifacts and notarize macOS artifacts where distribution requires it.
 - [ ] Add dependency/license inventory, privacy notice, support policy and release notes.
@@ -92,7 +96,7 @@ Not implemented:
 - [x] Make the initial legacy-schema upgrade transactional and record the schema version atomically.
 - [x] Add a startup assertion for the schema version.
 
-The latest main workflow run #605 completed successfully on Windows, Ubuntu and macOS. Simulator fixtures and CI do not certify real cameras or the physical network stack.
+The cross-platform build workflow is configured for Windows, Ubuntu and macOS. Check the Actions run for the exact release candidate commit. Simulator fixtures and CI do not certify real cameras or the physical network stack.
 
 ## Release decision
 
