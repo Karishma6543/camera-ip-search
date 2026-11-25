@@ -53,7 +53,8 @@ bool SubnetScanner::isUsableSubnet(const QNetworkAddressEntry &entry)
 }
 
 bool SubnetScanner::start(const QNetworkInterface &interface,
-                          const QNetworkAddressEntry &entry)
+                          const QNetworkAddressEntry &entry,
+                          quint32 maxHosts)
 {
     const auto flags = interface.flags();
     if (running_ || !interface.isValid() ||
@@ -94,19 +95,25 @@ bool SubnetScanner::start(const QNetworkInterface &interface,
     const quint32 first = network + 1;
     const quint32 last = broadcast - 1;
     const quint32 hostCount = last - first + 1;
+    const quint32 scanLimit = maxHosts == 0 ? 4096U : qMin(maxHosts, 4096U);
+    if (maxHosts == 0 && hostCount > scanLimit) {
+        emit statusChanged(tr("Subnet contains %1 hosts. Full scans are limited to 4096 hosts; choose a smaller subnet or use the bounded scan.")
+                               .arg(hostCount));
+        return false;
+    }
     quint32 scanFirst = first;
     quint32 scanLast = last;
-    if (hostCount > kMaxHosts) {
-        // Keep the bounded scan useful on larger subnets by centering the
-        // address window around the selected interface's own IPv4 address.
-        const quint32 halfWindow = static_cast<quint32>(kMaxHosts / 2);
+    if (hostCount > scanLimit) {
+        // Keep a bounded scan useful on larger subnets by centering its window
+        // around the selected interface's own IPv4 address.
+        const quint32 halfWindow = scanLimit / 2;
         if (ip > first + halfWindow)
             scanFirst = ip - halfWindow;
-        if (scanFirst > last - static_cast<quint32>(kMaxHosts) + 1)
-            scanFirst = last - static_cast<quint32>(kMaxHosts) + 1;
-        scanLast = scanFirst + static_cast<quint32>(kMaxHosts) - 1;
+        if (scanFirst > last - scanLimit + 1)
+            scanFirst = last - scanLimit + 1;
+        scanLast = scanFirst + scanLimit - 1;
         emit statusChanged(tr("Subnet contains %1 hosts; scanning a bounded %2-address window around %3 across common device services.")
-                               .arg(hostCount).arg(kMaxHosts).arg(entry.ip().toString()));
+                               .arg(hostCount).arg(scanLimit).arg(entry.ip().toString()));
     } else {
         emit statusChanged(tr("Scanning %1 local IPv4 host(s) across common device services on %2.")
                                .arg(hostCount).arg(interface.humanReadableName()));
