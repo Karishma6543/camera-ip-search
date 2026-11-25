@@ -92,7 +92,7 @@ void ReachabilityChecker::tryNextPort()
 {
     if (!running_ || completed_) return;
     if (portIndex_ >= ports_.size()) {
-        completeCurrent(QStringLiteral("No response"));
+        completeCurrent(QStringLiteral("Unreachable"));
         return;
     }
     bool ok = false;
