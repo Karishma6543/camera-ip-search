@@ -161,8 +161,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(discovery_, &DiscoveryService::maintenanceOperationFinished, this,
             [this](const DeviceRecord &device, const QString &operation, bool succeeded,
                    const QString &message) {
-        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
-            button->setEnabled(selectedDeviceRow() >= 0 && deviceTable_->item(selectedDeviceRow(), 8) && deviceTable_->item(selectedDeviceRow(), 8)->text().contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) && !deviceTable_->item(selectedDeviceRow(), 1)->data(Qt::UserRole + 3).toString().isEmpty());
+        if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))) {
+            button->setEnabled(false);
+            button->setToolTip(tr("Disabled until factory-reset support is verified for this exact camera model and firmware."));
+        }
         recordOperation(operation, device.ipAddress,
                         succeeded ? tr("Accepted") : tr("Failed"), message);
         refreshOperationHistory();
@@ -173,12 +175,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(discovery_, &DiscoveryService::networkConfigurationFinished, this,
             [this](const DeviceRecord &updatedDevice, bool verified, const QString &message) {
         if (!bulkIpv4Running_) {
-            for (auto *button : findChildren<QPushButton *>()) {
-                if (button->text() == tr("Apply static IPv4 (ONVIF)")) {
-                    button->setEnabled(selectedDeviceRow() >= 0);
-                    break;
-                }
-            }
+            const int row = selectedDeviceRow();
+            const auto *ip = row >= 0 ? deviceTable_->item(row, 1) : nullptr;
+            const bool ready = ip && deviceTable_->item(row, 8) &&
+                deviceTable_->item(row, 8)->text().contains(QStringLiteral("ONVIF"), Qt::CaseInsensitive) &&
+                !ip->data(Qt::UserRole + 3).toString().isEmpty() &&
+                !ip->data(Qt::UserRole + 7).toString().isEmpty() &&
+                ip->data(Qt::UserRole + 16).toBool();
+            if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
+                button->setEnabled(ready);
         }
         if (bulkIpv4Running_) {
             recordOperation(tr("Bulk static IPv4"), updatedDevice.ipAddress,
@@ -885,10 +890,8 @@ void MainWindow::buildUi()
         if (auto *button = findChild<QPushButton *>(QStringLiteral("renameLabelButton")))
             button->setEnabled(hasSelection);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))) {
-            button->setEnabled(hasOnvifService);
-            button->setToolTip(hasOnvifService
-                ? tr("Send an ONVIF factory-default request. Camera support and permissions are still required.")
-                : tr("Available only for a device with a discovered ONVIF device service."));
+            button->setEnabled(false);
+            button->setToolTip(tr("Factory reset is disabled until support is verified for this exact camera model and firmware. ONVIF discovery alone is not sufficient evidence."));
         }
         if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
             button->setEnabled(hasVerifiedIpv4Interface);
@@ -1128,7 +1131,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     factoryResetButton->setObjectName(QStringLiteral("factoryResetCameraButton"));
     factoryResetButton->setEnabled(false);
     factoryResetButton->setAccessibleName(tr("Factory reset selected camera"));
-    factoryResetButton->setToolTip(tr("Send an ONVIF factory-default request to the selected camera. This may erase configuration and change its IP address."));
+    factoryResetButton->setToolTip(tr("Disabled until support is verified for this exact camera model and firmware. ONVIF discovery alone does not prove factory-reset support."));
+    factoryResetButton->setEnabled(false);
     maintenanceLayout->addWidget(factoryResetButton);
     devicePageLayout->addWidget(maintenancePanel);
     connect(factoryResetButton, &QPushButton::clicked, this, [this, factoryResetButton] {
@@ -1150,7 +1154,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         device.onvifEndpoint = ipItem ? ipItem->data(Qt::UserRole + 2).toString() : QString();
         device.deviceServiceUrl = ipItem ? ipItem->data(Qt::UserRole + 3).toString() : QString();
         device.discoverySources = cell(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
-        if (device.deviceServiceUrl.isEmpty() || device.ipAddress.isEmpty()) {
+        if (device.deviceServiceUrl.isEmpty() || device.ipAddress.isEmpty() ||
+            !ipItem || !ipItem->data(Qt::UserRole + 20).toBool()) {
             QMessageBox::warning(this, tr("Factory reset unavailable"),
                 tr("Refresh this camera first. A verified ONVIF device-service URL is required."));
             return;
@@ -1761,7 +1766,7 @@ void MainWindow::startNextBulkIpv4Configuration()
         if (auto *button = findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")))
             button->setEnabled(selectedIpv4Ready);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")))
-            button->setEnabled(selectedOnvif);
+            button->setEnabled(false);
         if (auto *button = findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")))
             button->setEnabled(selected >= 0);
         if (operationProgress_) operationProgress_->hide();
