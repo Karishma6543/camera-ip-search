@@ -1,6 +1,8 @@
 name: Desktop release artifacts
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
   push:
     tags:
