@@ -66,7 +66,7 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QStandardPaths::setTestModeEnabled(true);
     MainWindow window;
     QVERIFY(!window.windowTitle().isEmpty());
-    const auto tabs = window.findChild<QTabWidget *>();
+    const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
