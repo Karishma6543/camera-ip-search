@@ -290,3 +290,25 @@ QByteArray OnvifNetworkConfig::buildSetNetworkDefaultGatewayRequest(const QStrin
     writer.writeEndDocument();
     return payload;
 }
+
+QByteArray OnvifNetworkConfig::buildSetSystemFactoryDefaultRequest(const QString &factoryDefaultType)
+{
+    const QString normalized = factoryDefaultType.trimmed();
+    if (normalized != QStringLiteral("Soft") && normalized != QStringLiteral("Hard"))
+        return {};
+
+    QByteArray payload;
+    QXmlStreamWriter writer(&payload);
+    writer.writeStartDocument();
+    writer.writeStartElement(QStringLiteral("s:Envelope"));
+    writer.writeNamespace(QStringLiteral("http://www.w3.org/2003/05/soap-envelope"), QStringLiteral("s"));
+    writer.writeNamespace(QStringLiteral("http://www.onvif.org/ver10/device/wsdl"), QStringLiteral("tds"));
+    writer.writeStartElement(QStringLiteral("s:Body"));
+    writer.writeStartElement(QStringLiteral("tds:SetSystemFactoryDefault"));
+    writer.writeTextElement(QStringLiteral("tds:FactoryDefault"), normalized);
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndElement();
+    writer.writeEndDocument();
+    return payload;
+}

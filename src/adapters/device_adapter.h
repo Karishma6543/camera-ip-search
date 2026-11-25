@@ -16,7 +16,8 @@ enum class DeviceOperation {
     ChangePassword,
     UpdateFirmware,
     ConfigureImageSettings,
-    ManageNvrChannels
+    ManageNvrChannels,
+    FactoryReset
 };
 
 class DeviceAdapter
@@ -50,6 +51,8 @@ public:
         case DeviceOperation::ConfigureImageSettings:
         case DeviceOperation::ManageNvrChannels:
             return false;
+        case DeviceOperation::FactoryReset:
+            return implementedWriteOperations().contains(QStringLiteral("SetSystemFactoryDefault"));
         }
         return false;
     }

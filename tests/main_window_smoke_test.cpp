@@ -1,6 +1,9 @@
 #include "ui/main_window.h"
 
 #include <QStandardPaths>
+#include <QApplication>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QTabWidget>
@@ -14,6 +17,10 @@
 #include <QNetworkAddressEntry>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QScrollArea>
+#include <QHeaderView>
+#include <QProgressBar>
+#include <QSplitter>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
@@ -29,6 +36,8 @@ private slots:
     void startupShowsOperationHistory();
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
+    void inventoryStartsWithGuidanceAndCompactColumns();
+    void guidedManualEntryAndRenameDialogsWork();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
@@ -37,6 +46,7 @@ private slots:
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
     void shutdownAbortsActiveOnvifEnrichment();
+    void sendsAndVerifiesOnvifFactoryResetRequest();
 };
 
 void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
@@ -60,7 +70,7 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QVERIFY(tabs);
     bool historyFound = false;
     for (int index = 0; index < tabs->count(); ++index) {
-        if (tabs->tabText(index) == QStringLiteral("Operation History")) {
+        if (tabs->tabText(index) == QStringLiteral("Operation history")) {
             historyFound = true;
             break;
         }
@@ -90,9 +100,8 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     const auto tabs = window.findChild<QTabWidget *>(QStringLiteral("workspaceTabs"));
     QVERIFY(tabs);
     const QStringList expectedTabs{
-        QStringLiteral("Device Info"), QStringLiteral("Bulk Config"),
-        QStringLiteral("Maintenance"), QStringLiteral("NVR Channels"),
-        QStringLiteral("Operation History")
+        QStringLiteral("Device details"), QStringLiteral("Device actions"),
+        QStringLiteral("Operation history")
     };
     QCOMPARE(tabs->count(), expectedTabs.size());
     for (int index = 0; index < expectedTabs.size(); ++index) {
@@ -115,12 +124,90 @@ void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("discoverButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("backupInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("restoreInventoryButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("bulkIpv4ConfigureButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("previewStaticIpv4Button")));
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
 
     auto *reachability = window.findChild<QPushButton *>(QStringLiteral("reachabilityButton"));
     QTest::mouseClick(reachability, Qt::LeftButton);
     const auto status = window.findChild<QLabel *>(QStringLiteral("applicationStatus"));
     QVERIFY(status);
     QVERIFY(status->text().contains(QStringLiteral("Add or discover devices")));
+}
+
+void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
+    QVERIFY(table);
+    QVERIFY(emptyState);
+    QVERIFY(!emptyState->isHidden());
+    QVERIFY(emptyState->text().contains(QStringLiteral("Discover cameras")));
+    QVERIFY(table->isColumnHidden(5));
+    QVERIFY(table->isColumnHidden(6));
+    QVERIFY(table->isColumnHidden(8));
+    QVERIFY(table->isColumnHidden(9));
+    QVERIFY(table->isColumnHidden(10));
+    QVERIFY(!table->isColumnHidden(1));
+    QVERIFY(!table->isColumnHidden(2));
+    QVERIFY(!table->isColumnHidden(3));
+    QVERIFY(!table->isColumnHidden(4));
+    QVERIFY(!table->isColumnHidden(7));
+    QVERIFY(!table->isColumnHidden(11));
+    QVERIFY(table->horizontalHeader()->sectionsClickable());
+    QCOMPARE(table->horizontalHeader()->contextMenuPolicy(), Qt::CustomContextMenu);
+    QVERIFY(window.findChild<QProgressBar *>(QStringLiteral("operationProgress")));
+    auto *workspace = window.findChild<QSplitter *>(QStringLiteral("deviceWorkspaceSplitter"));
+    auto *detailsScroll = window.findChild<QScrollArea *>(QStringLiteral("deviceDetailsScrollArea"));
+    QVERIFY(workspace);
+    QVERIFY(detailsScroll);
+    QVERIFY(workspace->count() == 2);
+    QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
+}
+
+void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
+    auto *renameButton = window.findChild<QPushButton *>(QStringLiteral("renameLabelButton"));
+    QVERIFY(table && addButton && renameButton);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *address = dialog->findChild<QLineEdit *>(QStringLiteral("manualAddress"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("manualDeviceName"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveManualDeviceButton"));
+        QVERIFY(address && name && save);
+        address->setText(QStringLiteral("192.168.10.25"));
+        name->setText(QStringLiteral("Front entrance"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(addButton, Qt::LeftButton);
+    QCOMPARE(table->rowCount(), 1);
+    QCOMPARE(table->item(0, 1)->text(), QStringLiteral("192.168.10.25"));
+    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Front entrance"));
+
+    table->selectRow(0);
+    table->setCurrentCell(0, 1);
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("deviceFriendlyName"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveDeviceNameButton"));
+        QVERIFY(name && save);
+        name->setText(QStringLiteral("Loading bay"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(renameButton, Qt::LeftButton);
+    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
@@ -150,7 +237,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
         insert.addBindValue(QStringLiteral("Acme"));
         insert.addBindValue(QStringLiteral("A-100"));
         insert.addBindValue(QStringLiteral("1.0"));
-        insert.addBindValue(QStringLiteral("A100"));
+        insert.addBindValue(QString(180, QLatin1Char('S')));
         insert.addBindValue(QStringLiteral("HW-A"));
         insert.addBindValue(QStringLiteral("Activated"));
         insert.addBindValue(QStringLiteral("ONVIF WS-Discovery"));
@@ -168,16 +255,43 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(table && search && vendor && statusFilter);
     QCOMPARE(table->rowCount(), 1);
     QVERIFY(!table->isRowHidden(0));
+    table->selectRow(0);
     table->setCurrentCell(0, 1);
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
     const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
     QVERIFY(deviceDetails);
     QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
     QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
+    const auto *fullProfile = window.findChild<QLabel *>(QStringLiteral("deviceDetails"));
+    const auto *firmwareSummary = window.findChild<QLabel *>(QStringLiteral("firmwareDetailsSummary"));
+    QVERIFY(fullProfile);
+    QVERIFY(firmwareSummary);
+    QVERIFY(fullProfile != firmwareSummary);
+    QVERIFY(fullProfile->text().contains(QStringLiteral("02:00:00:00:00:10")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("FIRMWARE")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("SERIAL NUMBER")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
+    QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
+    table->clearSelection();
+    table->setCurrentCell(-1, -1);
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
+    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
+    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
+    table->selectRow(0);
+    table->setCurrentCell(0, 1);
 
     search->setText(QStringLiteral("does-not-exist"));
     QVERIFY(table->isRowHidden(0));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
+    const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
+    QVERIFY(emptyState && !emptyState->isHidden());
+    QVERIFY(emptyState->text().contains(QStringLiteral("No devices match")));
     search->clear();
     QVERIFY(!table->isRowHidden(0));
+    QVERIFY(!!emptyState->isHidden());
 
     vendor->setCurrentText(QStringLiteral("Oxita devices"));
     QVERIFY(table->isRowHidden(0));
@@ -436,6 +550,57 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
 }
 
 
+void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool requestSeen = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requestSeen] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &requestSeen] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(QStringLiteral("Content-Length\\s*:\\s*(\\d+)"), QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                const QByteArray body = request.mid(headerEnd + 4, bodyLength);
+                if (!body.contains("SetSystemFactoryDefault") || !body.contains("<tds:FactoryDefault>Soft</tds:FactoryDefault>")) return;
+                requestSeen = true;
+                const QByteArray responseBody = QByteArrayLiteral("<s:Envelope xmlns:s='urn:soap' xmlns:tds='urn:onvif'><s:Body><tds:SetSystemFactoryDefaultResponse/></s:Body></s:Envelope>");
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml\r\nContent-Length: ") + QByteArray::number(responseBody.size()) + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService service;
+    bool finished = false;
+    bool succeeded = false;
+    QString resultMessage;
+    connect(&service, &DiscoveryService::maintenanceOperationFinished, &service,
+            [&finished, &succeeded, &resultMessage](const DeviceRecord &, const QString &,
+                                                    bool ok, const QString &message) {
+        finished = true;
+        succeeded = ok;
+        resultMessage = message;
+    });
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("127.0.0.1");
+    device.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service").arg(camera.serverPort());
+    device.onvifEndpoint = QStringLiteral("urn:uuid:factory-reset-test");
+    device.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    service.factoryReset(device, QStringLiteral("Soft"));
+    QTRY_VERIFY_WITH_TIMEOUT(finished, 3000);
+    QVERIFY(requestSeen);
+    QVERIFY(succeeded);
+    QVERIFY(resultMessage.contains(QStringLiteral("accepted"), Qt::CaseInsensitive));
+}
 void MainWindowSmokeTest::shutdownAbortsActiveOnvifEnrichment()
 {
     QStandardPaths::setTestModeEnabled(true);

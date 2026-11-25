@@ -13,6 +13,7 @@ private slots:
     void verifiesOnlyRequestedInterface();
     void rejectsWrongAddressAndToken();
     void buildsEscapedGatewayRequest();
+    void buildsFactoryResetRequestAndRejectsInvalidMode();
     void validatesGatewayOperationResponse();
     void selectsInterfaceMatchingDiscoveredAddress();
     void leavesInterfaceUnselectedWhenAddressDoesNotMatch();
@@ -70,6 +71,20 @@ void OnvifNetworkConfigTest::buildsEscapedGatewayRequest()
     QXmlStreamReader reader(xml);
     while (!reader.atEnd()) reader.readNext();
     QVERIFY(!reader.hasError());
+}
+
+void OnvifNetworkConfigTest::buildsFactoryResetRequestAndRejectsInvalidMode()
+{
+    const QByteArray soft = OnvifNetworkConfig::buildSetSystemFactoryDefaultRequest(QStringLiteral("Soft"));
+    QVERIFY(soft.contains("SetSystemFactoryDefault"));
+    QVERIFY(soft.contains("<tds:FactoryDefault>Soft</tds:FactoryDefault>"));
+    QXmlStreamReader reader(soft);
+    while (!reader.atEnd()) reader.readNext();
+    QVERIFY(!reader.hasError());
+
+    const QByteArray hard = OnvifNetworkConfig::buildSetSystemFactoryDefaultRequest(QStringLiteral("Hard"));
+    QVERIFY(hard.contains("<tds:FactoryDefault>Hard</tds:FactoryDefault>"));
+    QVERIFY(OnvifNetworkConfig::buildSetSystemFactoryDefaultRequest(QStringLiteral("erase-all")).isEmpty());
 }
 
 void OnvifNetworkConfigTest::validatesGatewayOperationResponse()

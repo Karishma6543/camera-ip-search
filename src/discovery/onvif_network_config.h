@@ -25,4 +25,5 @@ bool verifyInterfaceIpv4Address(const QByteArray &xml, const QString &interfaceT
 bool parseSoapOperationResponse(const QByteArray &xml, const QString &expectedResponse,
                                 QString *error = nullptr);
 QByteArray buildSetNetworkDefaultGatewayRequest(const QString &gateway);
+QByteArray buildSetSystemFactoryDefaultRequest(const QString &factoryDefaultType);
 }
