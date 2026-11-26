@@ -19,6 +19,8 @@ enum class DeviceOperation {
     ChangePassword,
     UpdateFirmware,
     ConfigureImageSettings,
+    ConfigurePtz,
+    ManageEvents,
     ManageNvrChannels,
     FactoryReset
 };
@@ -60,6 +62,8 @@ public:
         case DeviceOperation::ChangePassword:
         case DeviceOperation::UpdateFirmware:
         case DeviceOperation::ConfigureImageSettings:
+        case DeviceOperation::ConfigurePtz:
+        case DeviceOperation::ManageEvents:
         case DeviceOperation::ManageNvrChannels:
             return false;
         case DeviceOperation::FactoryReset:
