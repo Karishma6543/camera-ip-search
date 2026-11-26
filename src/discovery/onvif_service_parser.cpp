@@ -48,7 +48,7 @@ bool OnvifServiceParser::parseServiceCategories(const QByteArray &payload,
     QStringList parsed;
     QString namespaceUri;
     QString xaddr;
-    int serviceDepth = -1;
+    bool serviceOpen = false;
     bool responseSeen = false;
 
     while (!xml.atEnd()) {
@@ -58,23 +58,23 @@ bool OnvifServiceParser::parseServiceCategories(const QByteArray &payload,
             if (name == QStringLiteral("GetServicesResponse"))
                 responseSeen = true;
             else if (name == QStringLiteral("Service")) {
-                serviceDepth = xml.depth();
+                serviceOpen = true;
                 namespaceUri.clear();
                 xaddr.clear();
-            } else if (serviceDepth >= 0 && name == QStringLiteral("Namespace")) {
+            } else if (serviceOpen && name == QStringLiteral("Namespace")) {
                 namespaceUri = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
-            } else if (serviceDepth >= 0 && name == QStringLiteral("XAddr")) {
+            } else if (serviceOpen && name == QStringLiteral("XAddr")) {
                 xaddr = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
             }
         } else if (xml.isEndElement() &&
                    xml.name() == QStringLiteral("Service") &&
-                   serviceDepth == xml.depth()) {
+                   serviceOpen) {
             const QString category = categoryFromNamespace(namespaceUri);
             if (namespaceUri.startsWith(QStringLiteral("http://www.onvif.org/"), Qt::CaseInsensitive) &&
                 !category.isEmpty() && isSafeServiceEndpoint(xaddr, expectedHost) &&
                 !parsed.contains(category, Qt::CaseInsensitive))
                 parsed.append(category);
-            serviceDepth = -1;
+            serviceOpen = false;
         }
     }
 
