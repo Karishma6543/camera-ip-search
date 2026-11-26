@@ -51,6 +51,7 @@ private slots:
     void discoveryServiceRequestsAndRecordsOnvifServices();
     void discoveryServiceRetriesHttpBasicAuthenticationChallenge();
     void discoveryServiceRetriesWsseUsernameTokenChallenge();
+    void discoveryServiceRetriesWsseChallengeForGetServices();
     void discoveryServiceDoesNotFollowSoapRedirects();
     void discoveryServiceReportsSoapRequestTimeout();
     void discoveryServiceReportsSoapFaults();
@@ -899,6 +900,106 @@ void MainWindowSmokeTest::discoveryServiceRetriesWsseUsernameTokenChallenge()
     QVERIFY(digestReceived);
 }
 
+
+
+void MainWindowSmokeTest::discoveryServiceRetriesWsseChallengeForGetServices()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool servicesReturned = false;
+    bool digestReceived = false;
+    int prompts = 0;
+    connect(&camera, &QTcpServer::newConnection, &camera,
+            [&camera, &servicesReturned, &digestReceived] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer,
+                    [peer, &servicesReturned, &digestReceived] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(
+                    QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                const QByteArray soap = request.mid(headerEnd + 4, bodyLength);
+                QByteArray responseBody;
+                int status = 200;
+                if (soap.contains("GetDeviceInformation")) {
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                        "xmlns:tds='http://www.onvif.org/ver10/device/wsdl'><s:Body>"
+                        "<tds:GetDeviceInformationResponse><tds:Manufacturer>Service WSSE Fixture</tds:Manufacturer>"
+                        "<tds:Model>Service Auth</tds:Model><tds:FirmwareVersion>1</tds:FirmwareVersion>"
+                        "<tds:SerialNumber>SVC-WSSE-1</tds:SerialNumber>"
+                        "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
+                } else if (soap.contains("GetServices") && soap.contains("wsse:UsernameToken")) {
+                    digestReceived = true;
+                    servicesReturned = true;
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                        "xmlns:tds='http://www.onvif.org/ver10/device/wsdl' "
+                        "xmlns:dn='http://www.onvif.org/ver10/network/wsdl'><s:Body>"
+                        "<tds:GetServicesResponse><tds:Service><tds:Namespace>http://www.onvif.org/ver10/network/wsdl</tds:Namespace>"
+                        "<tds:XAddr>http://127.0.0.1/onvif/network_service</tds:XAddr>"
+                        "</tds:Service></tds:GetServicesResponse></s:Body></s:Envelope>");
+                } else if (soap.contains("GetServices")) {
+                    status = 500;
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body>"
+                        "<s:Fault><s:Code><s:Value>ter:NotAuthorized</s:Value></s:Code>"
+                        "<s:Reason><s:Text>Access denied</s:Text></s:Reason></s:Fault>"
+                        "</s:Body></s:Envelope>");
+                } else {
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body/>"
+                        "</s:Envelope>");
+                }
+                const QByteArray response = QByteArray("HTTP/1.1 ") + QByteArray::number(status)
+                    + (status == 500 ? QByteArrayLiteral(" Internal Server Error\r\n")
+                                     : QByteArrayLiteral(" OK\r\n"))
+                    + QByteArrayLiteral("Content-Type: application/soap+xml\r\nContent-Length: ")
+                    + QByteArray::number(responseBody.size())
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    connect(&discovery, &DiscoveryService::authenticationRequested, &discovery,
+            [&prompts](QAuthenticator *authenticator) {
+        ++prompts;
+        authenticator->setUser(QStringLiteral("operator"));
+        authenticator->setPassword(QStringLiteral("service-password"));
+    });
+    DeviceRecord enriched;
+    bool serviceCapabilitySeen = false;
+    connect(&discovery, &DiscoveryService::deviceFound, &discovery,
+            [&enriched, &serviceCapabilitySeen](const DeviceRecord &device) {
+        enriched = device;
+        serviceCapabilitySeen = device.capabilities.contains(QStringLiteral("Service: Network"));
+    });
+
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:wsse-services-fixture");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(serviceCapabilitySeen, 4000);
+    QCOMPARE(prompts, 1);
+    QVERIFY(servicesReturned);
+    QVERIFY(digestReceived);
+}
 
 void MainWindowSmokeTest::discoveryServiceDoesNotFollowSoapRedirects()
 {
