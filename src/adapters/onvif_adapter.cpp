@@ -34,6 +34,7 @@ QStringList OnvifAdapter::verifiedReadOperations() const
     return {
         QStringLiteral("GetDeviceInformation"),
         QStringLiteral("GetCapabilities"),
+        QStringLiteral("GetServices"),
         QStringLiteral("GetNetworkInterfaces")
     };
 }
