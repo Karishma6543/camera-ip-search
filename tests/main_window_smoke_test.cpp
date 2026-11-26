@@ -51,6 +51,8 @@ private slots:
     void discoveryServiceRequestsAndRecordsOnvifServices();
     void discoveryServiceRetriesHttpBasicAuthenticationChallenge();
     void discoveryServiceRetriesWsseUsernameTokenChallenge();
+    void discoveryServiceDoesNotFollowSoapRedirects();
+    void discoveryServiceReportsSoapRequestTimeout();
     void discoveryServiceReportsSoapFaults();
     void shutdownAbortsActiveOnvifEnrichment();
     void sendsAndVerifiesOnvifFactoryResetRequest();
@@ -895,6 +897,98 @@ void MainWindowSmokeTest::discoveryServiceRetriesWsseUsernameTokenChallenge()
     QCOMPARE(credentialPrompts, 1);
     QVERIFY(requests >= 2);
     QVERIFY(digestReceived);
+}
+
+
+void MainWindowSmokeTest::discoveryServiceDoesNotFollowSoapRedirects()
+{
+    QTcpServer camera;
+    QTcpServer redirectTarget;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    QVERIFY(redirectTarget.listen(QHostAddress::LocalHost, quint16(0)));
+    bool requestReceived = false;
+    int redirectedRequests = 0;
+    connect(&redirectTarget, &QTcpServer::newConnection, &redirectTarget, [&redirectTarget, &redirectedRequests] {
+        while (redirectTarget.hasPendingConnections()) {
+            QTcpSocket *peer = redirectTarget.nextPendingConnection();
+            if (!peer) continue;
+            ++redirectedRequests;
+            peer->disconnectFromHost();
+        }
+    });
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requestReceived, &redirectTarget] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &requestReceived, &redirectTarget] {
+                const QByteArray request = peer->readAll();
+                if (!request.contains("POST ")) return;
+                requestReceived = true;
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:")
+                    + QByteArray::number(redirectTarget.serverPort())
+                    + QByteArrayLiteral("/onvif/device_service\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    QString status;
+    connect(&discovery, &DiscoveryService::statusChanged, &discovery,
+            [&status](const QString &message) {
+        if (message.contains(QStringLiteral("GetDeviceInformation failed")))
+            status = message;
+    });
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:redirect-fixture");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(requestReceived, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!status.isEmpty(), 3000);
+    QTest::qWait(100);
+    QCOMPARE(redirectedRequests, 0);
+}
+
+void MainWindowSmokeTest::discoveryServiceReportsSoapRequestTimeout()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool requestReceived = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requestReceived] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [&requestReceived, peer] {
+                if (!peer->readAll().isEmpty())
+                    requestReceived = true;
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    QString status;
+    connect(&discovery, &DiscoveryService::statusChanged, &discovery,
+            [&status](const QString &message) {
+        if (message.contains(QStringLiteral("GetDeviceInformation failed")))
+            status = message;
+    });
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:timeout-fixture");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(requestReceived, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!status.isEmpty(), 6000);
+    QVERIFY(status.contains(QStringLiteral("HTTP 0")) ||
+            status.contains(QStringLiteral("timed out"), Qt::CaseInsensitive));
 }
 
 void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
