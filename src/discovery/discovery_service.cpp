@@ -76,6 +76,9 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
         return;
     }
     devices_.insert(key, device);
+    const QString credentialKey = QUrl(device.deviceServiceUrl).authority(QUrl::FullyEncoded).toLower();
+    if (!wsseCredentials_.contains(credentialKey))
+        wssePromptedHosts_.remove(credentialKey);
     emit statusChanged(tr("Refreshing device information using %1…").arg(adapter->displayName()));
     requestOnvifDeviceInformation(device);
 }
@@ -296,7 +299,7 @@ void DiscoveryService::guardOnvifReply(QNetworkReply *reply)
 }
 
 QNetworkReply *DiscoveryService::postOnvifRequest(const QNetworkRequest &request,
-                                                               const QByteArray &soap)
+                                                   const QByteArray &soap)
 {
     const QUrl url = request.url();
     const QString credentialKey = url.authority(QUrl::FullyEncoded).toLower();
