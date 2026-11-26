@@ -10,6 +10,7 @@
 #include <QNetworkAccessManager>
 #include <QAuthenticator>
 #include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPointer>
 #include <QTimer>
 #include <QUdpSocket>
