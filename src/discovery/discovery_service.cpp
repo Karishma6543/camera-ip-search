@@ -418,6 +418,12 @@ void DiscoveryService::factoryReset(const DeviceRecord &device, const QString &f
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const bool transportOk = reply->error() == QNetworkReply::NoError &&
                                  status >= 200 && status < 300;
+        if (isWsseAuthenticationFailure(payload, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetSystemFactoryDefault"))) {
+            reply->deleteLater();
+            factoryReset(device, mode);
+            return;
+        }
         QString parseError;
         const bool accepted = transportOk && OnvifNetworkConfig::parseSoapOperationResponse(
             payload, QStringLiteral("SetSystemFactoryDefaultResponse"), &parseError);
@@ -513,6 +519,12 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetNetworkInterfaces.StaticIPv4"))) {
+            setReply->deleteLater();
+            applyStaticIpv4(device, address, subnetMask, gateway);
+            return;
+        }
         bool rebootNeeded = false;
         QString responseError;
         const bool transportOk = setReply->error() == QNetworkReply::NoError &&
@@ -654,6 +666,12 @@ void DiscoveryService::configureDhcp(const DeviceRecord &device, bool enabled)
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, enabled] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetNetworkInterfaces.DHCP"))) {
+            reply->deleteLater();
+            configureDhcp(device, enabled);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
@@ -732,6 +750,12 @@ void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, fromDhcp, ipv4Servers] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetDNS"))) {
+            reply->deleteLater();
+            configureDns(device, fromDhcp, ipv4Servers);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
@@ -796,6 +820,12 @@ void DiscoveryService::rebootDevice(const DeviceRecord &device)
     connect(reply, &QNetworkReply::finished, this, [this, reply, device] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SystemReboot"))) {
+            reply->deleteLater();
+            rebootDevice(device);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
