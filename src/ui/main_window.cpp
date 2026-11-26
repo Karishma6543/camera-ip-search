@@ -1963,7 +1963,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
             compatibilityDevice.discoverySources = sourcesItem->text().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         details << tr("OPERATION COMPATIBILITY (evidence-based)");
         for (const auto &entry : OperationCompatibility::evaluate(compatibilityDevice)) {
-            details << tr("%1 — %2. %3")
+            details << tr("%1: %2. %3")
                 .arg(entry.operation, OperationCompatibility::statusLabel(entry.status), entry.evidence);
         }
     }
