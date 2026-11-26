@@ -65,7 +65,7 @@ private:
     void guardOnvifReply(QNetworkReply *reply);
     void trackEnrichmentReply(QNetworkReply *reply);
     QNetworkReply *postOnvifRequest(const QNetworkRequest &request, const QByteArray &soap);
-    bool requestWsseCredentials(const DeviceRecord &device);
+    bool requestWsseCredentials(const DeviceRecord &device, const QString &operation);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);
@@ -84,6 +84,7 @@ private:
     QNetworkAccessManager networkManager_;
     QHash<QString, QPair<QString, QString>> wsseCredentials_;
     QSet<QString> wssePromptedHosts_;
+    QSet<QString> wsseRetriedOperations_;
     AdapterRegistry adapterRegistry_;
     bool running_{false};
     quint32 sequence_{0};
