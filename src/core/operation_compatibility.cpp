@@ -28,8 +28,8 @@ constexpr std::array definitions{
     OperationDefinition{"Change camera password", DeviceOperation::ChangePassword, "Device", ""},
     OperationDefinition{"Firmware upgrade", DeviceOperation::UpdateFirmware, "Device", ""},
     OperationDefinition{"Image settings", DeviceOperation::ConfigureImageSettings, "Imaging", ""},
-    OperationDefinition{"PTZ controls", DeviceOperation::ConfigureImageSettings, "PTZ", ""},
-    OperationDefinition{"Events and alarms", DeviceOperation::ManageNvrChannels, "Events", ""},
+    OperationDefinition{"PTZ controls", DeviceOperation::ConfigurePtz, "PTZ", ""},
+    OperationDefinition{"Events and alarms", DeviceOperation::ManageEvents, "Events", ""},
     OperationDefinition{"NVR channel management", DeviceOperation::ManageNvrChannels, "Recording", ""}
 };
 
