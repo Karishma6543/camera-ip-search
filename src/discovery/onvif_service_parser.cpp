@@ -1,6 +1,5 @@
 #include "onvif_service_parser.h"
 
-#include <QSet>
 #include <QUrl>
 #include <QXmlStreamReader>
 
