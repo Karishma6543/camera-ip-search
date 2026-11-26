@@ -50,6 +50,7 @@ private slots:
     void discoveryServiceIgnoresUnrelatedSoapResponse();
     void discoveryServiceRequestsAndRecordsOnvifServices();
     void discoveryServiceRetriesHttpBasicAuthenticationChallenge();
+    void discoveryServiceRetriesWsseUsernameTokenChallenge();
     void discoveryServiceReportsSoapFaults();
     void shutdownAbortsActiveOnvifEnrichment();
     void sendsAndVerifiesOnvifFactoryResetRequest();
@@ -808,6 +809,93 @@ void MainWindowSmokeTest::discoveryServiceRetriesHttpBasicAuthenticationChalleng
     QVERIFY(authenticated);
 }
 
+
+
+void MainWindowSmokeTest::discoveryServiceRetriesWsseUsernameTokenChallenge()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    int requests = 0;
+    bool digestReceived = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requests, &digestReceived] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &requests, &digestReceived] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(
+                    QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                ++requests;
+                const QByteArray soap = request.mid(headerEnd + 4, bodyLength);
+                QByteArray responseBody;
+                int status = 200;
+                if (!soap.contains("wsse:UsernameToken") ||
+                    !soap.contains("<wsse:Username>operator</wsse:Username>") ||
+                    !soap.contains("PasswordDigest") || !soap.contains("wsu:Created")) {
+                    status = 500;
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body>"
+                        "<s:Fault><s:Code><s:Value>s:Sender</s:Value></s:Code>"
+                        "<s:Reason><s:Text>Not authorized: WS-Security required</s:Text></s:Reason>"
+                        "</s:Fault></s:Body></s:Envelope>");
+                } else {
+                    digestReceived = true;
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                        "xmlns:tds='http://www.onvif.org/ver10/device/wsdl'><s:Body>"
+                        "<tds:GetDeviceInformationResponse><tds:Manufacturer>WSSE Fixture</tds:Manufacturer>"
+                        "<tds:Model>Digest Auth</tds:Model><tds:FirmwareVersion>1</tds:FirmwareVersion>"
+                        "<tds:SerialNumber>WSSE-1</tds:SerialNumber><tds:HardwareId>WSSE-HW</tds:HardwareId>"
+                        "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
+                }
+                const QByteArray response = QByteArray("HTTP/1.1 ") + QByteArray::number(status)
+                    + (status == 500 ? QByteArrayLiteral(" Internal Server Error\r\n")
+                                     : QByteArrayLiteral(" OK\r\n"))
+                    + QByteArrayLiteral("Content-Type: application/soap+xml\r\nContent-Length: ")
+                    + QByteArray::number(responseBody.size())
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    int credentialPrompts = 0;
+    bool deviceReceived = false;
+    connect(&discovery, &DiscoveryService::authenticationRequested, &discovery,
+            [&credentialPrompts](QAuthenticator *authenticator) {
+        ++credentialPrompts;
+        authenticator->setUser(QStringLiteral("operator"));
+        authenticator->setPassword(QStringLiteral("fixture-password"));
+    });
+    connect(&discovery, &DiscoveryService::deviceFound, &discovery,
+            [&deviceReceived](const DeviceRecord &device) {
+        if (device.manufacturer == QStringLiteral("WSSE Fixture"))
+            deviceReceived = true;
+    });
+
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:wsse-auth-fixture");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(deviceReceived, 3000);
+    QCOMPARE(credentialPrompts, 1);
+    QVERIFY(requests >= 2);
+    QVERIFY(digestReceived);
+}
 
 void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
 {
