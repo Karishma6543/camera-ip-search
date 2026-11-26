@@ -1128,7 +1128,7 @@ void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
                     responseBody = QByteArrayLiteral(
                         "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body>"
                         "<s:Fault><s:Code><s:Value>s:Sender</s:Value></s:Code>"
-                        "<s:Reason><s:Text xml:lang='en'>Not authorized for GetServices</s:Text></s:Reason>"
+                        "<s:Reason><s:Text xml:lang='en'>Action not supported for GetServices</s:Text></s:Reason>"
                         "</s:Fault></s:Body></s:Envelope>");
                 } else {
                     responseBody = QByteArrayLiteral(
@@ -1151,7 +1151,7 @@ void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
     QString observedStatus;
     connect(&discovery, &DiscoveryService::statusChanged, &discovery,
             [&observedStatus](const QString &message) {
-        if (message.contains(QStringLiteral("Not authorized for GetServices")))
+        if (message.contains(QStringLiteral("Action not supported for GetServices")) )
             observedStatus = message;
     });
     DeviceRecord candidate;
