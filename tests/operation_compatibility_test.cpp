@@ -8,6 +8,7 @@ class OperationCompatibilityTest final : public QObject
 private slots:
     void distinguishesApplicationImplementationFromDeviceEvidence();
     void reportsDeviceResponseOnlyForObservedOperations();
+    void reportsServiceInventoryOnlyAfterGetServicesResponse();
     void doesNotTreatAdvertisedMediaServiceAsImplementedStreaming();
 };
 
@@ -35,6 +36,18 @@ void OperationCompatibilityTest::reportsDeviceResponseOnlyForObservedOperations(
     QCOMPARE(entries.at(0).status, OperationCompatibility::Status::DeviceResponded);
     QCOMPARE(entries.at(1).status, OperationCompatibility::Status::ImplementedNotTested);
     QCOMPARE(entries.at(2).status, OperationCompatibility::Status::ImplementedNotTested);
+}
+
+
+void OperationCompatibilityTest::reportsServiceInventoryOnlyAfterGetServicesResponse()
+{
+    DeviceRecord device;
+    device.ipAddress = QStringLiteral("192.0.2.10");
+    device.deviceServiceUrl = QStringLiteral("http://192.0.2.10/onvif/device_service");
+    device.discoverySources << QStringLiteral("ONVIF")
+                            << QStringLiteral("ONVIF GetServices");
+    const auto entries = OperationCompatibility::evaluate(device);
+    QCOMPARE(entries.at(2).status, OperationCompatibility::Status::DeviceResponded);
 }
 
 void OperationCompatibilityTest::doesNotTreatAdvertisedMediaServiceAsImplementedStreaming()
