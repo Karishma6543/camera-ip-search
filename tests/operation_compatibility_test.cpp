@@ -20,8 +20,8 @@ void OperationCompatibilityTest::distinguishesApplicationImplementationFromDevic
     const auto entries = OperationCompatibility::evaluate(device);
     QVERIFY(entries.size() >= 10);
     QCOMPARE(entries.at(0).status, OperationCompatibility::Status::ImplementedNotTested);
-    QCOMPARE(entries.at(3).status, OperationCompatibility::Status::ServiceNotReported);
-    QCOMPARE(entries.at(7).status, OperationCompatibility::Status::NotImplemented);
+    QCOMPARE(entries.at(4).status, OperationCompatibility::Status::ServiceNotReported);
+    QCOMPARE(entries.at(9).status, OperationCompatibility::Status::NotImplemented);
 }
 
 void OperationCompatibilityTest::reportsDeviceResponseOnlyForObservedOperations()
@@ -34,6 +34,7 @@ void OperationCompatibilityTest::reportsDeviceResponseOnlyForObservedOperations(
     const auto entries = OperationCompatibility::evaluate(device);
     QCOMPARE(entries.at(0).status, OperationCompatibility::Status::DeviceResponded);
     QCOMPARE(entries.at(1).status, OperationCompatibility::Status::ImplementedNotTested);
+    QCOMPARE(entries.at(2).status, OperationCompatibility::Status::ImplementedNotTested);
 }
 
 void OperationCompatibilityTest::doesNotTreatAdvertisedMediaServiceAsImplementedStreaming()
@@ -44,9 +45,9 @@ void OperationCompatibilityTest::doesNotTreatAdvertisedMediaServiceAsImplemented
     device.discoverySources << QStringLiteral("ONVIF");
     device.capabilities << QStringLiteral("Service: Media") << QStringLiteral("Service: Device");
     const auto entries = OperationCompatibility::evaluate(device);
-    QCOMPARE(entries.at(7).status, OperationCompatibility::Status::ServiceAdvertisedNotVerified);
-    QVERIFY(entries.at(7).evidence.contains(QStringLiteral("not implemented")));
-    QCOMPARE(entries.at(3).status, OperationCompatibility::Status::AuthenticationNotVerified);
+    QCOMPARE(entries.at(9).status, OperationCompatibility::Status::ServiceAdvertisedNotVerified);
+    QVERIFY(entries.at(9).evidence.contains(QStringLiteral("not implemented")));
+    QCOMPARE(entries.at(4).status, OperationCompatibility::Status::AuthenticationNotVerified);
 }
 QTEST_GUILESS_MAIN(OperationCompatibilityTest)
 #include "operation_compatibility_test.moc"
