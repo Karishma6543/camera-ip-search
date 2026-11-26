@@ -56,9 +56,10 @@ void AdapterRegistryTest::exposesOnlyImplementedReadOperations()
     device.discoverySources << QStringLiteral("ONVIF");
     AdapterRegistry registry;
     const QStringList operations = registry.supportedReadOperations(device);
-    QCOMPARE(operations.size(), 3);
+    QCOMPARE(operations.size(), 4);
     QVERIFY(operations.contains(QStringLiteral("GetDeviceInformation")));
     QVERIFY(operations.contains(QStringLiteral("GetCapabilities")));
+    QVERIFY(operations.contains(QStringLiteral("GetServices")));
     QVERIFY(operations.contains(QStringLiteral("GetNetworkInterfaces")));
     QVERIFY(!operations.contains(QStringLiteral("SetNetworkInterfaces")));
 }

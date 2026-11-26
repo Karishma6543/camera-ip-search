@@ -4,6 +4,7 @@
 #include "onvif_maintenance_operations.h"
 #include "onvif_dns_parser.h"
 #include "onvif_service_parser.h"
+#include "onvif_soap_fault_parser.h"
 #include "discovery_parser.h"
 #include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
@@ -776,17 +777,19 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
 
     QXmlStreamReader xml(payload);
     QString manufacturer, model, firmware, serial, hardware;
+    bool responseSeen = false;
     while (!xml.atEnd()) {
         xml.readNext();
         if (!xml.isStartElement()) continue;
         const QString name = xml.name().toString();
-        if (name == QStringLiteral("Manufacturer")) manufacturer = xml.readElementText().trimmed();
+        if (name == QStringLiteral("GetDeviceInformationResponse")) responseSeen = true;
+        else if (name == QStringLiteral("Manufacturer")) manufacturer = xml.readElementText().trimmed();
         else if (name == QStringLiteral("Model")) model = xml.readElementText().trimmed();
         else if (name == QStringLiteral("FirmwareVersion")) firmware = xml.readElementText().trimmed();
         else if (name == QStringLiteral("SerialNumber")) serial = xml.readElementText().trimmed();
         else if (name == QStringLiteral("HardwareId")) hardware = xml.readElementText().trimmed();
     }
-    if (xml.hasError()) return;
+    if (xml.hasError() || !responseSeen) return;
 
     DeviceRecord &device = devices_[deviceKey];
     if (!manufacturer.isEmpty()) device.manufacturer = manufacturer;
@@ -840,17 +843,19 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
 
     QXmlStreamReader xml(payload);
     QStringList capabilities;
+    bool responseSeen = false;
     while (!xml.atEnd()) {
         xml.readNext();
         if (!xml.isStartElement()) continue;
         const QString name = xml.name().toString();
+        if (name == QStringLiteral("GetCapabilitiesResponse")) responseSeen = true;
         if (name == QStringLiteral("Analytics") || name == QStringLiteral("Device") ||
             name == QStringLiteral("Events") || name == QStringLiteral("Imaging") ||
             name == QStringLiteral("Media") || name == QStringLiteral("PTZ") ||
             name == QStringLiteral("Extension"))
             if (!capabilities.contains(name)) capabilities.append(name);
     }
-    if (xml.hasError()) return;
+    if (xml.hasError() || !responseSeen) return;
     DeviceRecord &device = devices_[deviceKey];
     for (const QString &existing : device.capabilities) {
         if (existing.startsWith(QStringLiteral("Service: ")) && !capabilities.contains(existing))
@@ -895,10 +900,27 @@ void DiscoveryService::handleOnvifServices(QNetworkReply *reply, const QString &
     const QByteArray payload = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    const QString networkError = reply->errorString();
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > kMaxOnvifResponseBytes ||
-        !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
         return;
+    if (payload.size() > kMaxOnvifResponseBytes) {
+        emit statusChanged(tr("ONVIF GetServices response exceeded the 1 MiB safety limit."));
+        return;
+    }
+
+    QString faultMessage;
+    QString faultCode;
+    if (OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode)) {
+        emit statusChanged(tr("Camera rejected ONVIF GetServices: %1%2")
+            .arg(faultMessage, faultCode.isEmpty() ? QString() : tr(" (code: %1)").arg(faultCode)));
+        return;
+    }
+    if (!success || payload.isEmpty()) {
+        emit statusChanged(tr("ONVIF GetServices failed (HTTP %1): %2")
+            .arg(status).arg(networkError));
+        return;
+    }
 
     QStringList serviceCategories;
     QString parseError;

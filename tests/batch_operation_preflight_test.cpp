@@ -34,6 +34,10 @@ void BatchOperationPreflightTest::marksVerifiedReadAsReady()
     QCOMPARE(results.size(), 1);
     QCOMPARE(results.first().state, BatchTargetState::Ready);
     QCOMPARE(results.first().adapterId, QStringLiteral("onvif"));
+    const auto serviceResults = BatchOperationPreflight::build(
+        {onvifDevice(QStringLiteral("cam-2"), QStringLiteral("192.168.1.11"))},
+        registry, DeviceOperation::ReadServices);
+    QCOMPARE(serviceResults.first().state, BatchTargetState::Ready);
 }
 
 void BatchOperationPreflightTest::keepsManagementOperationsDisabled()
@@ -49,6 +53,8 @@ void BatchOperationPreflightTest::keepsManagementOperationsDisabled()
         DeviceOperation::ChangePassword,
         DeviceOperation::UpdateFirmware,
         DeviceOperation::ConfigureImageSettings,
+        DeviceOperation::ConfigurePtz,
+        DeviceOperation::ManageEvents,
         DeviceOperation::ManageNvrChannels,
         DeviceOperation::FactoryReset
     };

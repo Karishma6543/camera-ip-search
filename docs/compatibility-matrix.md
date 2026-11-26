@@ -58,3 +58,23 @@ A successful ONVIF probe does not prove activation, network configuration or fir
 ## Protocol implementation status
 
 The development branch `feat/onvif-camera-network-configuration` connects ONVIF DHCP, DNS and reboot requests to the desktop workflow, with response validation, read-back checks for DHCP/DNS, confirmation dialogs, and adapter-level operation declarations. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
+
+
+## Operation-level compatibility reporting
+
+The Device Info panel includes an operation-level evidence matrix. It distinguishes:
+- **Device responded** — a successful response to that read request was observed during discovery or refresh.
+- **Implemented; not tested** — the application has a read-request implementation, but no successful response has been observed for this device.
+- **Advertised; not implemented** — the device reported the related ONVIF service, but the application does not implement that individual operation.
+- **Authentication / permission not verified** — the application implements a write request and the device advertises the service, but the camera has not confirmed that the current account is authorized or that the operation succeeds.
+- **Not reported by device** — the application has an implementation, but this device has not reported the related service or operation.
+- **Not implemented** — the current application adapter does not implement the operation.
+
+Service advertisement is not operation-level certification. Write operations still require appropriate camera credentials and permissions; this matrix does not claim authorization, successful execution, or model/firmware compatibility. The current ONVIF adapter reports only application implementations already present in code. RTSP preview, snapshots, password changes, firmware upgrade, imaging/PTZ controls, events and NVR channel management remain unavailable unless a future adapter implements and tests them.
+
+
+## Authentication and SOAP fault handling
+
+The desktop client responds to HTTP authentication challenges through a per-request credential prompt. The credentials are supplied to Qt's network authenticator for the active request and are not written to the inventory database. Automated loopback integration coverage exercises an HTTP Basic challenge and retry. This does **not** certify every camera's HTTP authentication scheme.
+
+ONVIF WS-Security UsernameToken digest authentication is not implemented or certified by this milestone. Cameras that require WS-Security rather than HTTP authentication may still reject requests. SOAP 1.1 and SOAP 1.2 fault responses are parsed for a bounded diagnostic message so authorization failures and unsupported actions can be distinguished from successful responses.

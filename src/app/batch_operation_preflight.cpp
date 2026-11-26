@@ -15,6 +15,7 @@ bool isBatchSafeOperation(DeviceOperation operation)
     switch (operation) {
     case DeviceOperation::ReadDeviceInformation:
     case DeviceOperation::ReadCapabilities:
+    case DeviceOperation::ReadServices:
     case DeviceOperation::ReadNetworkInterfaces:
         return true;
     case DeviceOperation::ConfigureStaticIpv4:
@@ -26,6 +27,8 @@ bool isBatchSafeOperation(DeviceOperation operation)
     case DeviceOperation::ChangePassword:
     case DeviceOperation::UpdateFirmware:
     case DeviceOperation::ConfigureImageSettings:
+    case DeviceOperation::ConfigurePtz:
+    case DeviceOperation::ManageEvents:
     case DeviceOperation::ManageNvrChannels:
     case DeviceOperation::FactoryReset:
         return false;

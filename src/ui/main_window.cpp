@@ -2,6 +2,7 @@
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
 #include "core/device_classifier.h"
+#include "core/operation_compatibility.h"
 #include "core/inventory_backup.h"
 
 #include "discovery/discovery_service.h"
@@ -1950,6 +1951,21 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         addDetail(Qt::UserRole + 15, tr("Last successful response"));
         addDetail(Qt::UserRole + 16, tr("IPv4 configuration verified"));
         addDetail(Qt::UserRole + 19, tr("Last seen (UTC)"));
+    }
+
+    if (ipItem) {
+        DeviceRecord compatibilityDevice;
+        compatibilityDevice.ipAddress = ipItem->text();
+        compatibilityDevice.deviceServiceUrl = ipItem->data(Qt::UserRole + 3).toString();
+        compatibilityDevice.capabilities = ipItem->data(Qt::UserRole + 5).toString()
+            .split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        if (const auto *sourcesItem = deviceTable_->item(row, 8))
+            compatibilityDevice.discoverySources = sourcesItem->text().split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        details << tr("OPERATION COMPATIBILITY (evidence-based)");
+        for (const auto &entry : OperationCompatibility::evaluate(compatibilityDevice)) {
+            details << tr("%1: %2. %3")
+                .arg(entry.operation, OperationCompatibility::statusLabel(entry.status), entry.evidence);
+        }
     }
 
     QString html = QStringLiteral("<html><body style='margin:2px;font-family:Segoe UI, sans-serif;color:#E7EDF4;'>"

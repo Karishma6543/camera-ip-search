@@ -8,6 +8,7 @@
 enum class DeviceOperation {
     ReadDeviceInformation,
     ReadCapabilities,
+    ReadServices,
     ReadNetworkInterfaces,
     ConfigureStaticIpv4,
     ConfigureDhcp,
@@ -18,6 +19,8 @@ enum class DeviceOperation {
     ChangePassword,
     UpdateFirmware,
     ConfigureImageSettings,
+    ConfigurePtz,
+    ManageEvents,
     ManageNvrChannels,
     FactoryReset
 };
@@ -41,6 +44,8 @@ public:
             return verifiedReadOperations().contains(QStringLiteral("GetDeviceInformation"));
         case DeviceOperation::ReadCapabilities:
             return verifiedReadOperations().contains(QStringLiteral("GetCapabilities"));
+        case DeviceOperation::ReadServices:
+            return verifiedReadOperations().contains(QStringLiteral("GetServices"));
         case DeviceOperation::ReadNetworkInterfaces:
             return verifiedReadOperations().contains(QStringLiteral("GetNetworkInterfaces"));
         case DeviceOperation::ConfigureStaticIpv4:
@@ -57,6 +62,8 @@ public:
         case DeviceOperation::ChangePassword:
         case DeviceOperation::UpdateFirmware:
         case DeviceOperation::ConfigureImageSettings:
+        case DeviceOperation::ConfigurePtz:
+        case DeviceOperation::ManageEvents:
         case DeviceOperation::ManageNvrChannels:
             return false;
         case DeviceOperation::FactoryReset:
