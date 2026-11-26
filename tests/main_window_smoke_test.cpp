@@ -47,6 +47,7 @@ private slots:
     void rollsBackFailedInventoryMigration();
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
+    void discoveryServiceRequestsAndRecordsOnvifServices();
     void shutdownAbortsActiveOnvifEnrichment();
     void sendsAndVerifiesOnvifFactoryResetRequest();
 };
@@ -587,6 +588,89 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
     QCOMPARE(enriched.hardwareId, QStringLiteral("HW-001"));
 }
 
+
+
+void MainWindowSmokeTest::discoveryServiceRequestsAndRecordsOnvifServices()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool getServicesRequested = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &getServicesRequested] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &getServicesRequested] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(
+                    QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                const QByteArray soap = request.mid(headerEnd + 4, bodyLength);
+                QByteArray responseBody;
+                if (soap.contains("GetDeviceInformation")) {
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                        "xmlns:tds='http://www.onvif.org/ver10/device/wsdl'><s:Body>"
+                        "<tds:GetDeviceInformationResponse><tds:Manufacturer>Loopback</tds:Manufacturer>"
+                        "<tds:Model>ServiceFixture</tds:Model><tds:FirmwareVersion>1</tds:FirmwareVersion>"
+                        "<tds:SerialNumber>SVC-1</tds:SerialNumber><tds:HardwareId>HW-1</tds:HardwareId>"
+                        "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
+                } else if (soap.contains("GetServices")) {
+                    getServicesRequested = true;
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' "
+                        "xmlns:tds='http://www.onvif.org/ver10/device/wsdl'><s:Body>"
+                        "<tds:GetServicesResponse>"
+                        "<tds:Service><tds:Namespace>http://www.onvif.org/ver10/device/wsdl</tds:Namespace>"
+                        "<tds:XAddr>http://127.0.0.1/device_service</tds:XAddr></tds:Service>"
+                        "<tds:Service><tds:Namespace>http://www.onvif.org/ver10/media/wsdl</tds:Namespace>"
+                        "<tds:XAddr>http://127.0.0.1/media_service</tds:XAddr></tds:Service>"
+                        "</tds:GetServicesResponse></s:Body></s:Envelope>");
+                } else {
+                    responseBody = QByteArrayLiteral(
+                        "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body/>"
+                        "</s:Envelope>");
+                }
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\n")
+                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\\r\\n")
+                    + QByteArrayLiteral("Content-Length: ") + QByteArray::number(responseBody.size())
+                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + responseBody;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    DeviceRecord enriched;
+    bool receivedServices = false;
+    connect(&discovery, &DiscoveryService::deviceFound, &discovery,
+            [&enriched, &receivedServices](const DeviceRecord &device) {
+        enriched = device;
+        receivedServices = device.capabilities.contains(QStringLiteral("Service: Device")) &&
+                           device.capabilities.contains(QStringLiteral("Service: Media"));
+    });
+
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:onvif-services-integration");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(getServicesRequested, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(receivedServices, 3000);
+    QVERIFY(enriched.discoverySources.contains(QStringLiteral("ONVIF GetServices")));
+    QVERIFY(enriched.capabilities.contains(QStringLiteral("Service: Device")));
+    QVERIFY(enriched.capabilities.contains(QStringLiteral("Service: Media")));
+}
 
 void MainWindowSmokeTest::sendsAndVerifiesOnvifFactoryResetRequest()
 {
