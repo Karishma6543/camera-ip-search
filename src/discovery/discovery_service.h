@@ -64,7 +64,9 @@ private:
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);
+    void requestOnvifServices(const DeviceRecord &device);
     void handleOnvifCapabilities(QNetworkReply *reply, const QString &deviceKey);
+    void handleOnvifServices(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifNetworkInterfaces(const DeviceRecord &device);
     void handleOnvifNetworkInterfaces(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifDns(const DeviceRecord &device);
