@@ -549,6 +549,16 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
 
         QUrl verifyUrl = oldUrl;
         verifyUrl.setHost(address.trimmed());
+
+        // A static address change moves the ONVIF endpoint to a new authority.
+        // Carry the already supplied session-only credentials to that endpoint
+        // so the mandatory read-back can authenticate without prompting again.
+        const QString oldCredentialKey = oldUrl.authority(QUrl::FullyEncoded).toLower();
+        const QString newCredentialKey = verifyUrl.authority(QUrl::FullyEncoded).toLower();
+        const auto oldCredentials = wsseCredentials_.constFind(oldCredentialKey);
+        if (oldCredentials != wsseCredentials_.cend())
+            wsseCredentials_.insert(newCredentialKey, oldCredentials.value());
+
         QByteArray verifySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
  xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
