@@ -49,9 +49,11 @@ public:
             return implementedWriteOperations().contains(QStringLiteral("SetNetworkInterfaces"));
         case DeviceOperation::ConfigureDns:
             return implementedWriteOperations().contains(QStringLiteral("SetDNS"));
+        case DeviceOperation::Reboot:
+            return implementedWriteOperations().contains(QStringLiteral("SystemReboot"));
         case DeviceOperation::PreviewStream:
         case DeviceOperation::CaptureSnapshot:
-            return implementedWriteOperations().contains(QStringLiteral("SystemReboot"));
+            return false;
         case DeviceOperation::ChangePassword:
         case DeviceOperation::UpdateFirmware:
         case DeviceOperation::ConfigureImageSettings:
