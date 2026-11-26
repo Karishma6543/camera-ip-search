@@ -623,7 +623,7 @@ void DiscoveryService::configureDhcp(const DeviceRecord &device, bool enabled)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(8000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, enabled] {
         const QByteArray response = reply->readAll();
@@ -701,7 +701,7 @@ void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(8000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, fromDhcp, ipv4Servers] {
         const QByteArray response = reply->readAll();
@@ -724,7 +724,7 @@ void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
         verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-        QNetworkReply *verify = networkManager_.post(verifyRequest, verifySoap);
+        QNetworkReply *verify = postOnvifRequest(verifyRequest, verifySoap);
         guardOnvifReply(verify);
         connect(verify, &QNetworkReply::finished, this, [this, verify, device, fromDhcp, ipv4Servers] {
             const QByteArray payload = verify->readAll();
@@ -797,7 +797,7 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -892,7 +892,7 @@ void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -955,7 +955,7 @@ void DiscoveryService::requestOnvifServices(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -1029,7 +1029,7 @@ void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -1108,7 +1108,7 @@ void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
