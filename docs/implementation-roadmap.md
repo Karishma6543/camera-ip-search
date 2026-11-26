@@ -99,7 +99,8 @@ Do not mark a whole brand as supported based on one model.
 
 - [x] Report ONVIF service categories returned by GetServices, with same-host endpoint validation.
 - [x] Show a per-device operation compatibility matrix separating application implementation, observed device responses and advertised services.
-- [x] Add loopback ONVIF HTTP/SOAP integration tests for HTTP Basic challenge/retry, GetServices request/response, SOAP faults and malformed service XML.
+- [x] Add loopback ONVIF HTTP/SOAP integration tests for HTTP Basic and WS-Security challenge/retry, GetServices request/response, SOAP faults, malformed responses, redirect refusal and request timeouts.
+- [ ] Add explicit network-write read-back mismatch and partial-failure integration fixtures.
 - [x] Implement ONVIF WS-Security UsernameToken PasswordDigest with fresh nonce/Created values, in-memory session credentials and challenge/retry.
 - [x] Add deterministic digest unit tests and loopback SOAP challenge/retry integration coverage.
 - [ ] Validate WS-Security interoperability and clock/nonce behavior on representative physical camera models.
