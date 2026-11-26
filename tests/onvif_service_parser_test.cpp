@@ -38,7 +38,7 @@ void OnvifServiceParserTest::parsesServicesOnExpectedCameraHost()
 void OnvifServiceParserTest::rejectsServiceEndpointOnAnotherHost()
 {
     const QByteArray payload = R"(
-<s:Envelope><s:Body><GetServicesResponse>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><GetServicesResponse>
  <Service><Namespace>http://www.onvif.org/ver10/media/wsdl</Namespace>
  <XAddr>http://192.0.2.99/onvif/media_service</XAddr></Service>
 </GetServicesResponse></s:Body></s:Envelope>)";
