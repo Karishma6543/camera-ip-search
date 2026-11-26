@@ -27,6 +27,8 @@ bool isBatchSafeOperation(DeviceOperation operation)
     case DeviceOperation::ChangePassword:
     case DeviceOperation::UpdateFirmware:
     case DeviceOperation::ConfigureImageSettings:
+    case DeviceOperation::ConfigurePtz:
+    case DeviceOperation::ManageEvents:
     case DeviceOperation::ManageNvrChannels:
     case DeviceOperation::FactoryReset:
         return false;
