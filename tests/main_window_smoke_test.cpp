@@ -631,7 +631,9 @@ void MainWindowSmokeTest::discoveryServiceIgnoresUnrelatedSoapResponse()
     });
 
     DiscoveryService discovery;
-    QSignalSpy devicesFound(&discovery, &DiscoveryService::deviceFound);
+    int deviceFoundCount = 0;
+    connect(&discovery, &DiscoveryService::deviceFound, &discovery,
+            [&deviceFoundCount](const DeviceRecord &) { ++deviceFoundCount; });
     DeviceRecord candidate;
     candidate.ipAddress = QStringLiteral("127.0.0.1");
     candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
@@ -642,7 +644,7 @@ void MainWindowSmokeTest::discoveryServiceIgnoresUnrelatedSoapResponse()
 
     QTRY_VERIFY_WITH_TIMEOUT(requestReceived, 3000);
     QTest::qWait(100);
-    QCOMPARE(devicesFound.count(), 0);
+    QCOMPARE(deviceFoundCount, 0);
 }
 
 void MainWindowSmokeTest::discoveryServiceRequestsAndRecordsOnvifServices()
