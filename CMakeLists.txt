@@ -37,6 +37,8 @@ set(CAMERA_CORE_SOURCES
     src/core/device_record.h
     src/core/device_classifier.h
     src/core/device_classifier.cpp
+    src/core/operation_compatibility.h
+    src/core/operation_compatibility.cpp
     src/core/device_identity.h
     src/core/device_identity.cpp
     src/core/inventory_backup.h
@@ -68,6 +70,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/onvif_dns_parser.cpp
     src/discovery/onvif_service_parser.h
     src/discovery/onvif_service_parser.cpp
+    src/discovery/onvif_soap_fault_parser.h
+    src/discovery/onvif_soap_fault_parser.cpp
     src/discovery/ip_conflict_probe.h
     src/discovery/ip_conflict_probe.cpp
     src/discovery/ip_assignment_planner.h
@@ -116,10 +120,12 @@ if(BUILD_TESTING)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
     add_camera_test(device-identity-tests tests/device_identity_test.cpp)
     add_camera_test(device-classifier-tests tests/device_classifier_test.cpp)
+    add_camera_test(operation-compatibility-tests tests/operation_compatibility_test.cpp)
     add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
     add_camera_test(onvif-dns-parser-tests tests/onvif_dns_parser_test.cpp)
     add_camera_test(onvif-service-parser-tests tests/onvif_service_parser_test.cpp)
+    add_camera_test(onvif-soap-fault-parser-tests tests/onvif_soap_fault_parser_test.cpp)
     add_camera_test(ip-assignment-planner-tests tests/ip_assignment_planner_test.cpp)
     add_camera_test(ip-assignment-preflight-tests tests/ip_assignment_preflight_test.cpp)
     add_camera_test(ip-conflict-probe-tests tests/ip_conflict_probe_test.cpp)
