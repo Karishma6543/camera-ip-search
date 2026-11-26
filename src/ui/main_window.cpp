@@ -995,7 +995,7 @@ QWidget *MainWindow::makeInfoTab(QWidget *parent)
     auto *heading = new QLabel(tr("Device information"), content);
     heading->setObjectName(QStringLiteral("sectionTitle"));
     auto *description = mutedLabel(
-        tr("Select a device above to review its identity, discovery evidence, available services, network configuration and reported capabilities."),
+        tr("Select a device above to review its identity, discovery evidence, available services, network configuration and ONVIF-reported service categories."),
         content);
     layout->addWidget(heading);
     layout->addWidget(description);
@@ -1938,7 +1938,7 @@ void MainWindow::updateDeviceDetailsProfile(int row)
         addDetail(Qt::UserRole + 2, tr("ONVIF endpoint"));
         addDetail(Qt::UserRole + 3, tr("Device service URL"));
         addDetail(Qt::UserRole + 4, tr("Network interfaces"));
-        addDetail(Qt::UserRole + 5, tr("Verified capabilities"));
+        addDetail(Qt::UserRole + 5, tr("Reported ONVIF categories and services"));
         addDetail(Qt::UserRole + 6, tr("Open TCP ports (candidate evidence)"));
         addDetail(Qt::UserRole + 7, tr("ONVIF interface token"));
         addDetail(Qt::UserRole + 8, tr("Camera IPv4 address"));
