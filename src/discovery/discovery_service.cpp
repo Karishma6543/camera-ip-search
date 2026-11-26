@@ -30,6 +30,21 @@ constexpr quint16 kSsdpPort = 1900;
 constexpr qint64 kMaxOnvifResponseBytes = 1024 * 1024;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
 
+bool isWsseAuthenticationFailure(const QByteArray &payload, int httpStatus)
+{
+    if (httpStatus == 401 || httpStatus == 403)
+        return true;
+    QString message;
+    QString code;
+    if (!OnvifSoapFaultParser::parse(payload, &message, &code))
+        return false;
+    return code.contains(QStringLiteral("NotAuthorized"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("auth"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("credential"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("permission"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("not authorized"), Qt::CaseInsensitive);
+}
+
 bool isSafeDeviceServiceUrl(const QUrl &url, const QString &deviceIp)
 {
     return url.isValid() &&
@@ -318,12 +333,19 @@ QNetworkReply *DiscoveryService::postOnvifRequest(const QNetworkRequest &request
     return networkManager_.post(request, payload);
 }
 
-bool DiscoveryService::requestWsseCredentials(const DeviceRecord &device)
+bool DiscoveryService::requestWsseCredentials(const DeviceRecord &device, const QString &operation)
 {
     const QUrl url(device.deviceServiceUrl);
     const QString credentialKey = url.authority(QUrl::FullyEncoded).toLower();
+    const QString attemptKey = credentialKey + QLatin1Char('|') + operation;
     if (!url.isValid() || credentialKey.isEmpty() ||
-        wssePromptedHosts_.contains(credentialKey))
+        wsseRetriedOperations_.contains(attemptKey))
+        return false;
+    if (wsseCredentials_.contains(credentialKey)) {
+        wsseRetriedOperations_.insert(attemptKey);
+        return true;
+    }
+    if (wssePromptedHosts_.contains(credentialKey))
         return false;
     wssePromptedHosts_.insert(credentialKey);
 
@@ -337,6 +359,7 @@ bool DiscoveryService::requestWsseCredentials(const DeviceRecord &device)
     }
     wsseCredentials_.insert(credentialKey,
                             qMakePair(authenticator.user(), authenticator.password()));
+    wsseRetriedOperations_.insert(attemptKey);
     emit statusChanged(tr("WS-Security credentials are held in memory for this application session only."));
     return true;
 }
@@ -827,15 +850,10 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
     QString faultMessage;
     QString faultCode;
     const bool soapFault = OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode);
-    const bool authRejected = httpStatus == 401 || httpStatus == 403 || (soapFault &&
-        (faultCode.contains(QStringLiteral("NotAuthorized"), Qt::CaseInsensitive) ||
-         faultMessage.contains(QStringLiteral("auth"), Qt::CaseInsensitive) ||
-         faultMessage.contains(QStringLiteral("credential"), Qt::CaseInsensitive) ||
-         faultMessage.contains(QStringLiteral("permission"), Qt::CaseInsensitive) ||
-         faultMessage.contains(QStringLiteral("not authorized"), Qt::CaseInsensitive)));
+    const bool authRejected = isWsseAuthenticationFailure(payload, httpStatus);
     if (!success || soapFault) {
         const DeviceRecord device = devices_.value(deviceKey);
-        if (authRejected && requestWsseCredentials(device)) {
+        if (authRejected && requestWsseCredentials(device, QStringLiteral("GetDeviceInformation"))) {
             requestOnvifDeviceInformation(device);
             return;
         }
