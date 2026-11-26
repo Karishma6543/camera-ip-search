@@ -15,6 +15,8 @@
 #include <QUdpSocket>
 #include <QVector>
 #include <QList>
+#include <QSet>
+#include <QPair>
 
 class DiscoveryService final : public QObject
 {
@@ -61,6 +63,8 @@ private:
     void cancelEnrichmentRequests();
     void guardOnvifReply(QNetworkReply *reply);
     void trackEnrichmentReply(QNetworkReply *reply);
+    QNetworkReply *postOnvifRequest(const QNetworkRequest &request, const QByteArray &soap);
+    bool requestWsseCredentials(const DeviceRecord &device);
     void requestOnvifDeviceInformation(const DeviceRecord &device);
     void handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey);
     void requestOnvifCapabilities(const DeviceRecord &device);
@@ -77,6 +81,8 @@ private:
     QHash<QString, DeviceRecord> devices_;
     QTimer timeout_;
     QNetworkAccessManager networkManager_;
+    QHash<QString, QPair<QString, QString>> wsseCredentials_;
+    QSet<QString> wssePromptedHosts_;
     AdapterRegistry adapterRegistry_;
     bool running_{false};
     quint32 sequence_{0};
