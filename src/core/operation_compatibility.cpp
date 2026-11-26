@@ -74,9 +74,9 @@ QVector<OperationCompatibility::Entry> OperationCompatibility::evaluate(const De
         } else if (!responseSource.isEmpty()) {
             entry.status = Status::ImplementedNotTested;
             entry.evidence = QStringLiteral("The application implements this read request, but no successful device response has been recorded.");
-        } else if (advertised) {
-            entry.status = Status::ServiceAdvertisedNotVerified;
-            entry.evidence = QStringLiteral("The device advertises the service; this operation has not been individually tested.");
+        } else if (advertised && responseSource.isEmpty()) {
+            entry.status = Status::AuthenticationNotVerified;
+            entry.evidence = QStringLiteral("The device advertises the service and the application implements this request, but authentication, authorization and operation success have not been verified.");
         } else {
             entry.status = Status::ServiceNotReported;
             entry.evidence = QStringLiteral("The application has an implementation, but the device has not reported this service or operation.");
@@ -91,7 +91,8 @@ QString OperationCompatibility::statusLabel(Status status)
     switch (status) {
     case Status::DeviceResponded: return QStringLiteral("Device responded");
     case Status::ImplementedNotTested: return QStringLiteral("Implemented; not tested");
-    case Status::ServiceAdvertisedNotVerified: return QStringLiteral("Advertised / not verified");
+    case Status::ServiceAdvertisedNotVerified: return QStringLiteral("Advertised; not implemented");
+    case Status::AuthenticationNotVerified: return QStringLiteral("Authentication / permission not verified");
     case Status::ServiceNotReported: return QStringLiteral("Not reported by device");
     case Status::NotImplemented: return QStringLiteral("Not implemented");
     }
