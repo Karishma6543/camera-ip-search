@@ -66,6 +66,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/onvif_network_interface_parser.cpp
     src/discovery/onvif_dns_parser.h
     src/discovery/onvif_dns_parser.cpp
+    src/discovery/onvif_service_parser.h
+    src/discovery/onvif_service_parser.cpp
     src/discovery/ip_conflict_probe.h
     src/discovery/ip_conflict_probe.cpp
     src/discovery/ip_assignment_planner.h
@@ -117,6 +119,7 @@ if(BUILD_TESTING)
     add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
     add_camera_test(onvif-dns-parser-tests tests/onvif_dns_parser_test.cpp)
+    add_camera_test(onvif-service-parser-tests tests/onvif_service_parser_test.cpp)
     add_camera_test(ip-assignment-planner-tests tests/ip_assignment_planner_test.cpp)
     add_camera_test(ip-assignment-preflight-tests tests/ip_assignment_preflight_test.cpp)
     add_camera_test(ip-conflict-probe-tests tests/ip_conflict_probe_test.cpp)
