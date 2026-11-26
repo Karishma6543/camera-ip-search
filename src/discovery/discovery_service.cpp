@@ -933,7 +933,18 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetCapabilities"))) {
+            requestOnvifCapabilities(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetCapabilities requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     QXmlStreamReader xml(payload);
@@ -1004,6 +1015,15 @@ void DiscoveryService::handleOnvifServices(QNetworkReply *reply, const QString &
         return;
     }
 
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetServices"))) {
+            requestOnvifServices(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetServices requires credentials or permissions that were not supplied."));
+        return;
+    }
     QString faultMessage;
     QString faultCode;
     if (OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode)) {
@@ -1070,7 +1090,18 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetNetworkInterfaces"))) {
+            requestOnvifNetworkInterfaces(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetNetworkInterfaces requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     OnvifNetworkConfig::InterfaceIpv4Info selected;
@@ -1149,7 +1180,18 @@ void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &devic
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetDNS"))) {
+            requestOnvifDns(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetDNS requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     QXmlStreamReader xml(payload);
