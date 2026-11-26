@@ -4,6 +4,7 @@
 #include "onvif_maintenance_operations.h"
 #include "onvif_dns_parser.h"
 #include "onvif_service_parser.h"
+#include "onvif_soap_fault_parser.h"
 #include "discovery_parser.h"
 #include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
@@ -895,10 +896,27 @@ void DiscoveryService::handleOnvifServices(QNetworkReply *reply, const QString &
     const QByteArray payload = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    const QString networkError = reply->errorString();
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > kMaxOnvifResponseBytes ||
-        !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
         return;
+    if (payload.size() > kMaxOnvifResponseBytes) {
+        emit statusChanged(tr("ONVIF GetServices response exceeded the 1 MiB safety limit."));
+        return;
+    }
+
+    QString faultMessage;
+    QString faultCode;
+    if (OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode)) {
+        emit statusChanged(tr("Camera rejected ONVIF GetServices: %1%2")
+            .arg(faultMessage, faultCode.isEmpty() ? QString() : tr(" (code: %1)").arg(faultCode)));
+        return;
+    }
+    if (!success || payload.isEmpty()) {
+        emit statusChanged(tr("ONVIF GetServices failed (HTTP %1): %2")
+            .arg(status).arg(networkError));
+        return;
+    }
 
     QStringList serviceCategories;
     QString parseError;
