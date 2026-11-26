@@ -16,15 +16,16 @@ Implemented in source:
 - TCP reachability checks.
 - Local SQLite inventory, manual entry, labels and CSV export.
 - SQLite online backup with integrity validation and guarded restore that retains a pre-restore recovery snapshot.
-- Guarded ONVIF static IPv4 request, confirmation and post-change verification path.
-- Unsupported activation, firmware, reboot and vendor-specific provisioning remain unavailable. Bulk static IPv4 configuration is present but still requires physical-camera validation.
+- Guarded ONVIF static IPv4 request with address read-back; PR #28 adds subnet-prefix, DHCP-disabled and gateway read-back verification, pending CI.
+- ONVIF DHCP enable/disable and DNS configuration workflows with read-back checks.
+- ONVIF reboot request with response validation; acceptance is not proof that reboot completed.
+- Unsupported activation, firmware and vendor-specific provisioning remain unavailable. Bulk static IPv4 configuration is present but still requires physical-camera validation.
 
 Not implemented:
 - CP Plus, Hikvision or Prama vendor adapters.
 - Project-camera activation or network configuration commands.
 - Firmware upload/update and recovery.
-- DHCP toggle, DNS configuration and general network provisioning.
-- Persistent OS credential-vault integration (Windows Credential Manager, macOS Keychain and Linux Secret Service) and validated ONVIF WS-Security UsernameToken support.
+- Persistent OS credential-vault integration (Windows Credential Manager, macOS Keychain and Linux Secret Service). Session-only HTTP and ONVIF WS-Security UsernameToken PasswordDigest are implemented; physical interoperability remains unvalidated.
 - Cross-platform release installers and signed update distribution.
 
 ## Address-conflict preflight status
@@ -38,6 +39,7 @@ The repository contains an interface-scoped IPv4 conflict probe (`IpConflictProb
 - [x] The main CI workflow builds Release and runs CTest on Windows, Ubuntu and macOS using Qt 6.10.1. Verify the exact workflow run for each release candidate; CI success is not physical-camera acceptance.
 - [ ] Keep a release evidence record linking the exact source commit, CI run, security scan, SBOM and hardware matrix.
 - [ ] Run discovery against real ONVIF cameras and the project's own Contract B firmware; attach sanitized logs/packet evidence.
+- [ ] Validate DHCP, DNS and reboot behavior on exact physical models/firmware; simulator acceptance is not hardware certification.
 - [ ] Validate ONVIF static IPv4 changes on each specifically supported camera model/firmware, including authentication, rejected writes, address change, gateway failure and reboot-required response.
 - [ ] Verify multi-NIC cameras never expose a configuration token unless the interface IPv4 address matches the discovered camera address.
 - [ ] Complete the security and privacy review in [security-and-privacy-review.md](security-and-privacy-review.md), including TLS, WS-Security, OS credential vault, redaction tests and malformed-input testing.
