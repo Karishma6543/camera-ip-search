@@ -47,3 +47,10 @@ Device type, manufacturer/discovery source, reachability/activation status and f
 - Reachability is based on TCP checks; a failed check is not definitive proof that a host is offline.
 - Cross-VLAN discovery requires a routed discovery design or scanning each authorized VLAN from a host attached to that VLAN.
 - Do not claim that the application finds every device on every network. Firewalls, ACLs, VLANs, disabled services, host isolation and unsupported protocols can hide devices.
+
+
+## ONVIF service discovery and capability evidence
+
+After a successful ONVIF `GetDeviceInformation` response, the application requests both `GetCapabilities` and `GetServices`. The latter is parsed as a service inventory: a category is shown only when its advertised ONVIF namespace is recognized and its `XAddr` is a valid HTTP(S) endpoint on the discovered camera host. Endpoints that redirect the app to another host, embed credentials, or include query/fragment data are not accepted as camera service evidence.
+
+The device details panel labels this information as reported ONVIF categories and services. **A listed service is not proof that every operation in that service is implemented, enabled, authorized for the current account, or compatible with that camera firmware.** Individual write operations still require their own safe workflow, response validation, and read-back verification where the protocol permits it. Missing, malformed, or rejected `GetServices` responses do not cause the app to infer support from a manufacturer or model name.
