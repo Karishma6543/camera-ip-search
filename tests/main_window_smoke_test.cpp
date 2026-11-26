@@ -305,6 +305,8 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
     QVERIFY(fullProfile->text().contains(QStringLiteral("Last seen (UTC)")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("OPERATION COMPATIBILITY")));
+    QVERIFY(fullProfile->text().contains(QStringLiteral("Not implemented")));
     QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
     table->clearSelection();
     table->setCurrentCell(-1, -1);
