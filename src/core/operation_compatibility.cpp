@@ -71,6 +71,9 @@ QVector<OperationCompatibility::Entry> OperationCompatibility::evaluate(const De
             entry.evidence = advertised
                 ? QStringLiteral("The service is advertised, but this operation is not implemented by the application.")
                 : QStringLiteral("This operation is not implemented by the current application adapter.");
+        } else if (!responseSource.isEmpty()) {
+            entry.status = Status::ImplementedNotTested;
+            entry.evidence = QStringLiteral("The application implements this read request, but no successful device response has been recorded.");
         } else if (advertised) {
             entry.status = Status::ServiceAdvertisedNotVerified;
             entry.evidence = QStringLiteral("The device advertises the service; this operation has not been individually tested.");
