@@ -11,6 +11,7 @@ enum class Status {
     DeviceResponded,
     ImplementedNotTested,
     ServiceAdvertisedNotVerified,
+    AuthenticationNotVerified,
     ServiceNotReported,
     NotImplemented
 };
