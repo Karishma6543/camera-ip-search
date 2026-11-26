@@ -78,7 +78,9 @@ QVector<OperationCompatibility::Entry> OperationCompatibility::evaluate(const De
             entry.evidence = QStringLiteral("The application implements this read request, but no successful device response has been recorded.");
         } else if (advertised && responseSource.isEmpty()) {
             entry.status = Status::AuthenticationNotVerified;
-            entry.evidence = QStringLiteral("The device advertises the service and the application implements this request, but authentication, authorization and operation success have not been verified.");
+            entry.evidence = definition.operation == DeviceOperation::FactoryReset
+                ? QStringLiteral("The device advertises the service and the request exists in the adapter, but the UI deliberately keeps factory reset disabled until exact model and firmware support is validated. Authentication and authorization are also unverified.")
+                : QStringLiteral("The device advertises the service and the application implements this request, but authentication, authorization and operation success have not been verified.");
         } else {
             entry.status = Status::ServiceNotReported;
             entry.evidence = QStringLiteral("The application has an implementation, but the device has not reported this service or operation.");
