@@ -53,6 +53,8 @@ void BatchOperationPreflightTest::keepsManagementOperationsDisabled()
         DeviceOperation::ChangePassword,
         DeviceOperation::UpdateFirmware,
         DeviceOperation::ConfigureImageSettings,
+        DeviceOperation::ConfigurePtz,
+        DeviceOperation::ManageEvents,
         DeviceOperation::ManageNvrChannels,
         DeviceOperation::FactoryReset
     };
