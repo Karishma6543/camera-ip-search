@@ -481,6 +481,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         }
         if (set) ++prefix; else zeroSeen = true;
     }
+    const QString prefixText = QString::number(prefix);
 
     QByteArray soap;
     QXmlStreamWriter writer(&soap);
@@ -561,7 +562,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
         QNetworkReply *verifyReply = postOnvifRequest(verifyRequest, verifySoap);
                 guardOnvifReply(verifyReply);
         connect(verifyReply, &QNetworkReply::finished, this,
-            [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl] {
+            [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl, prefixText] {
                 const QByteArray payload = verifyReply->readAll();
                 const int verifyStatus = verifyReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                 const bool transportOk = verifyReply->error() == QNetworkReply::NoError &&
@@ -574,13 +575,14 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                     return;
                 }
                 QString verificationError;
-                if (!OnvifNetworkConfig::verifyInterfaceIpv4Address(
-                        payload, device.networkInterfaceToken, address, &verificationError)) {
+                if (!OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+                        payload, device.networkInterfaceToken, address, prefixText, QString(),
+                        &verificationError)) {
                     emit networkConfigurationFinished(device, false,
-                        tr("The new IP is reachable, but the requested interface address could not be verified. Inventory was not updated."));
+                        tr("The camera is reachable at the new IP, but the requested static address, subnet prefix or DHCP-disabled state could not be verified. Inventory was not updated."));
                     return;
                 }
-                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl]
+                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl, prefixText]
                     (bool gatewayApplied) {
                     DeviceRecord updated = device;
                     updated.ipAddress = address;
@@ -633,7 +635,38 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                             finishVerified(false);
                             return;
                         }
-                        finishVerified(true);
+
+                        // A successful SetNetworkDefaultGateway response confirms
+                        // acceptance only. Read the interface back before reporting
+                        // the gateway as verified.
+                        const QByteArray readBackSoap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetNetworkInterfaces/></s:Body>
+</s:Envelope>)";
+                        QNetworkRequest readBackRequest(verifyUrl);
+                        readBackRequest.setHeader(QNetworkRequest::ContentTypeHeader,
+                                                  QStringLiteral("application/soap+xml; charset=utf-8"));
+                        readBackRequest.setTransferTimeout(5000);
+                        readBackRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                                     QNetworkRequest::ManualRedirectPolicy);
+                        QNetworkReply *readBackReply = postOnvifRequest(readBackRequest, readBackSoap);
+                        guardOnvifReply(readBackReply);
+                        connect(readBackReply, &QNetworkReply::finished, this,
+                            [this, readBackReply, device, address, prefixText, gateway, finishVerified] {
+                                const QByteArray readBackPayload = readBackReply->readAll();
+                                const int readBackStatus = readBackReply->attribute(
+                                    QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                                const bool readBackTransportOk =
+                                    readBackReply->error() == QNetworkReply::NoError &&
+                                    readBackStatus >= 200 && readBackStatus < 300;
+                                readBackReply->deleteLater();
+                                const bool readBackVerified = readBackTransportOk &&
+                                    OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+                                        readBackPayload, device.networkInterfaceToken, address,
+                                        prefixText, gateway);
+                                finishVerified(readBackVerified);
+                            });
                     });
             });
     });
