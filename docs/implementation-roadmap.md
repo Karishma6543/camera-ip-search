@@ -98,7 +98,9 @@ Do not mark a whole brand as supported based on one model.
 - [x] Report ONVIF service categories returned by GetServices, with same-host endpoint validation.
 - [x] Show a per-device operation compatibility matrix separating application implementation, observed device responses and advertised services.
 - [x] Add loopback ONVIF HTTP/SOAP integration tests for HTTP Basic challenge/retry, GetServices request/response, SOAP faults and malformed service XML.
-- [ ] Add WS-Security UsernameToken digest support and interoperability tests for cameras that require it.
+- [x] Implement ONVIF WS-Security UsernameToken PasswordDigest with fresh nonce/Created values, in-memory session credentials and challenge/retry.
+- [x] Add deterministic digest unit tests and loopback SOAP challenge/retry integration coverage.
+- [ ] Validate WS-Security interoperability and clock/nonce behavior on representative physical camera models.
 - [ ] Expand integration tests for timeouts, redirects, malformed responses and read-back mismatches.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.
