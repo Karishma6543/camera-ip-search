@@ -71,3 +71,10 @@ The Device Info panel includes an operation-level evidence matrix. It distinguis
 - **Not implemented** — the current application adapter does not implement the operation.
 
 Service advertisement is not operation-level certification. Write operations still require appropriate camera credentials and permissions; this matrix does not claim authorization, successful execution, or model/firmware compatibility. The current ONVIF adapter reports only application implementations already present in code. RTSP preview, snapshots, password changes, firmware upgrade, imaging/PTZ controls, events and NVR channel management remain unavailable unless a future adapter implements and tests them.
+
+
+## Authentication and SOAP fault handling
+
+The desktop client responds to HTTP authentication challenges through a per-request credential prompt. The credentials are supplied to Qt's network authenticator for the active request and are not written to the inventory database. Automated loopback integration coverage exercises an HTTP Basic challenge and retry. This does **not** certify every camera's HTTP authentication scheme.
+
+ONVIF WS-Security UsernameToken digest authentication is not implemented or certified by this milestone. Cameras that require WS-Security rather than HTTP authentication may still reject requests. SOAP 1.1 and SOAP 1.2 fault responses are parsed for a bounded diagnostic message so authorization failures and unsupported actions can be distinguished from successful responses.
