@@ -39,11 +39,25 @@ void BatchOperationPreflightTest::marksVerifiedReadAsReady()
 void BatchOperationPreflightTest::keepsManagementOperationsDisabled()
 {
     AdapterRegistry registry;
-    const auto results = BatchOperationPreflight::build(
-        {onvifDevice(QStringLiteral("cam-1"), QStringLiteral("192.168.1.10"))},
-        registry, DeviceOperation::Reboot);
-    QCOMPARE(results.size(), 1);
-    QCOMPARE(results.first().state, BatchTargetState::UnsupportedOperation);
+    const DeviceRecord device = onvifDevice(
+        QStringLiteral("cam-1"), QStringLiteral("192.168.1.10"));
+    const QVector<DeviceOperation> blockedOperations = {
+        DeviceOperation::ConfigureStaticIpv4,
+        DeviceOperation::ConfigureDhcp,
+        DeviceOperation::ConfigureDns,
+        DeviceOperation::Reboot,
+        DeviceOperation::ChangePassword,
+        DeviceOperation::UpdateFirmware,
+        DeviceOperation::ConfigureImageSettings,
+        DeviceOperation::ManageNvrChannels,
+        DeviceOperation::FactoryReset
+    };
+
+    for (DeviceOperation operation : blockedOperations) {
+        const auto results = BatchOperationPreflight::build({device}, registry, operation);
+        QCOMPARE(results.size(), 1);
+        QCOMPARE(results.first().state, BatchTargetState::UnsupportedOperation);
+    }
 }
 
 void BatchOperationPreflightTest::reportsMissingAndDuplicateIds()

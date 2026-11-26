@@ -1,6 +1,8 @@
 #include "discovery_service.h"
 #include "core/device_identity.h"
 #include "onvif_network_config.h"
+#include "onvif_maintenance_operations.h"
+#include "onvif_dns_parser.h"
 #include "discovery_parser.h"
 #include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
@@ -549,6 +551,187 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         finishVerified(true);
                     });
             });
+    });
+}
+
+
+void DiscoveryService::configureDhcp(const DeviceRecord &device, bool enabled)
+{
+    const DeviceAdapter *adapter = adapterRegistry_.adapterFor(device);
+    if (!adapter || !adapter->supports(DeviceOperation::ConfigureDhcp) ||
+        device.networkInterfaceToken.isEmpty() || device.deviceServiceUrl.isEmpty() ||
+        !isSafeDeviceServiceUrl(QUrl(device.deviceServiceUrl), device.ipAddress)) {
+        emit maintenanceOperationFinished(device, QStringLiteral("DHCP configuration"), false,
+            tr("This camera has no verified ONVIF network interface or DHCP write capability."));
+        return;
+    }
+    const QByteArray soap = OnvifMaintenanceOperations::buildSetDhcpRequest(
+        device.networkInterfaceToken, enabled);
+    if (soap.isEmpty()) {
+        emit maintenanceOperationFinished(device, QStringLiteral("DHCP configuration"), false,
+            tr("Could not build a valid DHCP configuration request."));
+        return;
+    }
+    QNetworkRequest request(QUrl(device.deviceServiceUrl));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(8000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    guardOnvifReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, device, enabled] {
+        const QByteArray response = reply->readAll();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QString error;
+        const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
+            status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
+                response, QStringLiteral("SetNetworkInterfacesResponse"), &error);
+        const QString transportError = reply->errorString();
+        reply->deleteLater();
+        if (!accepted) {
+            emit maintenanceOperationFinished(device, QStringLiteral("DHCP configuration"), false,
+                tr("Camera did not confirm the DHCP change: %1").arg(error.isEmpty() ? transportError : error));
+            return;
+        }
+        // Read the interface back before reporting success. If DHCP changes the
+        // address, the old endpoint may disappear; that is reported as pending
+        // rediscovery, never as a verified success.
+        const QByteArray verifySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl"><s:Body><tds:GetNetworkInterfaces/></s:Body></s:Envelope>)";
+        QNetworkRequest verifyRequest(QUrl(device.deviceServiceUrl));
+        verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+        verifyRequest.setTransferTimeout(5000);
+        verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        QNetworkReply *verify = networkManager_.post(verifyRequest, verifySoap);
+        guardOnvifReply(verify);
+        connect(verify, &QNetworkReply::finished, this, [this, verify, device, enabled] {
+            const QByteArray payload = verify->readAll();
+            const int code = verify->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const bool transportOk = verify->error() == QNetworkReply::NoError && code >= 200 && code < 300;
+            verify->deleteLater();
+            OnvifNetworkConfig::InterfaceIpv4Info info;
+            QStringList summaries;
+            QString parseError;
+            const bool parsed = transportOk && OnvifNetworkConfig::parseNetworkInterfaces(
+                payload, device.ipAddress, &info, &summaries, &parseError);
+            const bool verified = parsed && info.token == device.networkInterfaceToken &&
+                (info.dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0) == enabled;
+            if (!verified) {
+                emit maintenanceOperationFinished(device, QStringLiteral("DHCP configuration"), false,
+                    tr("The camera accepted the DHCP request, but the setting could not be read back and verified. Rediscover the camera if its IP address changed."));
+                return;
+            }
+            DeviceRecord updated = device;
+            updated.ipv4DhcpEnabled = enabled;
+            updated.ipv4ConfigurationKnown = true;
+            if (devices_.contains(storageKeyForDevice(device)))
+                devices_[storageKeyForDevice(device)] = updated;
+            emit deviceFound(updated);
+            emit maintenanceOperationFinished(updated, QStringLiteral("DHCP configuration"), true,
+                enabled ? tr("DHCP is enabled and verified.") : tr("DHCP is disabled and verified."));
+        });
+    });
+}
+
+void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
+                                    const QStringList &ipv4Servers)
+{
+    const DeviceAdapter *adapter = adapterRegistry_.adapterFor(device);
+    if (!adapter || !adapter->supports(DeviceOperation::ConfigureDns) ||
+        device.deviceServiceUrl.isEmpty() ||
+        !isSafeDeviceServiceUrl(QUrl(device.deviceServiceUrl), device.ipAddress)) {
+        emit maintenanceOperationFinished(device, QStringLiteral("DNS configuration"), false,
+            tr("This camera has no verified ONVIF DNS write capability."));
+        return;
+    }
+    const QByteArray soap = OnvifMaintenanceOperations::buildSetDnsRequest(fromDhcp, ipv4Servers);
+    if (soap.isEmpty()) {
+        emit maintenanceOperationFinished(device, QStringLiteral("DNS configuration"), false,
+            tr("Enter one or two valid IPv4 DNS servers, or choose automatic DNS."));
+        return;
+    }
+    QNetworkRequest request(QUrl(device.deviceServiceUrl));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(8000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    guardOnvifReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, device, fromDhcp, ipv4Servers] {
+        const QByteArray response = reply->readAll();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QString error;
+        const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
+            status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
+                response, QStringLiteral("SetDNSResponse"), &error);
+        const QString transportError = reply->errorString();
+        reply->deleteLater();
+        if (!accepted) {
+            emit maintenanceOperationFinished(device, QStringLiteral("DNS configuration"), false,
+                tr("Camera did not confirm the DNS change: %1").arg(error.isEmpty() ? transportError : error));
+            return;
+        }
+        const QByteArray verifySoap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl"><s:Body><tds:GetDNS/></s:Body></s:Envelope>)";
+        QNetworkRequest verifyRequest(QUrl(device.deviceServiceUrl));
+        verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+        verifyRequest.setTransferTimeout(5000);
+        verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        QNetworkReply *verify = networkManager_.post(verifyRequest, verifySoap);
+        guardOnvifReply(verify);
+        connect(verify, &QNetworkReply::finished, this, [this, verify, device, fromDhcp, ipv4Servers] {
+            const QByteArray payload = verify->readAll();
+            const int code = verify->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const bool transportOk = verify->error() == QNetworkReply::NoError && code >= 200 && code < 300;
+            verify->deleteLater();
+            QString actual;
+            QString parseError;
+            const bool parsed = transportOk && OnvifDnsParser::parseIpv4DnsAddress(payload, &actual, &parseError);
+            const bool verified = parsed && (fromDhcp ||
+                (!ipv4Servers.isEmpty() && actual.compare(ipv4Servers.first(), Qt::CaseInsensitive) == 0));
+            if (!verified) {
+                emit maintenanceOperationFinished(device, QStringLiteral("DNS configuration"), false,
+                    tr("The camera accepted the DNS request, but the requested primary DNS server could not be verified."));
+                return;
+            }
+            DeviceRecord updated = device;
+            updated.ipv4DnsServer = actual;
+            emit deviceFound(updated);
+            emit maintenanceOperationFinished(updated, QStringLiteral("DNS configuration"), true,
+                fromDhcp ? tr("Automatic DNS was enabled; the camera returned %1.").arg(actual)
+                         : tr("Primary DNS server %1 was verified.").arg(actual));
+        });
+    });
+}
+
+void DiscoveryService::rebootDevice(const DeviceRecord &device)
+{
+    const DeviceAdapter *adapter = adapterRegistry_.adapterFor(device);
+    if (!adapter || !adapter->supports(DeviceOperation::Reboot) ||
+        device.deviceServiceUrl.isEmpty() ||
+        !isSafeDeviceServiceUrl(QUrl(device.deviceServiceUrl), device.ipAddress)) {
+        emit maintenanceOperationFinished(device, QStringLiteral("Reboot"), false,
+            tr("This camera has no verified ONVIF reboot capability."));
+        return;
+    }
+    QNetworkRequest request(QUrl(device.deviceServiceUrl));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(5000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, OnvifMaintenanceOperations::buildSystemRebootRequest());
+    guardOnvifReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, device] {
+        const QByteArray response = reply->readAll();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QString error;
+        const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
+            status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
+                response, QStringLiteral("SystemRebootResponse"), &error);
+        const QString transportError = reply->errorString();
+        reply->deleteLater();
+        emit maintenanceOperationFinished(device, QStringLiteral("Reboot"), accepted,
+            accepted ? tr("The camera accepted the reboot request. It will temporarily disconnect; run discovery again after it restarts.")
+                     : tr("The camera did not confirm the reboot request: %1").arg(error.isEmpty() ? transportError : error));
     });
 }
 

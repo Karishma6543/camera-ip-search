@@ -6,6 +6,33 @@
 #include <QHostAddress>
 
 namespace {
+bool isBatchSafeOperation(DeviceOperation operation)
+{
+    // Batch execution is intentionally read-only. A protocol adapter may
+    // implement individual write/maintenance actions (DHCP, DNS, reboot,
+    // static IPv4, factory reset), but that must never implicitly authorize
+    // applying them to multiple cameras through the batch runner.
+    switch (operation) {
+    case DeviceOperation::ReadDeviceInformation:
+    case DeviceOperation::ReadCapabilities:
+    case DeviceOperation::ReadNetworkInterfaces:
+        return true;
+    case DeviceOperation::ConfigureStaticIpv4:
+    case DeviceOperation::ConfigureDhcp:
+    case DeviceOperation::ConfigureDns:
+    case DeviceOperation::PreviewStream:
+    case DeviceOperation::CaptureSnapshot:
+    case DeviceOperation::Reboot:
+    case DeviceOperation::ChangePassword:
+    case DeviceOperation::UpdateFirmware:
+    case DeviceOperation::ConfigureImageSettings:
+    case DeviceOperation::ManageNvrChannels:
+    case DeviceOperation::FactoryReset:
+        return false;
+    }
+    return false;
+}
+
 QString canonicalIpv4(const QString &value)
 {
     QHostAddress address;
@@ -61,7 +88,10 @@ QVector<BatchTargetResult> BatchOperationPreflight::build(
                 result.message = QStringLiteral("No compatible verified adapter");
             } else {
                 result.adapterId = adapter->id();
-                if (adapter->supports(operation)) {
+                if (!isBatchSafeOperation(operation)) {
+                    result.state = BatchTargetState::UnsupportedOperation;
+                    result.message = QStringLiteral("This operation is restricted to an individually selected device");
+                } else if (adapter->supports(operation)) {
                     result.state = BatchTargetState::Ready;
                     result.message = QStringLiteral("Adapter advertises this operation");
                 } else {

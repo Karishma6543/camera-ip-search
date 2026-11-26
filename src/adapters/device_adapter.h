@@ -10,6 +10,8 @@ enum class DeviceOperation {
     ReadCapabilities,
     ReadNetworkInterfaces,
     ConfigureStaticIpv4,
+    ConfigureDhcp,
+    ConfigureDns,
     PreviewStream,
     CaptureSnapshot,
     Reboot,
@@ -43,9 +45,15 @@ public:
             return verifiedReadOperations().contains(QStringLiteral("GetNetworkInterfaces"));
         case DeviceOperation::ConfigureStaticIpv4:
             return implementedWriteOperations().contains(QStringLiteral("SetNetworkInterfaces"));
+        case DeviceOperation::ConfigureDhcp:
+            return implementedWriteOperations().contains(QStringLiteral("SetNetworkInterfaces"));
+        case DeviceOperation::ConfigureDns:
+            return implementedWriteOperations().contains(QStringLiteral("SetDNS"));
+        case DeviceOperation::Reboot:
+            return implementedWriteOperations().contains(QStringLiteral("SystemReboot"));
         case DeviceOperation::PreviewStream:
         case DeviceOperation::CaptureSnapshot:
-        case DeviceOperation::Reboot:
+            return false;
         case DeviceOperation::ChangePassword:
         case DeviceOperation::UpdateFirmware:
         case DeviceOperation::ConfigureImageSettings:
