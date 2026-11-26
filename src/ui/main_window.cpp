@@ -1229,6 +1229,8 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     enableDhcpButton->setObjectName(QStringLiteral("enableDhcpButton"));
     auto *disableDhcpButton = actionButton(tr("Disable DHCP"), onvifOpsPanel);
     disableDhcpButton->setObjectName(QStringLiteral("disableDhcpButton"));
+    disableDhcpButton->setEnabled(false);
+    disableDhcpButton->setToolTip(tr("Use Apply static IPv4 (ONVIF), which disables DHCP and applies a verified manual address together."));
     auto *configureDnsButton = actionButton(tr("Configure DNS"), onvifOpsPanel);
     configureDnsButton->setObjectName(QStringLiteral("configureDnsButton"));
     auto *rebootButton = actionButton(tr("Reboot camera"), onvifOpsPanel);
@@ -1280,19 +1282,6 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
                 tr("Enable DHCP on %1? Its IP address may change and the camera may disconnect. You may need to run discovery again.")
                     .arg(device.ipAddress), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
         discovery_->configureDhcp(device, true);
-    });
-    connect(disableDhcpButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
-        const DeviceRecord device = requireSelectedOnvif();
-        if (device.ipAddress.isEmpty()) return;
-        if (device.ipv4Address.isEmpty() || device.ipv4SubnetMask.isEmpty()) {
-            QMessageBox::warning(this, tr("Static IP unavailable"),
-                tr("Refresh the camera and confirm its current IPv4 address and subnet mask before disabling DHCP. Use the static IPv4 workflow to choose a safe address."));
-            return;
-        }
-        if (QMessageBox::question(this, tr("Disable DHCP"),
-                tr("Disable DHCP on %1? This operation disables automatic addressing; use the static IPv4 workflow to set a suitable address.")
-                    .arg(device.ipAddress), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
-        discovery_->configureDhcp(device, false);
     });
     connect(configureDnsButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
         const DeviceRecord device = requireSelectedOnvif();
