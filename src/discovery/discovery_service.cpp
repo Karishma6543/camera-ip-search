@@ -610,7 +610,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                     emit deviceFound(updated);
                     const bool complete = gateway.trimmed().isEmpty() || gatewayApplied;
                     const QString message = !complete
-                        ? tr("The new IP address was verified, but the gateway change was not confirmed. Inventory now records the new IP and retains the previous gateway; review the gateway setting and reconnect if needed.")
+                        ? tr("The new IP address was verified, but the gateway setting could not be confirmed by read-back. Inventory records the new IP and retains the previous gateway; review the gateway setting and reconnect if needed.")
                         : tr("Static IPv4 address was verified at %1%2.")
                             .arg(address, gateway.trimmed().isEmpty()
                                 ? QString() : tr("; gateway was also applied"));
