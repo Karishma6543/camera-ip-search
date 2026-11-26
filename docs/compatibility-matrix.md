@@ -65,7 +65,8 @@ The development branch `feat/onvif-camera-network-configuration` connects ONVIF 
 The Device Info panel includes an operation-level evidence matrix. It distinguishes:
 - **Device responded** — a successful response to that read request was observed during discovery or refresh.
 - **Implemented; not tested** — the application has a read-request implementation, but no successful response has been observed for this device.
-- **Advertised / not verified** — the device reported the related ONVIF service, but the individual operation is not implemented or has not been individually verified.
+- **Advertised; not implemented** — the device reported the related ONVIF service, but the application does not implement that individual operation.
+- **Authentication / permission not verified** — the application implements a write request and the device advertises the service, but the camera has not confirmed that the current account is authorized or that the operation succeeds.
 - **Not reported by device** — the application has an implementation, but this device has not reported the related service or operation.
 - **Not implemented** — the current application adapter does not implement the operation.
 
