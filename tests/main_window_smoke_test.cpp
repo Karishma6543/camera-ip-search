@@ -607,7 +607,7 @@ void MainWindowSmokeTest::discoveryServiceRequestsAndRecordsOnvifServices()
                 QByteArray request = peer->property("requestBuffer").toByteArray();
                 request.append(peer->readAll());
                 peer->setProperty("requestBuffer", request);
-                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
                 if (headerEnd < 0) return;
                 const QRegularExpression lengthPattern(
                     QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
@@ -641,10 +641,10 @@ void MainWindowSmokeTest::discoveryServiceRequestsAndRecordsOnvifServices()
                         "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body/>"
                         "</s:Envelope>");
                 }
-                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\n")
-                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\\r\\n")
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\n")
+                    + QByteArrayLiteral("Content-Type: application/soap+xml; charset=utf-8\r\n")
                     + QByteArrayLiteral("Content-Length: ") + QByteArray::number(responseBody.size())
-                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + responseBody;
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
                 peer->write(response);
                 peer->disconnectFromHost();
             });
@@ -691,7 +691,7 @@ void MainWindowSmokeTest::discoveryServiceRetriesHttpBasicAuthenticationChalleng
                 QByteArray request = peer->property("requestBuffer").toByteArray();
                 request.append(peer->readAll());
                 peer->setProperty("requestBuffer", request);
-                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
                 if (headerEnd < 0) return;
                 const QRegularExpression lengthPattern(
                     QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
@@ -703,8 +703,8 @@ void MainWindowSmokeTest::discoveryServiceRetriesHttpBasicAuthenticationChalleng
                 const QByteArray headers = request.left(headerEnd);
                 if (!headers.contains(QByteArrayLiteral("Authorization: Basic dXNlcjp0ZXN0LXNlY3JldA=="))) {
                     const QByteArray response = QByteArrayLiteral(
-                        "HTTP/1.1 401 Unauthorized\\r\\nWWW-Authenticate: Basic realm=\\"Fixture Camera\\"\\r\\n"
-                        "Content-Length: 0\\r\\nConnection: close\\r\\n\\r\\n");
+                        "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"Fixture Camera\"\r\n"
+                        "Content-Length: 0\r\nConnection: close\r\n\r\n");
                     peer->write(response);
                     peer->disconnectFromHost();
                     return;
@@ -717,9 +717,9 @@ void MainWindowSmokeTest::discoveryServiceRetriesHttpBasicAuthenticationChalleng
                     "<tds:Model>HTTP Basic</tds:Model><tds:FirmwareVersion>1</tds:FirmwareVersion>"
                     "<tds:SerialNumber>AUTH-1</tds:SerialNumber><tds:HardwareId>AUTH-HW</tds:HardwareId>"
                     "</tds:GetDeviceInformationResponse></s:Body></s:Envelope>");
-                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\\r\\nContent-Type: application/soap+xml\\r\\n")
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml\r\n")
                     + QByteArrayLiteral("Content-Length: ") + QByteArray::number(body.size())
-                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + body;
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + body;
                 peer->write(response);
                 peer->disconnectFromHost();
             });
@@ -768,7 +768,7 @@ void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
                 QByteArray request = peer->property("requestBuffer").toByteArray();
                 request.append(peer->readAll());
                 peer->setProperty("requestBuffer", request);
-                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\\r\\n\\r\\n"));
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
                 if (headerEnd < 0) return;
                 const QRegularExpression lengthPattern(
                     QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
@@ -800,11 +800,11 @@ void MainWindowSmokeTest::discoveryServiceReportsSoapFaults()
                         "</s:Envelope>");
                 }
                 const QByteArray response = QByteArray("HTTP/1.1 ") + QByteArray::number(status)
-                    + (status == 500 ? QByteArrayLiteral(" Internal Server Error\\r\\n")
-                                     : QByteArrayLiteral(" OK\\r\\n"))
-                    + QByteArrayLiteral("Content-Type: application/soap+xml\\r\\nContent-Length: ")
+                    + (status == 500 ? QByteArrayLiteral(" Internal Server Error\r\n")
+                                     : QByteArrayLiteral(" OK\r\n"))
+                    + QByteArrayLiteral("Content-Type: application/soap+xml\r\nContent-Length: ")
                     + QByteArray::number(responseBody.size())
-                    + QByteArrayLiteral("\\r\\nConnection: close\\r\\n\\r\\n") + responseBody;
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + responseBody;
                 peer->write(response);
                 peer->disconnectFromHost();
             });
