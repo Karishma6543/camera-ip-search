@@ -19,6 +19,8 @@ private slots:
     void leavesInterfaceUnselectedWhenAddressDoesNotMatch();
     void parsesSpecStylePluralInterfacesAndVerifiesSelectedToken();
     void rejectsResponseWithoutMatchingInterface();
+    void verifiesCompleteStaticIpv4Configuration();
+    void rejectsStaticIpv4ReadbackMismatches();
 };
 
 void OnvifNetworkConfigTest::parsesSuccessfulSetResponse()
@@ -176,6 +178,48 @@ void OnvifNetworkConfigTest::rejectsResponseWithoutMatchingInterface()
     OnvifNetworkConfig::InterfaceIpv4Info selected;
     QStringList summaries;
     QVERIFY(!OnvifNetworkConfig::parseNetworkInterfaces(xml, "192.168.1.20", &selected, &summaries));
+}
+
+
+void OnvifNetworkConfigTest::verifiesCompleteStaticIpv4Configuration()
+{
+    const QByteArray xml = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterfaces token="lan"><IPv4><Config><DHCP>false</DHCP>
+        <Manual><Address>192.168.10.20</Address><PrefixLength>24</PrefixLength></Manual>
+        <Gateway><IPv4Address>192.168.10.1</IPv4Address></Gateway>
+      </Config></IPv4></NetworkInterfaces>
+    </GetNetworkInterfacesResponse></Envelope>)";
+    QString error;
+    QVERIFY2(OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+        xml, "lan", "192.168.10.20", "24", "192.168.10.1", &error), qPrintable(error));
+}
+
+void OnvifNetworkConfigTest::rejectsStaticIpv4ReadbackMismatches()
+{
+    const QByteArray wrongPrefix = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterfaces token="lan"><IPv4><Config><DHCP>false</DHCP>
+        <Manual><Address>192.168.10.20</Address><PrefixLength>25</PrefixLength></Manual>
+        <Gateway><IPv4Address>192.168.10.1</IPv4Address></Gateway>
+      </Config></IPv4></NetworkInterfaces>
+    </GetNetworkInterfacesResponse></Envelope>)";
+    const QByteArray wrongGateway = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterfaces token="lan"><IPv4><Config><DHCP>false</DHCP>
+        <Manual><Address>192.168.10.20</Address><PrefixLength>24</PrefixLength></Manual>
+        <Gateway><IPv4Address>192.168.10.254</IPv4Address></Gateway>
+      </Config></IPv4></NetworkInterfaces>
+    </GetNetworkInterfacesResponse></Envelope>)";
+    const QByteArray dhcpEnabled = R"(<Envelope><GetNetworkInterfacesResponse>
+      <NetworkInterfaces token="lan"><IPv4><Config><DHCP>true</DHCP>
+        <FromDHCP><Address>192.168.10.20</Address><PrefixLength>24</PrefixLength></FromDHCP>
+        <Gateway><IPv4Address>192.168.10.1</IPv4Address></Gateway>
+      </Config></IPv4></NetworkInterfaces>
+    </GetNetworkInterfacesResponse></Envelope>)";
+    QVERIFY(!OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+        wrongPrefix, "lan", "192.168.10.20", "24", "192.168.10.1"));
+    QVERIFY(!OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+        wrongGateway, "lan", "192.168.10.20", "24", "192.168.10.1"));
+    QVERIFY(!OnvifNetworkConfig::verifyInterfaceIpv4Configuration(
+        dhcpEnabled, "lan", "192.168.10.20", "24", "192.168.10.1"));
 }
 
 QTEST_GUILESS_MAIN(OnvifNetworkConfigTest)
