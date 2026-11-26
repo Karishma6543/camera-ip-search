@@ -827,11 +827,12 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
     QString faultMessage;
     QString faultCode;
     const bool soapFault = OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode);
-    const bool authRejected = httpStatus == 401 || httpStatus == 403 || soapFault &&
-        (faultMessage.contains(QStringLiteral("auth"), Qt::CaseInsensitive) ||
+    const bool authRejected = httpStatus == 401 || httpStatus == 403 || (soapFault &&
+        (faultCode.contains(QStringLiteral("NotAuthorized"), Qt::CaseInsensitive) ||
+         faultMessage.contains(QStringLiteral("auth"), Qt::CaseInsensitive) ||
          faultMessage.contains(QStringLiteral("credential"), Qt::CaseInsensitive) ||
          faultMessage.contains(QStringLiteral("permission"), Qt::CaseInsensitive) ||
-         faultMessage.contains(QStringLiteral("not authorized"), Qt::CaseInsensitive));
+         faultMessage.contains(QStringLiteral("not authorized"), Qt::CaseInsensitive)));
     if (!success || soapFault) {
         const DeviceRecord device = devices_.value(deviceKey);
         if (authRejected && requestWsseCredentials(device)) {
