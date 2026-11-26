@@ -517,7 +517,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
     QNetworkReply *setReply = postOnvifRequest(request, soap);
     guardOnvifReply(setReply);
     const QString key = storageKeyForDevice(device);
-    connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
+    connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key, prefixText] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (isWsseAuthenticationFailure(response, status) &&
@@ -631,7 +631,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                 QNetworkReply *gatewayReply = postOnvifRequest(gatewayRequest, gatewaySoap);
                 guardOnvifReply(gatewayReply);
                 connect(gatewayReply, &QNetworkReply::finished, this,
-                    [this, gatewayReply, device, address, gateway, finishVerified] {
+                    [this, gatewayReply, device, address, gateway, verifyUrl, prefixText, finishVerified] {
                         const QByteArray gatewayResponse = gatewayReply->readAll();
                         const int gatewayStatus = gatewayReply->attribute(
                             QNetworkRequest::HttpStatusCodeAttribute).toInt();
