@@ -47,6 +47,7 @@ private slots:
     void rollsBackFailedInventoryMigration();
     void rejectsOversizedOnvifResponseDuringReceive();
     void discoveryServiceEnrichesDeviceFromLocalOnvifPeer();
+    void discoveryServiceIgnoresUnrelatedSoapResponse();
     void discoveryServiceRequestsAndRecordsOnvifServices();
     void discoveryServiceRetriesHttpBasicAuthenticationChallenge();
     void discoveryServiceReportsSoapFaults();
@@ -593,6 +594,56 @@ void MainWindowSmokeTest::discoveryServiceEnrichesDeviceFromLocalOnvifPeer()
 }
 
 
+
+
+void MainWindowSmokeTest::discoveryServiceIgnoresUnrelatedSoapResponse()
+{
+    QTcpServer camera;
+    QVERIFY(camera.listen(QHostAddress::LocalHost, quint16(0)));
+    bool requestReceived = false;
+    connect(&camera, &QTcpServer::newConnection, &camera, [&camera, &requestReceived] {
+        while (camera.hasPendingConnections()) {
+            QTcpSocket *peer = camera.nextPendingConnection();
+            if (!peer) continue;
+            connect(peer, &QTcpSocket::readyRead, peer, [peer, &requestReceived] {
+                QByteArray request = peer->property("requestBuffer").toByteArray();
+                request.append(peer->readAll());
+                peer->setProperty("requestBuffer", request);
+                const qsizetype headerEnd = request.indexOf(QByteArrayLiteral("\r\n\r\n"));
+                if (headerEnd < 0) return;
+                const QRegularExpression lengthPattern(
+                    QStringLiteral("Content-Length\\s*:\\s*(\\d+)"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const auto match = lengthPattern.match(QString::fromLatin1(request.left(headerEnd)));
+                const qsizetype bodyLength = match.hasMatch() ? match.captured(1).toLongLong() : 0;
+                if (request.size() < headerEnd + 4 + bodyLength) return;
+                requestReceived = true;
+                const QByteArray body = QByteArrayLiteral(
+                    "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'><s:Body/>"
+                    "</s:Envelope>");
+                const QByteArray response = QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml\r\n")
+                    + QByteArrayLiteral("Content-Length: ") + QByteArray::number(body.size())
+                    + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + body;
+                peer->write(response);
+                peer->disconnectFromHost();
+            });
+        }
+    });
+
+    DiscoveryService discovery;
+    QSignalSpy devicesFound(&discovery, &DiscoveryService::deviceFound);
+    DeviceRecord candidate;
+    candidate.ipAddress = QStringLiteral("127.0.0.1");
+    candidate.deviceServiceUrl = QStringLiteral("http://127.0.0.1:%1/onvif/device_service")
+                                     .arg(camera.serverPort());
+    candidate.onvifEndpoint = QStringLiteral("urn:uuid:unrelated-soap-fixture");
+    candidate.discoverySources << QStringLiteral("ONVIF WS-Discovery");
+    discovery.refreshDeviceInfo(candidate);
+
+    QTRY_VERIFY_WITH_TIMEOUT(requestReceived, 3000);
+    QTest::qWait(100);
+    QCOMPARE(devicesFound.count(), 0);
+}
 
 void MainWindowSmokeTest::discoveryServiceRequestsAndRecordsOnvifServices()
 {
