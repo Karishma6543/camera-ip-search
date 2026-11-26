@@ -1219,6 +1219,128 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     networkLayout->addLayout(networkActions);
     networkPageLayout->addWidget(networkPanel);
 
+    auto *onvifOpsPanel = panel(tr("Automatic network and maintenance operations"), networkContent);
+    auto *onvifOpsLayout = new QVBoxLayout(onvifOpsPanel);
+    onvifOpsLayout->addWidget(mutedLabel(
+        tr("These actions use standard ONVIF operations when the camera firmware supports them. Every change is read back before the app reports success. A camera may disconnect after DHCP or reboot."),
+        onvifOpsPanel));
+    auto *onvifOpsGrid = new QGridLayout();
+    auto *enableDhcpButton = actionButton(tr("Enable DHCP"), onvifOpsPanel);
+    enableDhcpButton->setObjectName(QStringLiteral("enableDhcpButton"));
+    auto *disableDhcpButton = actionButton(tr("Disable DHCP"), onvifOpsPanel);
+    disableDhcpButton->setObjectName(QStringLiteral("disableDhcpButton"));
+    auto *configureDnsButton = actionButton(tr("Configure DNS"), onvifOpsPanel);
+    configureDnsButton->setObjectName(QStringLiteral("configureDnsButton"));
+    auto *rebootButton = actionButton(tr("Reboot camera"), onvifOpsPanel);
+    rebootButton->setObjectName(QStringLiteral("rebootCameraButton"));
+    onvifOpsGrid->addWidget(enableDhcpButton, 0, 0);
+    onvifOpsGrid->addWidget(disableDhcpButton, 0, 1);
+    onvifOpsGrid->addWidget(configureDnsButton, 1, 0);
+    onvifOpsGrid->addWidget(rebootButton, 1, 1);
+    onvifOpsLayout->addLayout(onvifOpsGrid);
+    networkPageLayout->addWidget(onvifOpsPanel);
+
+    const auto selectedOnvifDevice = [this]() {
+        DeviceRecord device;
+        const int row = selectedDeviceRow();
+        if (row < 0 || !deviceTable_ || !deviceTable_->item(row, 1)) return device;
+        const auto *ip = deviceTable_->item(row, 1);
+        const auto cell = [this, row](int column) {
+            const auto *item = deviceTable_->item(row, column);
+            return item ? item->text().trimmed() : QString();
+        };
+        device.ipAddress = cell(1);
+        device.manufacturer = cell(3);
+        device.model = cell(4);
+        device.macAddress = cell(5);
+        device.deviceServiceUrl = ip->data(Qt::UserRole + 3).toString();
+        device.onvifEndpoint = ip->data(Qt::UserRole + 2).toString();
+        device.networkInterfaceToken = ip->data(Qt::UserRole + 7).toString();
+        device.ipv4Address = ip->data(Qt::UserRole + 8).toString();
+        device.ipv4SubnetMask = ip->data(Qt::UserRole + 9).toString();
+        device.ipv4Gateway = ip->data(Qt::UserRole + 10).toString();
+        device.ipv4DnsServer = ip->data(Qt::UserRole + 11).toString();
+        device.discoverySources = cell(8).split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        return device;
+    };
+    const auto requireSelectedOnvif = [this, selectedOnvifDevice]() {
+        const DeviceRecord device = selectedOnvifDevice();
+        if (device.ipAddress.isEmpty() || device.deviceServiceUrl.isEmpty() ||
+            device.networkInterfaceToken.isEmpty()) {
+            QMessageBox::warning(this, tr("ONVIF operation unavailable"),
+                tr("Select a camera and refresh its device information first. A valid ONVIF service URL and interface token are required."));
+            return DeviceRecord{};
+        }
+        return device;
+    };
+    connect(enableDhcpButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
+        const DeviceRecord device = requireSelectedOnvif();
+        if (device.ipAddress.isEmpty()) return;
+        if (QMessageBox::question(this, tr("Enable DHCP"),
+                tr("Enable DHCP on %1? Its IP address may change and the camera may disconnect. You may need to run discovery again.")
+                    .arg(device.ipAddress), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+        discovery_->configureDhcp(device, true);
+    });
+    connect(disableDhcpButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
+        const DeviceRecord device = requireSelectedOnvif();
+        if (device.ipAddress.isEmpty()) return;
+        if (device.ipv4Address.isEmpty() || device.ipv4SubnetMask.isEmpty()) {
+            QMessageBox::warning(this, tr("Static IP unavailable"),
+                tr("Refresh the camera and confirm its current IPv4 address and subnet mask before disabling DHCP. Use the static IPv4 workflow to choose a safe address."));
+            return;
+        }
+        if (QMessageBox::question(this, tr("Disable DHCP"),
+                tr("Disable DHCP on %1? This operation disables automatic addressing; use the static IPv4 workflow to set a suitable address.")
+                    .arg(device.ipAddress), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+        discovery_->configureDhcp(device, false);
+    });
+    connect(configureDnsButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
+        const DeviceRecord device = requireSelectedOnvif();
+        if (device.ipAddress.isEmpty()) return;
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Configure camera DNS"));
+        dialog.setMinimumWidth(430);
+        auto *form = new QFormLayout(&dialog);
+        auto *mode = new QComboBox(&dialog);
+        mode->addItem(tr("Obtain DNS automatically (DHCP)"), true);
+        mode->addItem(tr("Use manual DNS servers"), false);
+        auto *primary = new QLineEdit(&dialog);
+        primary->setPlaceholderText(QStringLiteral("8.8.8.8"));
+        auto *secondary = new QLineEdit(&dialog);
+        secondary->setPlaceholderText(QStringLiteral("1.1.1.1 (optional)"));
+        form->addRow(tr("DNS mode"), mode);
+        form->addRow(tr("Primary DNS"), primary);
+        form->addRow(tr("Secondary DNS"), secondary);
+        form->addRow(mutedLabel(tr("Manual DNS is verified against the camera's primary reported IPv4 DNS server. Some models expose only DHCP-provided DNS."), &dialog));
+        const auto updateDnsFields = [mode, primary, secondary] {
+            const bool manual = !mode->currentData().toBool();
+            primary->setEnabled(manual);
+            secondary->setEnabled(manual);
+        };
+        connect(mode, &QComboBox::currentIndexChanged, &dialog, updateDnsFields);
+        updateDnsFields();
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Apply | QDialogButtonBox::Cancel, &dialog);
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog] { dialog.accept(); });
+        if (dialog.exec() != QDialog::Accepted) return;
+        const bool fromDhcp = mode->currentData().toBool();
+        QStringList servers;
+        if (!fromDhcp) {
+            servers << primary->text().trimmed();
+            if (!secondary->text().trimmed().isEmpty()) servers << secondary->text().trimmed();
+        }
+        discovery_->configureDns(device, fromDhcp, servers);
+    });
+    connect(rebootButton, &QPushButton::clicked, this, [this, requireSelectedOnvif] {
+        const DeviceRecord device = requireSelectedOnvif();
+        if (device.ipAddress.isEmpty()) return;
+        if (QMessageBox::warning(this, tr("Reboot camera"),
+                tr("Reboot %1? Live streams and connections will be interrupted temporarily.")
+                    .arg(device.ipAddress), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+        discovery_->rebootDevice(device);
+    });
+
     auto *bulkPanel = panel(tr("Bulk IPv4 configuration"), networkContent);
     auto *bulkLayout = new QVBoxLayout(bulkPanel);
     bulkLayout->addWidget(mutedLabel(tr("Configure checked cameras with a different static IPv4 address per device. Each camera must first be refreshed so its ONVIF interface token and current subnet are verified. Devices are changed sequentially and verified individually."), bulkPanel));
