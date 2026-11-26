@@ -3,6 +3,7 @@
 #include "onvif_network_config.h"
 #include "onvif_maintenance_operations.h"
 #include "onvif_dns_parser.h"
+#include "onvif_service_parser.h"
 #include "discovery_parser.h"
 #include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
@@ -797,6 +798,7 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
         device.discoverySources << QStringLiteral("ONVIF GetDeviceInformation");
     emit deviceFound(device);
     requestOnvifCapabilities(device);
+    requestOnvifServices(device);
     requestOnvifNetworkInterfaces(device);
 }
 
@@ -850,11 +852,72 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
     }
     if (xml.hasError()) return;
     DeviceRecord &device = devices_[deviceKey];
+    for (const QString &existing : device.capabilities) {
+        if (existing.startsWith(QStringLiteral("Service: ")) && !capabilities.contains(existing))
+            capabilities.append(existing);
+    }
     device.capabilities = capabilities;
     if (!device.discoverySources.contains(QStringLiteral("ONVIF GetCapabilities")))
         device.discoverySources << QStringLiteral("ONVIF GetCapabilities");
     emit deviceFound(device);
     requestOnvifDns(device);
+}
+
+void DiscoveryService::requestOnvifServices(const DeviceRecord &device)
+{
+    const QUrl url(device.deviceServiceUrl);
+    if (!isSafeDeviceServiceUrl(url, device.ipAddress))
+        return;
+    const QByteArray soap = R"(<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+ <s:Body><tds:GetServices><tds:IncludeCapability>false</tds:IncludeCapability></tds:GetServices></s:Body>
+</s:Envelope>)";
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
+    request.setTransferTimeout(3500);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = networkManager_.post(request, soap);
+    trackEnrichmentReply(reply);
+    const quint64 generation = enrichmentGeneration_;
+    const QString key = storageKeyForDevice(device);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, generation] {
+        if (generation != enrichmentGeneration_) {
+            reply->deleteLater();
+            return;
+        }
+        handleOnvifServices(reply, key);
+    });
+}
+
+void DiscoveryService::handleOnvifServices(QNetworkReply *reply, const QString &deviceKey)
+{
+    const QByteArray payload = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+    reply->deleteLater();
+    if (!success || payload.isEmpty() || payload.size() > kMaxOnvifResponseBytes ||
+        !devices_.contains(deviceKey))
+        return;
+
+    QStringList serviceCategories;
+    QString parseError;
+    if (!OnvifServiceParser::parseServiceCategories(
+            payload, devices_.value(deviceKey).ipAddress, &serviceCategories, &parseError)) {
+        emit statusChanged(tr("Could not parse ONVIF services: %1").arg(parseError));
+        return;
+    }
+
+    DeviceRecord &device = devices_[deviceKey];
+    for (int index = device.capabilities.size() - 1; index >= 0; --index) {
+        if (device.capabilities.at(index).startsWith(QStringLiteral("Service: ")))
+            device.capabilities.removeAt(index);
+    }
+    for (const QString &category : serviceCategories)
+        device.capabilities.append(tr("Service: %1").arg(category));
+    if (!device.discoverySources.contains(QStringLiteral("ONVIF GetServices")))
+        device.discoverySources << QStringLiteral("ONVIF GetServices");
+    emit deviceFound(device);
 }
 
 void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
