@@ -28,7 +28,8 @@ bool OnvifSoapFaultParser::parse(const QByteArray &payload, QString *message, QS
                 const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
                 if (!value.isEmpty())
                     parsedMessage = value;
-            } else if (inFault && name.compare(QStringLiteral("Value"), Qt::CaseInsensitive) == 0) {
+            } else if (inFault && (name.compare(QStringLiteral("Value"), Qt::CaseInsensitive) == 0 ||
+                                  name.compare(QStringLiteral("faultcode"), Qt::CaseInsensitive) == 0)) {
                 const QString value = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
                 if (!value.isEmpty())
                     parsedCode = value;
