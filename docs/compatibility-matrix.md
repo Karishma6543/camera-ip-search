@@ -58,3 +58,15 @@ A successful ONVIF probe does not prove activation, network configuration or fir
 ## Protocol implementation status
 
 The development branch `feat/onvif-camera-network-configuration` connects ONVIF DHCP, DNS and reboot requests to the desktop workflow, with response validation, read-back checks for DHCP/DNS, confirmation dialogs, and adapter-level operation declarations. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
+
+
+## Operation-level compatibility reporting
+
+The Device Info panel includes an operation-level evidence matrix. It distinguishes:
+- **Device responded** — a successful response to that read request was observed during discovery or refresh.
+- **Implemented; not tested** — the application has a read-request implementation, but no successful response has been observed for this device.
+- **Advertised / not verified** — the device reported the related ONVIF service, but the individual operation is not implemented or has not been individually verified.
+- **Not reported by device** — the application has an implementation, but this device has not reported the related service or operation.
+- **Not implemented** — the current application adapter does not implement the operation.
+
+Service advertisement is not operation-level certification. Write operations still require appropriate camera credentials and permissions; this matrix does not claim authorization, successful execution, or model/firmware compatibility. The current ONVIF adapter reports only application implementations already present in code. RTSP preview, snapshots, password changes, firmware upgrade, imaging/PTZ controls, events and NVR channel management remain unavailable unless a future adapter implements and tests them.
