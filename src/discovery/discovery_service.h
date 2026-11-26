@@ -29,6 +29,9 @@ public:
     void factoryReset(const DeviceRecord &device, const QString &factoryDefaultType);
     void applyStaticIpv4(const DeviceRecord &device, const QString &address,
                          const QString &subnetMask, const QString &gateway);
+    void configureDhcp(const DeviceRecord &device, bool enabled);
+    void configureDns(const DeviceRecord &device, bool fromDhcp, const QStringList &ipv4Servers);
+    void rebootDevice(const DeviceRecord &device);
 
 signals:
     void deviceFound(const DeviceRecord &device);
