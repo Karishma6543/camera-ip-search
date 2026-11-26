@@ -25,6 +25,7 @@ QByteArray OnvifWsse::addUsernameToken(const QByteArray &soapEnvelope,
         QStringLiteral("http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"));
     xml.writeAttribute(QStringLiteral("xmlns:wsu"),
         QStringLiteral("http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"));
+    xml.writeAttribute(QStringLiteral("s:mustUnderstand"), QStringLiteral("1"));
     xml.writeStartElement(QStringLiteral("wsse:UsernameToken"));
     xml.writeTextElement(QStringLiteral("wsse:Username"), username);
     xml.writeStartElement(QStringLiteral("wsse:Password"));
