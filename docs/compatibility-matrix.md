@@ -13,9 +13,9 @@ The application uses standards-based ONVIF WS-Discovery and Device-service reque
 | Device capabilities | ONVIF GetCapabilities | Service categories are reported; not every operation is guaranteed |
 | Read network interfaces | ONVIF GetNetworkInterfaces | Interface token and IPv4 match required |
 | Static IPv4 and gateway | ONVIF SetNetworkInterfaces / SetNetworkDefaultGateway | Requires authenticated permission and verified interface; model/firmware validation still required |
-| DHCP configuration | Not implemented in this release | Not advertised as supported |
-| DNS configuration | Read via ONVIF GetDNS; write not implemented | Not advertised as supported |
-| Reboot, time and user management | Not implemented in this release | Not advertised as supported |
+| DHCP configuration | ONVIF SetNetworkInterfaces request, then GetNetworkInterfaces read-back | Requires interface token, camera authorization and model/firmware support; address changes may require rediscovery |
+| DNS configuration | ONVIF SetDNS request, then GetDNS read-back | Manual primary IPv4 DNS is compared; automatic DNS is accepted when the camera returns a valid IPv4 DNS address |
+| Reboot | ONVIF SystemReboot request with response validation | Camera may disconnect; successful response means accepted, not proof that reboot completed |\n| Time and user management | Not implemented | Not advertised as supported |
 | Vendor-specific APIs | Adapter extension point exists; no CP Plus/Prama/Hikvision proprietary adapter is currently validated | Add only against official SDK/protocol documentation and physical model tests |
 | Factory reset | Request code exists, but UI action is disabled pending model/firmware support verification | ONVIF discovery alone is not sufficient proof |
 
@@ -56,4 +56,4 @@ A successful ONVIF probe does not prove activation, network configuration or fir
 
 ## In-progress protocol foundations (not user-facing support)
 
-The development branch `feat/onvif-operations-foundation` adds validated SOAP request builders and unit tests for ONVIF DHCP enable/disable, manual/DHCP DNS selection, and SystemReboot. These builders are not yet connected to the desktop operation workflow, do not establish model-level support, and must not be exposed as working UI actions until authenticated request execution, capability checks, response verification, error handling, and hardware tests are complete. Date/time and user-management operations remain unimplemented.
+The development branch `feat/onvif-camera-network-configuration` connects ONVIF DHCP, DNS and reboot requests to the desktop workflow, with response validation, read-back checks for DHCP/DNS, confirmation dialogs, and adapter-level operation declarations. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
