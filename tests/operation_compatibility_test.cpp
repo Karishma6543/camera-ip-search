@@ -42,10 +42,11 @@ void OperationCompatibilityTest::doesNotTreatAdvertisedMediaServiceAsImplemented
     device.ipAddress = QStringLiteral("192.0.2.10");
     device.deviceServiceUrl = QStringLiteral("http://192.0.2.10/onvif/device_service");
     device.discoverySources << QStringLiteral("ONVIF");
-    device.capabilities << QStringLiteral("Service: Media");
+    device.capabilities << QStringLiteral("Service: Media") << QStringLiteral("Service: Device");
     const auto entries = OperationCompatibility::evaluate(device);
     QCOMPARE(entries.at(7).status, OperationCompatibility::Status::ServiceAdvertisedNotVerified);
     QVERIFY(entries.at(7).evidence.contains(QStringLiteral("not implemented")));
+    QCOMPARE(entries.at(3).status, OperationCompatibility::Status::AuthenticationNotVerified);
 }
 QTEST_GUILESS_MAIN(OperationCompatibilityTest)
 #include "operation_compatibility_test.moc"
