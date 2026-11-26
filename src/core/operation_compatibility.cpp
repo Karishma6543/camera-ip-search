@@ -16,8 +16,10 @@ struct OperationDefinition {
 constexpr std::array definitions{
     OperationDefinition{"Read device information", DeviceOperation::ReadDeviceInformation, "Device", "ONVIF GetDeviceInformation"},
     OperationDefinition{"Read capabilities", DeviceOperation::ReadCapabilities, "Device", "ONVIF GetCapabilities"},
+    OperationDefinition{"Read ONVIF service inventory", DeviceOperation::ReadServices, "Device", "ONVIF GetServices"},
     OperationDefinition{"Read network interfaces", DeviceOperation::ReadNetworkInterfaces, "Device", "ONVIF GetNetworkInterfaces"},
-    OperationDefinition{"Configure static IPv4 / DHCP", DeviceOperation::ConfigureDhcp, "Device", ""},
+    OperationDefinition{"Configure static IPv4", DeviceOperation::ConfigureStaticIpv4, "Device", ""},
+    OperationDefinition{"Configure DHCP", DeviceOperation::ConfigureDhcp, "Device", ""},
     OperationDefinition{"Configure DNS", DeviceOperation::ConfigureDns, "Device", ""},
     OperationDefinition{"Reboot camera", DeviceOperation::Reboot, "Device", ""},
     OperationDefinition{"Factory reset", DeviceOperation::FactoryReset, "Device", ""},
