@@ -35,8 +35,8 @@ inline bool verifyInterfaceIpv4Configuration(const QByteArray &xml,
         return false;
     if (actual.token != interfaceToken || actual.address != address ||
         actual.prefix != prefix ||
-        actual.dhcp.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
-        actual.dhcp == QStringLiteral("1")) {
+        !(actual.dhcp.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0 ||
+          actual.dhcp == QStringLiteral("0"))) {
         if (error) *error = QStringLiteral("The selected interface address, prefix or DHCP mode does not match the requested configuration.");
         return false;
     }
