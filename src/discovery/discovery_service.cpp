@@ -592,7 +592,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                         tr("The camera is reachable at the new IP, but the requested static address, subnet prefix or DHCP-disabled state could not be verified. Inventory was not updated."));
                     return;
                 }
-                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl, prefixText]
+                const auto finishVerified = [this, device, address, subnetMask, gateway, key, verifyUrl]
                     (bool gatewayApplied) {
                     DeviceRecord updated = device;
                     updated.ipAddress = address;
