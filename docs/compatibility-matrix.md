@@ -10,7 +10,7 @@ The application uses standards-based ONVIF WS-Discovery and Device-service reque
 |---|---|---|
 | Discovery | ONVIF WS-Discovery | Depends on ONVIF being enabled and multicast being permitted |
 | Manufacturer/model/firmware/serial | ONVIF GetDeviceInformation | Fields depend on the device response |
-| Device capabilities | ONVIF GetCapabilities | Service categories are reported; not every operation is guaranteed |
+| Device capabilities and service inventory | ONVIF GetCapabilities + GetServices | Reported service categories are listed only for same-host HTTP(S) XAddr values; this does not prove individual operation support |
 | Read network interfaces | ONVIF GetNetworkInterfaces | Interface token and IPv4 match required |
 | Static IPv4 and gateway | ONVIF SetNetworkInterfaces / SetNetworkDefaultGateway | Requires authenticated permission and verified interface; model/firmware validation still required |
 | DHCP configuration | ONVIF SetNetworkInterfaces request, then GetNetworkInterfaces read-back | Requires interface token, camera authorization and model/firmware support; address changes may require rediscovery |
