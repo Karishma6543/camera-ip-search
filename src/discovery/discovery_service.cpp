@@ -777,17 +777,19 @@ void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const 
 
     QXmlStreamReader xml(payload);
     QString manufacturer, model, firmware, serial, hardware;
+    bool responseSeen = false;
     while (!xml.atEnd()) {
         xml.readNext();
         if (!xml.isStartElement()) continue;
         const QString name = xml.name().toString();
-        if (name == QStringLiteral("Manufacturer")) manufacturer = xml.readElementText().trimmed();
+        if (name == QStringLiteral("GetDeviceInformationResponse")) responseSeen = true;
+        else if (name == QStringLiteral("Manufacturer")) manufacturer = xml.readElementText().trimmed();
         else if (name == QStringLiteral("Model")) model = xml.readElementText().trimmed();
         else if (name == QStringLiteral("FirmwareVersion")) firmware = xml.readElementText().trimmed();
         else if (name == QStringLiteral("SerialNumber")) serial = xml.readElementText().trimmed();
         else if (name == QStringLiteral("HardwareId")) hardware = xml.readElementText().trimmed();
     }
-    if (xml.hasError()) return;
+    if (xml.hasError() || !responseSeen) return;
 
     DeviceRecord &device = devices_[deviceKey];
     if (!manufacturer.isEmpty()) device.manufacturer = manufacturer;
@@ -841,17 +843,19 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
 
     QXmlStreamReader xml(payload);
     QStringList capabilities;
+    bool responseSeen = false;
     while (!xml.atEnd()) {
         xml.readNext();
         if (!xml.isStartElement()) continue;
         const QString name = xml.name().toString();
+        if (name == QStringLiteral("GetCapabilitiesResponse")) responseSeen = true;
         if (name == QStringLiteral("Analytics") || name == QStringLiteral("Device") ||
             name == QStringLiteral("Events") || name == QStringLiteral("Imaging") ||
             name == QStringLiteral("Media") || name == QStringLiteral("PTZ") ||
             name == QStringLiteral("Extension"))
             if (!capabilities.contains(name)) capabilities.append(name);
     }
-    if (xml.hasError()) return;
+    if (xml.hasError() || !responseSeen) return;
     DeviceRecord &device = devices_[deviceKey];
     for (const QString &existing : device.capabilities) {
         if (existing.startsWith(QStringLiteral("Service: ")) && !capabilities.contains(existing))
