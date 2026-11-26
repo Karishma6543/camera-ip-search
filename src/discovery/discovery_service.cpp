@@ -5,6 +5,7 @@
 #include "onvif_dns_parser.h"
 #include "onvif_service_parser.h"
 #include "onvif_soap_fault_parser.h"
+#include "onvif_wsse.h"
 #include "discovery_parser.h"
 #include "ssdp_parser.h"
 #include "adapters/network_config_validator.h"
@@ -17,6 +18,7 @@
 #include <QSslError>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <QDateTime>
 #include <QUrl>
 #include <QUuid>
 #include <algorithm>
@@ -27,6 +29,21 @@ constexpr quint16 kOnvifPort = 3702;
 constexpr quint16 kSsdpPort = 1900;
 constexpr qint64 kMaxOnvifResponseBytes = 1024 * 1024;
 const QHostAddress kOnvifGroup(QStringLiteral("239.255.255.250"));
+
+bool isWsseAuthenticationFailure(const QByteArray &payload, int httpStatus)
+{
+    if (httpStatus == 401 || httpStatus == 403)
+        return true;
+    QString message;
+    QString code;
+    if (!OnvifSoapFaultParser::parse(payload, &message, &code))
+        return false;
+    return code.contains(QStringLiteral("NotAuthorized"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("auth"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("credential"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("permission"), Qt::CaseInsensitive) ||
+           message.contains(QStringLiteral("not authorized"), Qt::CaseInsensitive);
+}
 
 bool isSafeDeviceServiceUrl(const QUrl &url, const QString &deviceIp)
 {
@@ -74,6 +91,9 @@ void DiscoveryService::refreshDeviceInfo(const DeviceRecord &device)
         return;
     }
     devices_.insert(key, device);
+    const QString credentialKey = QUrl(device.deviceServiceUrl).authority(QUrl::FullyEncoded).toLower();
+    if (!wsseCredentials_.contains(credentialKey))
+        wssePromptedHosts_.remove(credentialKey);
     emit statusChanged(tr("Refreshing device information using %1…").arg(adapter->displayName()));
     requestOnvifDeviceInformation(device);
 }
@@ -293,6 +313,57 @@ void DiscoveryService::guardOnvifReply(QNetworkReply *reply)
     });
 }
 
+QNetworkReply *DiscoveryService::postOnvifRequest(const QNetworkRequest &request,
+                                                   const QByteArray &soap)
+{
+    const QUrl url = request.url();
+    const QString credentialKey = url.authority(QUrl::FullyEncoded).toLower();
+    QByteArray payload = soap;
+    const auto credentials = wsseCredentials_.constFind(credentialKey);
+    if (credentials != wsseCredentials_.cend()) {
+        const QByteArray nonce = QUuid::createUuid().toRfc4122();
+        const QString created = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+        payload = OnvifWsse::addUsernameToken(soap, credentials->first,
+                                               credentials->second, nonce, created);
+        if (payload.isEmpty()) {
+            emit statusChanged(tr("Could not construct a WS-Security UsernameToken for the ONVIF request."));
+            return nullptr;
+        }
+    }
+    return networkManager_.post(request, payload);
+}
+
+bool DiscoveryService::requestWsseCredentials(const DeviceRecord &device, const QString &operation)
+{
+    const QUrl url(device.deviceServiceUrl);
+    const QString credentialKey = url.authority(QUrl::FullyEncoded).toLower();
+    const QString attemptKey = credentialKey + QLatin1Char('|') + operation;
+    if (!url.isValid() || credentialKey.isEmpty() ||
+        wsseRetriedOperations_.contains(attemptKey))
+        return false;
+    if (wsseCredentials_.contains(credentialKey)) {
+        wsseRetriedOperations_.insert(attemptKey);
+        return true;
+    }
+    if (wssePromptedHosts_.contains(credentialKey))
+        return false;
+    wssePromptedHosts_.insert(credentialKey);
+
+    QAuthenticator authenticator;
+    emit statusChanged(tr("The camera requires ONVIF WS-Security credentials for %1.")
+                           .arg(url.host()));
+    emit authenticationRequested(&authenticator);
+    if (authenticator.user().isEmpty()) {
+        emit statusChanged(tr("WS-Security authentication was cancelled; no credentials were saved."));
+        return false;
+    }
+    wsseCredentials_.insert(credentialKey,
+                            qMakePair(authenticator.user(), authenticator.password()));
+    wsseRetriedOperations_.insert(attemptKey);
+    emit statusChanged(tr("WS-Security credentials are held in memory for this application session only."));
+    return true;
+}
+
 void DiscoveryService::trackEnrichmentReply(QNetworkReply *reply)
 {
     if (!reply) return;
@@ -340,13 +411,19 @@ void DiscoveryService::factoryReset(const DeviceRecord &device, const QString &f
                       QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(8000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, mode] {
         const QByteArray payload = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const bool transportOk = reply->error() == QNetworkReply::NoError &&
                                  status >= 200 && status < 300;
+        if (isWsseAuthenticationFailure(payload, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetSystemFactoryDefault"))) {
+            reply->deleteLater();
+            factoryReset(device, mode);
+            return;
+        }
         QString parseError;
         const bool accepted = transportOk && OnvifNetworkConfig::parseSoapOperationResponse(
             payload, QStringLiteral("SetSystemFactoryDefaultResponse"), &parseError);
@@ -436,12 +513,18 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                       QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *setReply = networkManager_.post(request, soap);
+    QNetworkReply *setReply = postOnvifRequest(request, soap);
     guardOnvifReply(setReply);
     const QString key = storageKeyForDevice(device);
     connect(setReply, &QNetworkReply::finished, this, [this, setReply, device, oldUrl, address, subnetMask, gateway, key] {
         const QByteArray response = setReply->readAll();
         const int status = setReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetNetworkInterfaces.StaticIPv4"))) {
+            setReply->deleteLater();
+            applyStaticIpv4(device, address, subnetMask, gateway);
+            return;
+        }
         bool rebootNeeded = false;
         QString responseError;
         const bool transportOk = setReply->error() == QNetworkReply::NoError &&
@@ -475,7 +558,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                                 QStringLiteral("application/soap+xml; charset=utf-8"));
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-        QNetworkReply *verifyReply = networkManager_.post(verifyRequest, verifySoap);
+        QNetworkReply *verifyReply = postOnvifRequest(verifyRequest, verifySoap);
                 guardOnvifReply(verifyReply);
         connect(verifyReply, &QNetworkReply::finished, this,
             [this, verifyReply, device, address, subnetMask, gateway, key, verifyUrl] {
@@ -533,7 +616,7 @@ void DiscoveryService::applyStaticIpv4(const DeviceRecord &device, const QString
                 gatewayRequest.setTransferTimeout(5000);
                 gatewayRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                                             QNetworkRequest::ManualRedirectPolicy);
-                QNetworkReply *gatewayReply = networkManager_.post(gatewayRequest, gatewaySoap);
+                QNetworkReply *gatewayReply = postOnvifRequest(gatewayRequest, gatewaySoap);
                 guardOnvifReply(gatewayReply);
                 connect(gatewayReply, &QNetworkReply::finished, this,
                     [this, gatewayReply, device, address, gateway, finishVerified] {
@@ -578,11 +661,17 @@ void DiscoveryService::configureDhcp(const DeviceRecord &device, bool enabled)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(8000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, enabled] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetNetworkInterfaces.DHCP"))) {
+            reply->deleteLater();
+            configureDhcp(device, enabled);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
@@ -604,7 +693,7 @@ void DiscoveryService::configureDhcp(const DeviceRecord &device, bool enabled)
         verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-        QNetworkReply *verify = networkManager_.post(verifyRequest, verifySoap);
+        QNetworkReply *verify = postOnvifRequest(verifyRequest, verifySoap);
         guardOnvifReply(verify);
         connect(verify, &QNetworkReply::finished, this, [this, verify, device, enabled] {
             const QByteArray payload = verify->readAll();
@@ -656,11 +745,17 @@ void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(8000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device, fromDhcp, ipv4Servers] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SetDNS"))) {
+            reply->deleteLater();
+            configureDns(device, fromDhcp, ipv4Servers);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
@@ -679,7 +774,7 @@ void DiscoveryService::configureDns(const DeviceRecord &device, bool fromDhcp,
         verifyRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
         verifyRequest.setTransferTimeout(5000);
         verifyRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-        QNetworkReply *verify = networkManager_.post(verifyRequest, verifySoap);
+        QNetworkReply *verify = postOnvifRequest(verifyRequest, verifySoap);
         guardOnvifReply(verify);
         connect(verify, &QNetworkReply::finished, this, [this, verify, device, fromDhcp, ipv4Servers] {
             const QByteArray payload = verify->readAll();
@@ -720,11 +815,17 @@ void DiscoveryService::rebootDevice(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(5000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, OnvifMaintenanceOperations::buildSystemRebootRequest());
+    QNetworkReply *reply = postOnvifRequest(request, OnvifMaintenanceOperations::buildSystemRebootRequest());
     guardOnvifReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, device] {
         const QByteArray response = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (isWsseAuthenticationFailure(response, status) &&
+            requestWsseCredentials(device, QStringLiteral("SystemReboot"))) {
+            reply->deleteLater();
+            rebootDevice(device);
+            return;
+        }
         QString error;
         const bool accepted = reply->error() == QNetworkReply::NoError && status >= 200 &&
             status < 300 && OnvifNetworkConfig::parseSoapOperationResponse(
@@ -752,7 +853,7 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -768,11 +869,35 @@ void DiscoveryService::requestOnvifDeviceInformation(const DeviceRecord &device)
 void DiscoveryService::handleOnvifDeviceInformation(QNetworkReply *reply, const QString &deviceKey)
 {
     const QByteArray payload = reply->readAll();
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError &&
-                         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 200 &&
-                         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() < 300;
+                         httpStatus >= 200 && httpStatus < 300;
+    const QString transportError = reply->errorString();
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (payload.size() > kMaxOnvifResponseBytes || !devices_.contains(deviceKey))
+        return;
+
+    QString faultMessage;
+    QString faultCode;
+    const bool soapFault = OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode);
+    const bool authRejected = isWsseAuthenticationFailure(payload, httpStatus);
+    if (!success || soapFault) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (authRejected && requestWsseCredentials(device, QStringLiteral("GetDeviceInformation"))) {
+            requestOnvifDeviceInformation(device);
+            return;
+        }
+        if (authRejected)
+            emit statusChanged(tr("ONVIF authentication was not accepted for %1. Check the account and permissions.")
+                                   .arg(device.ipAddress));
+        else if (soapFault)
+            emit statusChanged(tr("ONVIF GetDeviceInformation fault: %1").arg(faultMessage));
+        else
+            emit statusChanged(tr("ONVIF GetDeviceInformation failed (HTTP %1): %2")
+                                   .arg(httpStatus).arg(transportError));
+        return;
+    }
+    if (payload.isEmpty())
         return;
 
     QXmlStreamReader xml(payload);
@@ -819,7 +944,7 @@ void DiscoveryService::requestOnvifCapabilities(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -838,7 +963,18 @@ void DiscoveryService::handleOnvifCapabilities(QNetworkReply *reply, const QStri
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetCapabilities"))) {
+            requestOnvifCapabilities(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetCapabilities requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     QXmlStreamReader xml(payload);
@@ -882,7 +1018,7 @@ void DiscoveryService::requestOnvifServices(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -909,6 +1045,15 @@ void DiscoveryService::handleOnvifServices(QNetworkReply *reply, const QString &
         return;
     }
 
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetServices"))) {
+            requestOnvifServices(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetServices requires credentials or permissions that were not supplied."));
+        return;
+    }
     QString faultMessage;
     QString faultCode;
     if (OnvifSoapFaultParser::parse(payload, &faultMessage, &faultCode)) {
@@ -956,7 +1101,7 @@ void DiscoveryService::requestOnvifNetworkInterfaces(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -975,7 +1120,18 @@ void DiscoveryService::handleOnvifNetworkInterfaces(QNetworkReply *reply, const 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetNetworkInterfaces"))) {
+            requestOnvifNetworkInterfaces(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetNetworkInterfaces requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     OnvifNetworkConfig::InterfaceIpv4Info selected;
@@ -1035,7 +1191,7 @@ void DiscoveryService::requestOnvifDns(const DeviceRecord &device)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/soap+xml; charset=utf-8"));
     request.setTransferTimeout(3500);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    QNetworkReply *reply = networkManager_.post(request, soap);
+    QNetworkReply *reply = postOnvifRequest(request, soap);
     trackEnrichmentReply(reply);
     const quint64 generation = enrichmentGeneration_;
     const QString key = storageKeyForDevice(device);
@@ -1054,7 +1210,18 @@ void DiscoveryService::handleOnvifDns(QNetworkReply *reply, const QString &devic
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const bool success = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
     reply->deleteLater();
-    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024 || !devices_.contains(deviceKey))
+    if (!devices_.contains(deviceKey))
+        return;
+    if (isWsseAuthenticationFailure(payload, status)) {
+        const DeviceRecord device = devices_.value(deviceKey);
+        if (requestWsseCredentials(device, QStringLiteral("GetDNS"))) {
+            requestOnvifDns(device);
+            return;
+        }
+        emit statusChanged(tr("ONVIF GetDNS requires credentials or permissions that were not supplied."));
+        return;
+    }
+    if (!success || payload.isEmpty() || payload.size() > 1024 * 1024)
         return;
 
     QXmlStreamReader xml(payload);
