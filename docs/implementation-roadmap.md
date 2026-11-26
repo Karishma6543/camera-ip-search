@@ -49,6 +49,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Add a desktop startup smoke test for the Operation History workspace.
 - [ ] Validate inventory behavior with large device lists and repeated discovery.
 
+See [vendor protocol research](vendor-protocol-research.md) for model-specific public evidence and the adapter boundaries.
+
 ## Milestone 4 — Vendor integrations
 - [ ] Research official SDK/protocol options for CP Plus.
 - [ ] Research official SDK/protocol options for Hikvision.
