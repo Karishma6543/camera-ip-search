@@ -74,6 +74,15 @@ void AdapterRegistryTest::exposesImplementedOnvifWriteOperations()
     const QStringList operations = registry.implementedWriteOperations(device);
     QVERIFY(operations.contains(QStringLiteral("SetNetworkInterfaces")));
     QVERIFY(operations.contains(QStringLiteral("SetNetworkDefaultGateway")));
+    QVERIFY(operations.contains(QStringLiteral("SetDNS")));
+    QVERIFY(operations.contains(QStringLiteral("SystemReboot")));
+    const DeviceAdapter *adapter = registry.adapterFor(device);
+    QVERIFY(adapter);
+    QVERIFY(adapter->supports(DeviceOperation::ConfigureDhcp));
+    QVERIFY(adapter->supports(DeviceOperation::ConfigureDns));
+    QVERIFY(adapter->supports(DeviceOperation::Reboot));
+    QVERIFY(!adapter->supports(DeviceOperation::UpdateFirmware));
+    QVERIFY(!adapter->supports(DeviceOperation::ChangePassword));
 }
 
 void AdapterRegistryTest::exposesFactoryResetOnlyForOnvifAdapter()
