@@ -8,6 +8,7 @@
 enum class DeviceOperation {
     ReadDeviceInformation,
     ReadCapabilities,
+    ReadServices,
     ReadNetworkInterfaces,
     ConfigureStaticIpv4,
     ConfigureDhcp,
@@ -41,6 +42,8 @@ public:
             return verifiedReadOperations().contains(QStringLiteral("GetDeviceInformation"));
         case DeviceOperation::ReadCapabilities:
             return verifiedReadOperations().contains(QStringLiteral("GetCapabilities"));
+        case DeviceOperation::ReadServices:
+            return verifiedReadOperations().contains(QStringLiteral("GetServices"));
         case DeviceOperation::ReadNetworkInterfaces:
             return verifiedReadOperations().contains(QStringLiteral("GetNetworkInterfaces"));
         case DeviceOperation::ConfigureStaticIpv4:
