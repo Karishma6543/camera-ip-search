@@ -112,5 +112,66 @@ class ContractBSimulatorTests(unittest.TestCase):
         import json
         self.assertNotIn("mac", json.loads(payload)["device"])
 
+
+    def _post_simulator_request(self, scenario, path="/onvif/device_service", body=b"<GetDeviceInformation/>", headers=None):
+        args = Namespace(
+            scenario=scenario, advertised_ip="127.0.0.1", http_port=0,
+            mac="02:00:00:00:00:01", bind="127.0.0.1", interface_ip="127.0.0.1"
+        )
+        simulator = simulator_module.Scenario(args)
+        try:
+            simulator.start_http()
+            port = simulator.http.server_address[1]
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+            connection.request(
+                "POST", path, body=body,
+                headers=headers or {"Content-Type": "application/soap+xml"}
+            )
+            response = connection.getresponse()
+            payload = response.read()
+            result = (response.status, dict(response.getheaders()), payload)
+            connection.close()
+            return result
+        finally:
+            simulator.shutdown()
+
+    def test_auth_required_scenario_returns_basic_challenge(self):
+        status, headers, _ = self._post_simulator_request("auth-required")
+        self.assertEqual(status, 401)
+        self.assertIn("Basic", headers.get("WWW-Authenticate", ""))
+
+    def test_auth_required_scenario_accepts_followup_authorization_header(self):
+        status, _, payload = self._post_simulator_request(
+            "auth-required", headers={
+                "Content-Type": "application/soap+xml",
+                "Authorization": "Basic dXNlcjpwYXNz",
+            }
+        )
+        self.assertEqual(status, 200)
+        self.assertIn(b"GetDeviceInformationResponse", payload)
+
+    def test_soap_fault_scenario_returns_a_soap_fault(self):
+        status, _, payload = self._post_simulator_request("soap-fault")
+        self.assertEqual(status, 200)
+        self.assertIn(b"<s:Fault>", payload)
+        self.assertIn(b"Simulated device fault", payload)
+
+    def test_simulator_explicitly_rejects_state_changing_network_requests(self):
+        status, _, payload = self._post_simulator_request(
+            "normal", body=b"<SetNetworkInterfaces/>"
+        )
+        self.assertEqual(status, 200)
+        self.assertIn(b"Writes disabled in simulator", payload)
+
+    def test_simulator_rejects_unknown_device_service_path(self):
+        status, _, _ = self._post_simulator_request("normal", path="/admin")
+        self.assertEqual(status, 404)
+
+    def test_simulator_rejects_oversized_soap_request_body(self):
+        status, _, _ = self._post_simulator_request(
+            "normal", body=b"x" * (1024 * 1024 + 1)
+        )
+        self.assertEqual(status, 413)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
