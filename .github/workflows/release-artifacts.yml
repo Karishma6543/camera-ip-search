@@ -42,6 +42,7 @@ jobs:
         shell: pwsh
         run: |
           $exe = Join-Path $PWD 'package/bin/camera-ip-search.exe'
+          if (!(Test-Path $exe -PathType Leaf)) { throw 'Installed application executable is missing' }
           & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations --compiler-runtime --dir (Split-Path $exe) $exe
           if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
       - name: Deploy Qt runtime (macOS)
@@ -49,33 +50,51 @@ jobs:
         run: |
           APP="package/camera-ip-search.app"
           test -d "$APP"
+          test -x "$APP/Contents/MacOS/camera-ip-search"
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
+          test -s "camera-ip-search-macos.zip"
+          shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"
       - name: Archive Windows package
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path package/* -DestinationPath camera-ip-search-windows.zip
+        run: |
+          Compress-Archive -Path package/* -DestinationPath camera-ip-search-windows.zip
+          if (!(Test-Path 'camera-ip-search-windows.zip' -PathType Leaf)) { throw 'Windows archive was not created' }
+          if ((Get-Item 'camera-ip-search-windows.zip').Length -le 0) { throw 'Windows archive is empty' }
+          $hash = (Get-FileHash 'camera-ip-search-windows.zip' -Algorithm SHA256).Hash.ToLower()
+          "$hash  camera-ip-search-windows.zip" | Set-Content -Encoding ascii 'camera-ip-search-windows.zip.sha256'
       - name: Archive Linux package
         if: runner.os == 'Linux'
-        run: tar -C package -czf camera-ip-search-linux-runtime-required.tar.gz .
+        run: |
+          test -x package/bin/camera-ip-search
+          tar -C package -czf camera-ip-search-linux-runtime-required.tar.gz .
+          test -s camera-ip-search-linux-runtime-required.tar.gz
+          sha256sum camera-ip-search-linux-runtime-required.tar.gz > camera-ip-search-linux-runtime-required.tar.gz.sha256
       - name: Upload Windows artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: camera-ip-search-windows.zip
+          path: |
+            camera-ip-search-windows.zip
+            camera-ip-search-windows.zip.sha256
           if-no-files-found: error
       - name: Upload macOS artifact
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: camera-ip-search-macos.zip
+          path: |
+            camera-ip-search-macos.zip
+            camera-ip-search-macos.zip.sha256
           if-no-files-found: error
       - name: Upload Linux artifact
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: camera-ip-search-linux-runtime-required.tar.gz
+          path: |
+            camera-ip-search-linux-runtime-required.tar.gz
+            camera-ip-search-linux-runtime-required.tar.gz.sha256
           if-no-files-found: error
