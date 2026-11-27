@@ -134,3 +134,15 @@ For each exact model, hardware revision and firmware:
 9. Record authentication mode, operator role, firmware response, elapsed time and sanitized logs.
 
 The application does not automatically roll back a verified IP change. If a test fails, use the camera's documented local recovery process. A model remains unsupported until the full matrix passes on its actual hardware.
+
+## ONVIF HTTP negative-path fixture coverage
+
+The Python fixture suite also exercises the simulator's HTTP service, not just its response builders:
+- Basic-auth challenge and the authorized retry path.
+- SOAP fault response handling.
+- Explicit rejection of state-changing network requests (the simulator never claims a write succeeded).
+- Unknown device-service paths.
+- Oversized request-body rejection (413).
+- Oversized response-body generation for the desktop client's response-size guard.
+
+These tests verify that the simulator presents the intended deterministic fixtures. They do not prove the desktop client handles each case correctly unless paired with a corresponding C++ service-level test, and they do not establish physical-camera interoperability.
