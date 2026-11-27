@@ -244,6 +244,15 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
     });
     QTest::mouseClick(renameButton, Qt::LeftButton);
     QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
+
+    const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid() && database.isOpen());
+    QSqlQuery persisted(database);
+    persisted.prepare(QStringLiteral("SELECT user_label FROM devices WHERE ip=:ip"));
+    persisted.bindValue(QStringLiteral(":ip"), QStringLiteral("192.168.10.25"));
+    QVERIFY(persisted.exec());
+    QVERIFY(persisted.next());
+    QCOMPARE(persisted.value(0).toString(), QStringLiteral("Loading bay"));
 }
 
 void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
