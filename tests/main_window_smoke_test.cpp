@@ -38,6 +38,7 @@ class MainWindowSmokeTest final : public QObject
     Q_OBJECT
 private slots:
     void startupShowsOperationHistory();
+    void inventorySchemaDoesNotPersistCameraCredentials();
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
@@ -105,6 +106,32 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
 }
 
 
+
+void MainWindowSmokeTest::inventorySchemaDoesNotPersistCameraCredentials()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid() && database.isOpen());
+
+    const QStringList tables{QStringLiteral("devices"), QStringLiteral("operation_history")};
+    const QStringList forbiddenFragments{
+        QStringLiteral("username"), QStringLiteral("password"),
+        QStringLiteral("credential"), QStringLiteral("secret"),
+        QStringLiteral("authorization")
+    };
+    for (const QString &table : tables) {
+        QSqlQuery columns(database);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table)));
+        while (columns.next()) {
+            const QString column = columns.value(1).toString().toLower();
+            for (const QString &fragment : forbiddenFragments)
+                QVERIFY2(!column.contains(fragment),
+                         qPrintable(QStringLiteral("Sensitive credential column found: %1.%2")
+                                        .arg(table, column)));
+        }
+    }
+}
 
 void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
 {
