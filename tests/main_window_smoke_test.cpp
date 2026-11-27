@@ -313,7 +313,7 @@ void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
         auto *dialog = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
         QVERIFY2(dialog, "CSV export must present a file selection dialog.");
         dialog->selectFile(csvPath);
-        dialog->accept();
+        dialog->done(QDialog::Accepted);
     });
     QTest::mouseClick(exportButton, Qt::LeftButton);
 
