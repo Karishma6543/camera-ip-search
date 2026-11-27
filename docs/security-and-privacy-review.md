@@ -33,7 +33,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Run dependency/SBOM and license review for the exact release build.
 - [ ] Run static analysis and compiler sanitizers where supported. An Ubuntu ASan/UBSan CI job now exercises the full CTest suite; cross-platform sanitizer and static-analysis coverage remains outstanding.
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
-- [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard (execution still awaits a functioning CI runner).
+- [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard; the complete CTest suite passed on the PR #16 head CI matrix.
 - [ ] Verify that cancellation and shutdown abort pending sockets/replies and do not leave worker threads running.
 - [x] Add parser-level static IPv4 mismatch tests and service-level DHCP/DNS read-back mismatch loopback tests (PR #28 merged; CI passed on the PR head).
 - [ ] Add full static-IP service-level tests for changed-IP reconnect, stale address, gateway mismatch/partial failure and post-write transport loss.
