@@ -18,6 +18,9 @@ private slots:
     void restoresBackupAndKeepsRecoverySnapshot();
     void sqliteFullFailureDoesNotCorruptExistingRows();
     void uncommittedChangesAreRolledBackAfterConnectionLoss();
+    void rejectsBackupDestinationWhenParentIsAFile();
+    void rejectsActiveDatabaseAsRestoreSourceWithoutChangingRows();
+    void rejectsDirectoryAndEmptyFilesAsBackups();
 };
 
 static bool createInventory(QSqlDatabase &database, const QString &path, const QString &value)
@@ -115,6 +118,67 @@ void InventoryBackupTest::sqliteFullFailureDoesNotCorruptExistingRows()
     QCOMPARE(verify.value(0).toString(), QStringLiteral("safe-record"));
     QVERIFY(!verify.next());
     database.close();
+}
+
+void InventoryBackupTest::rejectsBackupDestinationWhenParentIsAFile()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSqlDatabase database;
+    QVERIFY(createInventory(database, directory.filePath(QStringLiteral("inventory.sqlite")),
+                            QStringLiteral("preserve-me")));
+
+    const QString blocker = directory.filePath(QStringLiteral("not-a-directory"));
+    QFile file(blocker);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QByteArrayLiteral("keep-this-file"));
+    file.close();
+
+    QString error;
+    const QString destination = blocker + QStringLiteral("/backup.sqlite");
+    QVERIFY(!InventoryBackup::create(database, destination, &error));
+    QVERIFY(!error.isEmpty());
+    QFile verifyBlocker(blocker);
+    QVERIFY(verifyBlocker.open(QIODevice::ReadOnly));
+    QCOMPARE(verifyBlocker.readAll(), QByteArrayLiteral("keep-this-file"));
+    QVERIFY(!QFileInfo::exists(destination));
+    database.close();
+}
+
+void InventoryBackupTest::rejectsActiveDatabaseAsRestoreSourceWithoutChangingRows()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("inventory.sqlite"));
+    QSqlDatabase database;
+    QVERIFY(createInventory(database, path, QStringLiteral("active-inventory")));
+
+    QString error;
+    QVERIFY(!InventoryBackup::restore(database, path, &error));
+    QVERIFY(!error.isEmpty());
+    QSqlQuery verify(database);
+    QVERIFY(verify.exec(QStringLiteral("SELECT name FROM devices")));
+    QVERIFY(verify.next());
+    QCOMPARE(verify.value(0).toString(), QStringLiteral("active-inventory"));
+    QVERIFY(!verify.next());
+    database.close();
+}
+
+void InventoryBackupTest::rejectsDirectoryAndEmptyFilesAsBackups()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString emptyFile = directory.filePath(QStringLiteral("empty.sqlite"));
+    QFile file(emptyFile);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.close();
+
+    QString error;
+    QVERIFY(!InventoryBackup::validate(emptyFile, &error));
+    QVERIFY(!error.isEmpty());
+    error.clear();
+    QVERIFY(!InventoryBackup::validate(directory.path(), &error));
+    QVERIFY(!error.isEmpty());
 }
 
 void InventoryBackupTest::uncommittedChangesAreRolledBackAfterConnectionLoss()
