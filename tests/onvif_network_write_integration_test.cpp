@@ -3,6 +3,7 @@
 #include <QtTest>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QNetworkInterface>
 #include <QRegularExpression>
 #include <functional>
 
@@ -53,6 +54,32 @@ public:
         return QStringLiteral("http://127.0.0.1:%1/onvif/device_service").arg(server.serverPort());
     }
 };
+
+QString usableLocalIpv4Address()
+{
+    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack))
+            continue;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            const QHostAddress address = entry.ip();
+            if (address.protocol() == QAbstractSocket::IPv4Protocol &&
+                !address.isNull() && !address.isLoopback() && !address.isMulticast())
+                return address.toString();
+        }
+    }
+    return QString();
+}
+
+QString nearbyGatewayAddress(const QString &address)
+{
+    QHostAddress parsed;
+    if (!parsed.setAddress(address))
+        return QString();
+    return QHostAddress(parsed.toIPv4Address() + 1U).toString();
+}
 
 DeviceRecord onvifDevice(const QString &endpoint)
 {
@@ -167,12 +194,14 @@ static QByteArray networkInterfaceResponse(const QString &address, const QString
 
 void OnvifNetworkWriteIntegrationTest::staticIpv4ReconnectsAndVerifiesAtChangedAddress()
 {
+    const QString newAddress = usableLocalIpv4Address();
+    QVERIFY2(!newAddress.isEmpty(), "A non-loopback IPv4 interface is required for the changed-address test.");
     SoapPeerFixture camera;
-    camera.respond = [](const QByteArray &soap) {
+    camera.respond = [newAddress](const QByteArray &soap) {
         if (soap.contains("SetNetworkInterfaces"))
             return QByteArrayLiteral("<Envelope><SetNetworkInterfacesResponse><RebootNeeded>false</RebootNeeded></SetNetworkInterfacesResponse></Envelope>");
         if (soap.contains("GetNetworkInterfaces"))
-            return networkInterfaceResponse(QStringLiteral("127.0.0.2"));
+            return networkInterfaceResponse(newAddress);
         return QByteArrayLiteral("<Envelope/>");
     };
     QVERIFY(camera.listen());
@@ -185,16 +214,16 @@ void OnvifNetworkWriteIntegrationTest::staticIpv4ReconnectsAndVerifiesAtChangedA
             finished = true; verified = ok; detail = message;
         });
     QObject::connect(&service, &DiscoveryService::deviceFound, &service,
-        [&result](const DeviceRecord &device) { if (device.ipAddress == QStringLiteral("127.0.0.2")) result = device; });
-    service.applyStaticIpv4(onvifDevice(camera.endpoint()), QStringLiteral("127.0.0.2"),
+        [&result](const DeviceRecord &device) { if (device.ipAddress == newAddress) result = device; });
+    service.applyStaticIpv4(onvifDevice(camera.endpoint()), newAddress,
                             QStringLiteral("255.0.0.0"), QString());
     QTRY_VERIFY_WITH_TIMEOUT(finished, 5000);
     QVERIFY2(verified, qPrintable(detail));
-    QCOMPARE(result.ipAddress, QStringLiteral("127.0.0.2"));
+    QCOMPARE(result.ipAddress, newAddress);
     QCOMPARE(result.ipv4SubnetMask, QStringLiteral("255.0.0.0"));
     QVERIFY(result.ipv4ConfigurationKnown);
     QVERIFY(!result.ipv4DhcpEnabled);
-    QVERIFY(result.deviceServiceUrl.contains(QStringLiteral("127.0.0.2")));
+    QVERIFY(result.deviceServiceUrl.contains(newAddress));
 }
 
 void OnvifNetworkWriteIntegrationTest::staticIpv4RejectsStaleReadback()
@@ -224,14 +253,18 @@ void OnvifNetworkWriteIntegrationTest::staticIpv4RejectsStaleReadback()
 
 void OnvifNetworkWriteIntegrationTest::gatewayFailureReportsVerifiedAddressAsPartialOutcome()
 {
+    const QString newAddress = usableLocalIpv4Address();
+    QVERIFY2(!newAddress.isEmpty(), "A non-loopback IPv4 interface is required for the gateway test.");
+    const QString gatewayAddress = nearbyGatewayAddress(newAddress);
+    QVERIFY(!gatewayAddress.isEmpty() && gatewayAddress != newAddress);
     SoapPeerFixture camera;
-    camera.respond = [](const QByteArray &soap) {
+    camera.respond = [newAddress, gatewayAddress](const QByteArray &soap) {
         if (soap.contains("SetNetworkInterfaces"))
             return QByteArrayLiteral("<Envelope><SetNetworkInterfacesResponse><RebootNeeded>false</RebootNeeded></SetNetworkInterfacesResponse></Envelope>");
         if (soap.contains("SetNetworkDefaultGateway"))
             return QByteArrayLiteral("<Envelope><SetNetworkDefaultGatewayResponse/></Envelope>");
         if (soap.contains("GetNetworkInterfaces"))
-            return networkInterfaceResponse(QStringLiteral("127.0.0.2"), QStringLiteral("127.0.0.1"));
+            return networkInterfaceResponse(newAddress, gatewayAddress);
         return QByteArrayLiteral("<Envelope/>");
     };
     QVERIFY(camera.listen());
@@ -244,13 +277,13 @@ void OnvifNetworkWriteIntegrationTest::gatewayFailureReportsVerifiedAddressAsPar
             finished = true; verified = ok; detail = message;
         });
     QObject::connect(&service, &DiscoveryService::deviceFound, &service,
-        [&updated](const DeviceRecord &device) { if (device.ipAddress == QStringLiteral("127.0.0.2")) updated = device; });
-    service.applyStaticIpv4(onvifDevice(camera.endpoint()), QStringLiteral("127.0.0.2"),
-                            QStringLiteral("255.0.0.0"), QStringLiteral("127.0.0.254"));
+        [&updated](const DeviceRecord &device) { if (device.ipAddress == newAddress) updated = device; });
+    service.applyStaticIpv4(onvifDevice(camera.endpoint()), newAddress,
+                            QStringLiteral("255.0.0.0"), gatewayAddress);
     QTRY_VERIFY_WITH_TIMEOUT(finished, 5000);
     QVERIFY(!verified);
     QVERIFY(detail.contains(QStringLiteral("gateway"), Qt::CaseInsensitive));
-    QCOMPARE(updated.ipAddress, QStringLiteral("127.0.0.2"));
+    QCOMPARE(updated.ipAddress, newAddress);
     QCOMPARE(updated.ipv4Gateway, QString());
 }
 
