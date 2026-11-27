@@ -68,7 +68,7 @@ See [vendor protocol research](vendor-protocol-research.md) for model-specific p
 - [x] Preserve the verified new IP and report partial failure when gateway application fails.
 - [x] Verify static IPv4 address, subnet prefix and DHCP-disabled state by GetNetworkInterfaces read-back.
 - [x] Verify gateway by a second GetNetworkInterfaces read-back after SetNetworkDefaultGateway is accepted (PR #28 merged; build, test, sanitizer, packaging and CodeQL checks passed on the PR head).
-- [ ] Add full static-IP service-level fixtures for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss. Current coverage includes parser-level static-IP mismatch tests, plus service-level DHCP/DNS read-back mismatch fixtures.
+- [x] Add service-level static-IP changed-address reconnect and stale-address read-back tests; add gateway-failure partial-outcome test (this PR). Remaining: transport-loss/reboot-required and wrong-prefix/gateway-read-back edge cases.
 - [ ] Define and version the project's activation/network-configuration contract before implementation.
 - [x] Add local operation history for discovery, scans, reachability, manual inventory changes, exports and static-IPv4 outcomes.
 - [ ] Expand audit coverage to every request/response stage and partial failure.
@@ -109,6 +109,6 @@ Do not mark a whole brand as supported based on one model.
 - [x] Add deterministic digest unit tests and loopback SOAP challenge/retry integration coverage.
 - [ ] Validate WS-Security interoperability and clock/nonce behavior on representative physical camera models.
 - [x] Add loopback tests for request timeouts, redirect refusal, malformed responses and oversized responses.
-- [ ] Add end-to-end static-IP service-level read-back mismatch and partial-failure fixtures, including changed-IP reconnect and post-write transport loss.
+- [x] Add end-to-end changed-IP reconnect, stale-address read-back mismatch and gateway-failure partial-outcome fixtures (this PR). Remaining: transport-loss/reboot-required and wrong-prefix/gateway-read-back edge cases.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.
