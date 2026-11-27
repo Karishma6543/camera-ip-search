@@ -103,7 +103,7 @@ QString DiagnosticLogger::redact(const QString &text)
     safe.replace(xmlSecrets, QStringLiteral("\\1[REDACTED]</\\2\\3>"));
 
     static const QRegularExpression secrets(
-        QStringLiteral(R"((password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)(\s*[:=]\s*|\s+)("[^"]*"|'[^']*'|[^\s&,;]+))"),
+        QStringLiteral(R"((?<![<A-Za-z0-9_:.-])(password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)(\s*[:=]\s*|\s+)("[^"]*"|'[^']*'|[^\s&,;]+))"),
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(secrets, QStringLiteral("\\1\\2[REDACTED]"));
 
