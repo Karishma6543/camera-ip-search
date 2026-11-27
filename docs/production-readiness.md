@@ -16,9 +16,9 @@ Implemented in source:
 - TCP reachability checks.
 - Local SQLite inventory, manual entry, labels and CSV export.
 - SQLite online backup with integrity validation and guarded restore that retains a pre-restore recovery snapshot.
-- Guarded ONVIF static IPv4 request with address read-back; PR #28 adds subnet-prefix, DHCP-disabled and gateway read-back verification, pending CI.
+- Guarded ONVIF static IPv4 request with read-back verification of selected interface address, subnet prefix and DHCP-disabled state; when a gateway is supplied, gateway is set and verified by a second GetNetworkInterfaces read-back (PR #28 merged; CI passed on PR head).
 - ONVIF DHCP enable/disable and DNS configuration workflows with read-back checks.
-- ONVIF reboot request with response validation; acceptance is not proof that reboot completed.
+- ONVIF reboot request with response validation; acceptance is not proof that reboot completed. Factory-reset request code and protocol tests exist, but its UI action remains disabled pending exact-model/firmware hardware evidence.
 - Unsupported activation, firmware and vendor-specific provisioning remain unavailable. Bulk static IPv4 configuration is present but still requires physical-camera validation.
 
 Not implemented:
@@ -54,6 +54,7 @@ The repository contains an interface-scoped IPv4 conflict probe (`IpConflictProb
 - [x] Document the scanner bounds: full scans up to 4096 hosts; larger subnets use a 256-address window centered on the selected interface. A larger-subnet full scan is not supported.
 - [x] Add a local operation-history view for discovery, scan, reachability, inventory and static-IPv4 outcomes; retention is capped at 1,000 records. Configuration audit details still need broader stage-by-stage coverage.
 - [x] Track and cancel in-flight ONVIF enrichment requests when discovery is cancelled or restarted; generation checks prevent stale replies from updating a newer scan.
+- [x] Close and schedule discovery UDP sockets for deletion after timeout/cancellation; regression coverage verifies cancelled scans do not retain child sockets.
 - [x] Add per-device progress and user-visible cancellation for reachability checks.
 - [ ] Add automated tests for reachability timeout and cancellation. [x] Test cancellation and ensure a second start cannot replace an active reachability batch.
 - [x] Persist the verified new camera IP and report a partial outcome when the later gateway update fails.

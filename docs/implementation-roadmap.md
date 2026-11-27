@@ -31,6 +31,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Basic duplicate merging and discovery provenance.
 - [x] Add unit tests for invalid interfaces, IPv4 mask/prefix mismatch and unusable /31-/32 scan ranges.
 - [x] Add cancellation for in-flight ONVIF enrichment and reject stale replies after cancellation/restart.
+- [x] Close and delete discovery UDP sockets after timeout/cancellation; add a regression assertion for socket cleanup.
 - [ ] Add end-to-end integration tests for socket lifecycle, cancellation, multiple interfaces, duplicate responses and timeouts. SSDP response parsing has focused unit tests; multicast delivery still requires physical-network validation.
 - [x] Add a local Contract B/ONVIF simulator and deterministic Python fixture tests; full C++ socket integration remains pending.
 - [ ] Verify broadcast/multicast behavior on Windows, macOS and Linux.
@@ -66,8 +67,8 @@ See [vendor protocol research](vendor-protocol-research.md) for model-specific p
 - [ ] Verify ONVIF write behavior, authentication and recovery on supported physical models.
 - [x] Preserve the verified new IP and report partial failure when gateway application fails.
 - [x] Verify static IPv4 address, subnet prefix and DHCP-disabled state by GetNetworkInterfaces read-back.
-- [x] Verify gateway by a second GetNetworkInterfaces read-back after SetNetworkDefaultGateway is accepted (PR #28; CI pending).
-- [ ] Add static-IP service-level fixtures for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss. PR #28 adds service-level DHCP/DNS read-back mismatch fixtures.
+- [x] Verify gateway by a second GetNetworkInterfaces read-back after SetNetworkDefaultGateway is accepted (PR #28 merged; build, test, sanitizer, packaging and CodeQL checks passed on the PR head).
+- [ ] Add full static-IP service-level fixtures for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss. Current coverage includes parser-level static-IP mismatch tests, plus service-level DHCP/DNS read-back mismatch fixtures.
 - [ ] Define and version the project's activation/network-configuration contract before implementation.
 - [x] Add local operation history for discovery, scans, reachability, manual inventory changes, exports and static-IPv4 outcomes.
 - [ ] Expand audit coverage to every request/response stage and partial failure.
@@ -103,11 +104,11 @@ Do not mark a whole brand as supported based on one model.
 - [x] Report ONVIF service categories returned by GetServices, with same-host endpoint validation.
 - [x] Show a per-device operation compatibility matrix separating application implementation, observed device responses and advertised services.
 - [x] Add loopback ONVIF HTTP/SOAP integration tests for HTTP Basic and WS-Security challenge/retry, GetServices request/response, SOAP faults, malformed responses, redirect refusal and request timeouts.
-- [ ] Add static-IP service-level read-back mismatch and partial-failure fixtures. PR #28 adds parser-level static-IP mismatch tests and service-level DHCP/DNS read-back mismatch fixtures.
+- [x] Add parser-level static-IP read-back mismatch tests and service-level DHCP/DNS read-back mismatch fixtures (PR #28, merged and CI-passing).
 - [x] Implement ONVIF WS-Security UsernameToken PasswordDigest with fresh nonce/Created values, in-memory session credentials and challenge/retry.
 - [x] Add deterministic digest unit tests and loopback SOAP challenge/retry integration coverage.
 - [ ] Validate WS-Security interoperability and clock/nonce behavior on representative physical camera models.
 - [x] Add loopback tests for request timeouts, redirect refusal, malformed responses and oversized responses.
-- [ ] Add end-to-end static-IP read-back mismatch and partial-failure fixtures. PR #28 adds parser-level static-IP mismatch tests plus DHCP/DNS service-level read-back mismatch fixtures.
+- [ ] Add end-to-end static-IP service-level read-back mismatch and partial-failure fixtures, including changed-IP reconnect and post-write transport loss.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.

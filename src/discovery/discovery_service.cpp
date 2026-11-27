@@ -70,7 +70,10 @@ DiscoveryService::DiscoveryService(QObject *parent) : QObject(parent)
         emit statusChanged(tr("Discovery finished. Found %1 device(s).").arg(devices_.size()));
         emit finished(devices_.size());
         for (auto &entry : sockets_) {
-            if (entry.socket) entry.socket->close();
+            if (entry.socket) {
+                entry.socket->close();
+                entry.socket->deleteLater();
+            }
         }
         sockets_.clear();
     });
@@ -147,7 +150,10 @@ void DiscoveryService::cancel()
     running_ = false;
     cancelEnrichmentRequests();
     for (auto &entry : sockets_) {
-        if (entry.socket) entry.socket->close();
+        if (entry.socket) {
+            entry.socket->close();
+            entry.socket->deleteLater();
+        }
     }
     sockets_.clear();
     emit statusChanged(wasRunning
