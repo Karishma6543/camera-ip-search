@@ -5,6 +5,8 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QTabWidget>
 #include <QTabBar>
@@ -40,6 +42,7 @@ private slots:
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
     void guidedManualEntryAndRenameDialogsWork();
+    void exportsInventoryAsUtf8CsvWithEscapedFields();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
@@ -241,6 +244,49 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
     });
     QTest::mouseClick(renameButton, Qt::LeftButton);
     QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
+}
+
+void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
+    auto *exportButton = window.findChild<QPushButton *>(QStringLiteral("exportCsvButton"));
+    QVERIFY(addButton && exportButton);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *address = dialog->findChild<QLineEdit *>(QStringLiteral("manualAddress"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("manualDeviceName"));
+        auto *manufacturer = dialog->findChild<QLineEdit *>(QStringLiteral("manualManufacturer"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveManualDeviceButton"));
+        QVERIFY(address && name && manufacturer && save);
+        address->setText(QStringLiteral("192.168.10.25"));
+        name->setText(QStringLiteral("Front \"east\", gate"));
+        manufacturer->setText(QStringLiteral("Oxita"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(addButton, Qt::LeftButton);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString csvPath = directory.filePath(QStringLiteral("inventory.csv"));
+    QTimer::singleShot(0, &window, [&window, csvPath] {
+        auto *dialog = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
+        QVERIFY2(dialog, "CSV export must present a file selection dialog.");
+        dialog->selectFile(csvPath);
+        dialog->accept();
+    });
+    QTest::mouseClick(exportButton, Qt::LeftButton);
+
+    QFile csv(csvPath);
+    QVERIFY2(csv.open(QIODevice::ReadOnly), "The CSV export should create the selected file.");
+    const QByteArray contents = csv.readAll();
+    QVERIFY(contents.startsWith(QByteArray::fromHex("efbbbf")));
+    QVERIFY(contents.contains(QByteArrayLiteral("\"192.168.10.25\",\"Front \"\"east\"\", gate\",\"Oxita\"")));
+    QVERIFY(contents.contains(QByteArrayLiteral("\"IP\"")) ||
+            contents.contains(QByteArrayLiteral("\"IP Address\"")));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
