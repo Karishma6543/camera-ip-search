@@ -315,9 +315,9 @@ void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
         dialog->selectFile(csvPath);
         auto *buttons = dialog->findChild<QDialogButtonBox *>();
         QVERIFY2(buttons, "CSV export dialog must expose its standard action buttons.");
-        auto *openButton = buttons->button(QDialogButtonBox::Open);
-        QVERIFY2(openButton, "CSV export dialog must expose its Open/accept button.");
-        QTest::mouseClick(openButton, Qt::LeftButton);
+        auto *saveButton = buttons->button(QDialogButtonBox::Save);
+        QVERIFY2(saveButton, "CSV export dialog must expose its Save/accept button.");
+        QTest::mouseClick(saveButton, Qt::LeftButton);
     });
     QTest::mouseClick(exportButton, Qt::LeftButton);
 
