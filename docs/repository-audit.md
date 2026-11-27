@@ -39,9 +39,9 @@ The code change and documentation edits in this audit require their own CI run o
 
 ## Remaining engineering work
 
-1. Add end-to-end static-IP service tests for changed-address reconnect, stale address, gateway mismatch/partial failure and post-write transport loss.
+1. Added loopback end-to-end static-IP tests for changed-address reconnect, stale address read-back and gateway-failure partial outcome. Still add post-write transport loss/reboot-required and wrong-prefix/gateway cases.
 2. Expand UI acceptance tests for CSV export, static-IP confirmation/recovery, scan cancellation and persistence/error states.
-3. Complete database failure tests for read-only directories, disk-full and abrupt process interruption.
+3. Added SQLite constrained-page-count (SQLITE_FULL) and uncommitted-transaction connection-loss recovery tests. Still add application-level read-only path/backup-target failure cases and an OS-level abrupt-kill test.
 4. Complete cross-platform TLS/certificate, credential-redaction, OS credential-vault and dependency/license reviews.
 5. Validate discovery and every state-changing ONVIF operation on exact physical models/firmware; maintain the compatibility matrix at model level.
 6. Complete signed installers, install/upgrade/uninstall testing, SBOM and release evidence before any production release.

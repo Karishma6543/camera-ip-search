@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QTemporaryDir>
 #include <QUuid>
 #include <QtTest>
@@ -15,6 +16,8 @@ private slots:
     void createsAndValidatesConsistentBackup();
     void rejectsCorruptBackupWithoutChangingInventory();
     void restoresBackupAndKeepsRecoverySnapshot();
+    void sqliteFullFailureDoesNotCorruptExistingRows();
+    void uncommittedChangesAreRolledBackAfterConnectionLoss();
 };
 
 static bool createInventory(QSqlDatabase &database, const QString &path, const QString &value)
@@ -88,6 +91,50 @@ void InventoryBackupTest::restoresBackupAndKeepsRecoverySnapshot()
         {QStringLiteral("inventory.sqlite.pre-restore-*.sqlite")}, QDir::Files);
     QCOMPARE(recoveryFiles.size(), 1);
     QVERIFY(InventoryBackup::validate(directory.filePath(recoveryFiles.first()), &error));
+    database.close();
+}
+
+
+void InventoryBackupTest::sqliteFullFailureDoesNotCorruptExistingRows()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSqlDatabase database;
+    QVERIFY(createInventory(database, directory.filePath(QStringLiteral("inventory.sqlite")),
+                            QStringLiteral("safe-record")));
+    QSqlQuery limit(database);
+    QVERIFY(limit.exec(QStringLiteral("PRAGMA max_page_count=2")));
+    QSqlQuery insert(database);
+    insert.prepare(QStringLiteral("INSERT INTO devices VALUES (:name)"));
+    insert.bindValue(QStringLiteral(":name"), QString(256 * 1024, QLatin1Char('x')));
+    QVERIFY2(!insert.exec(), "The constrained SQLite database should report SQLITE_FULL.");
+    QVERIFY(insert.lastError().text().contains(QStringLiteral("full"), Qt::CaseInsensitive));
+    QSqlQuery verify(database);
+    QVERIFY(verify.exec(QStringLiteral("SELECT name FROM devices")));
+    QVERIFY(verify.next());
+    QCOMPARE(verify.value(0).toString(), QStringLiteral("safe-record"));
+    QVERIFY(!verify.next());
+    database.close();
+}
+
+void InventoryBackupTest::uncommittedChangesAreRolledBackAfterConnectionLoss()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("inventory.sqlite"));
+    QSqlDatabase database;
+    QVERIFY(createInventory(database, path, QStringLiteral("before-crash")));
+    QVERIFY(database.transaction());
+    {
+        QSqlQuery update(database);
+        QVERIFY(update.exec(QStringLiteral("UPDATE devices SET name='uncommitted'")));
+    }
+    database.close();
+    QVERIFY(database.open());
+    QSqlQuery verify(database);
+    QVERIFY(verify.exec(QStringLiteral("SELECT name FROM devices")));
+    QVERIFY(verify.next());
+    QCOMPARE(verify.value(0).toString(), QStringLiteral("before-crash"));
     database.close();
 }
 
