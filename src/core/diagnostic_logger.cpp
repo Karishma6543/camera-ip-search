@@ -93,10 +93,14 @@ QString DiagnosticLogger::redact(const QString &text)
         QRegularExpression::CaseInsensitiveOption);
     safe.replace(jsonSecrets, QStringLiteral("\\1\"[REDACTED]\""));
 
+    // ONVIF commonly uses namespace-prefixed elements (for example,
+    // wsse:Password). Preserve the opening tag while matching the same
+    // namespace and local name in the closing tag. [\s\S]* also covers
+    // credentials whose XML text is split across lines.
     static const QRegularExpression xmlSecrets(
-        QStringLiteral(R"(<(Password|Username|Token|AccessToken|Secret)>[^<]*</\1>)"),
+        QStringLiteral(R"((<((?:[A-Za-z_][A-Za-z0-9_.-]*:)?)(Password|Username|Token|AccessToken|Secret)\b[^>]*>)[\s\S]*?</\2\3\s*>)"),
         QRegularExpression::CaseInsensitiveOption);
-    safe.replace(xmlSecrets, QStringLiteral("<\\1>[REDACTED]</\\1>"));
+    safe.replace(xmlSecrets, QStringLiteral("\\1[REDACTED]</\\2\\3>"));
 
     static const QRegularExpression secrets(
         QStringLiteral(R"((password|passwd|pwd|username|user_name|token|access_token|refresh_token|api[_-]?key|secret|credential)(\s*[:=]\s*|\s+)("[^"]*"|'[^']*'|[^\s&,;]+))"),
