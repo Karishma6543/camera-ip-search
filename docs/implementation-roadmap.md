@@ -52,9 +52,9 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 See [vendor protocol research](vendor-protocol-research.md) for model-specific public evidence and the adapter boundaries.
 
 ## Milestone 4 — Vendor integrations
-- [ ] Research official SDK/protocol options for CP Plus.
+- [x] Research public official product/protocol evidence for CP Plus; proprietary API/SDK contract and redistribution terms remain unverified.
 - [ ] Research official SDK/protocol options for Hikvision.
-- [ ] Research official SDK/protocol options for Prama.
+- [x] Research public official product/protocol evidence for Prama; exact model/firmware hardware validation remains pending.
 - [ ] Implement adapters only for exact models/firmware with authorized documentation and licensing.
 - [ ] Add model-level hardware evidence to the compatibility matrix.
 
@@ -64,7 +64,10 @@ See [vendor protocol research](vendor-protocol-research.md) for model-specific p
 - [x] Persist a verified new IP and report partial failure when a subsequent gateway update fails.
 - [ ] Add guided recovery/reconnect instructions for partial network-configuration failures.
 - [ ] Verify ONVIF write behavior, authentication and recovery on supported physical models.
-- [ ] Add robust partial-failure/recovery handling when IP changes succeed but gateway or verification fails.
+- [x] Preserve the verified new IP and report partial failure when gateway application fails.
+- [x] Verify static IPv4 address, subnet prefix and DHCP-disabled state by GetNetworkInterfaces read-back.
+- [x] Verify gateway by a second GetNetworkInterfaces read-back after SetNetworkDefaultGateway is accepted (PR #28; CI pending).
+- [ ] Add static-IP service-level fixtures for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss. PR #28 adds service-level DHCP/DNS read-back mismatch fixtures.
 - [ ] Define and version the project's activation/network-configuration contract before implementation.
 - [x] Add local operation history for discovery, scans, reachability, manual inventory changes, exports and static-IPv4 outcomes.
 - [ ] Expand audit coverage to every request/response stage and partial failure.
@@ -100,10 +103,11 @@ Do not mark a whole brand as supported based on one model.
 - [x] Report ONVIF service categories returned by GetServices, with same-host endpoint validation.
 - [x] Show a per-device operation compatibility matrix separating application implementation, observed device responses and advertised services.
 - [x] Add loopback ONVIF HTTP/SOAP integration tests for HTTP Basic and WS-Security challenge/retry, GetServices request/response, SOAP faults, malformed responses, redirect refusal and request timeouts.
-- [ ] Add explicit network-write read-back mismatch and partial-failure integration fixtures.
+- [ ] Add static-IP service-level read-back mismatch and partial-failure fixtures. PR #28 adds parser-level static-IP mismatch tests and service-level DHCP/DNS read-back mismatch fixtures.
 - [x] Implement ONVIF WS-Security UsernameToken PasswordDigest with fresh nonce/Created values, in-memory session credentials and challenge/retry.
 - [x] Add deterministic digest unit tests and loopback SOAP challenge/retry integration coverage.
 - [ ] Validate WS-Security interoperability and clock/nonce behavior on representative physical camera models.
-- [ ] Expand integration tests for timeouts, redirects, malformed responses and read-back mismatches.
+- [x] Add loopback tests for request timeouts, redirect refusal, malformed responses and oversized responses.
+- [ ] Add end-to-end static-IP read-back mismatch and partial-failure fixtures. PR #28 adds parser-level static-IP mismatch tests plus DHCP/DNS service-level read-back mismatch fixtures.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.

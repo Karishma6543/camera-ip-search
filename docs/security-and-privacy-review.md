@@ -26,7 +26,8 @@ This is a review aid, not a security certification. Complete it against the exac
 - [x] Explicitly abort ONVIF requests when Qt reports TLS certificate validation errors; no certificate errors are ignored.
 - [ ] Add cross-platform tests for trusted, expired, hostname-mismatched and self-signed certificates and verify operator guidance.
 - [ ] Implement OS credential-vault integration before offering persistent credential storage. Until then, credentials remain session-only and must not be cached in app settings or SQLite.
-- [ ] Review ONVIF authentication behavior, including WS-Security UsernameToken digest/nonce/timestamp requirements for target devices. HTTP Basic challenge support alone is not sufficient for every ONVIF camera.
+- [x] Implement ONVIF WS-Security UsernameToken PasswordDigest with fresh nonce/Created values, session-only credentials and bounded per-operation retry; deterministic digest and loopback challenge/retry tests are present.
+- [ ] Validate WS-Security interoperability, nonce/timestamp tolerance and authentication behavior on representative physical camera models. HTTP Basic and WS-Security tests do not certify every HTTP Digest or vendor-specific authentication variant.
 - [ ] Review database file permissions and whether local inventory metadata is sensitive in the deployment environment.
 - [ ] Review support-bundle contents on each OS and ensure users can inspect the file before sharing.
 - [ ] Run dependency/SBOM and license review for the exact release build.
@@ -34,6 +35,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
 - [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard (execution still awaits a functioning CI runner).
 - [ ] Verify that cancellation and shutdown abort pending sockets/replies and do not leave worker threads running.
+- [ ] Add service-level static IPv4 read-back tests for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss; DHCP/DNS mismatch loopback tests and parser-level static mismatch tests are included in PR #28 pending CI.
 
 ## Credential-vault policy
 

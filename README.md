@@ -31,11 +31,11 @@ The desktop client is written in C++/Qt. It is **not** a Flutter application, an
 - Provides an opt-in local IPv4 candidate scan. It checks common TCP service ports across a bounded range: full scans are available up to 4096 hosts; larger subnets use a 256-address window centered around the selected interface address. Results are **unverified network candidates**, not confirmed cameras.
 - Checks reachability using known/common TCP ports.
 - Supports manual device entry, device labels, CSV export and local SQLite inventory persistence. SQLite integrity is checked on startup; invalid databases are not automatically overwritten.
-- Offers guarded single-camera and sequential bulk ONVIF static IPv4 workflows when matching ONVIF interface tokens and current device-service endpoints have been obtained. Bulk mode requires per-camera unique addresses, validates and confirms the full assignment list, applies changes one camera at a time and records each verification result. There is no automatic rollback.
-- Provides ONVIF factory reset through SetSystemFactoryDefault with explicit Soft/Hard selection and destructive-action confirmations when the camera exposes and authorizes that operation.
+- Offers guarded ONVIF static IPv4, DHCP enable/disable and DNS configuration workflows when matching ONVIF interface tokens and current device-service endpoints have been obtained. Static IPv4 verifies the selected interface address and subnet prefix; gateway read-back verification is being added in PR #28. DHCP and DNS require post-write read-back; a DHCP address change can require rediscovery. Bulk static IPv4 requires per-camera unique addresses, validates and confirms the full assignment list, applies changes one camera at a time and records each result. There is no automatic rollback.
+- Provides ONVIF reboot and factory-reset requests with response validation and explicit confirmations when the camera exposes and authorizes those operations. A successful response means accepted, not proof that the device completed the reboot/reset.
 - Provides a local Operation History workspace and user-confirmed diagnostics text export with recent activity and OS/application/network-interface summary.
 - Includes a local Contract B/limited ONVIF simulator for deterministic pre-production testing; see [simulator and integration testing](docs/simulator-and-integration-testing.md).
-- Keeps activation, firmware flashing, reboot, NVR, general-purpose bulk provisioning and unsupported vendor operations unavailable rather than simulating success. Bulk support is currently limited to static IPv4 network assignments.
+- Keeps activation, firmware flashing, NVR management, general-purpose bulk provisioning and unsupported vendor operations unavailable rather than simulating success. Bulk support is currently limited to static IPv4 network assignments.
 
 ## Quick start and common workflow
 

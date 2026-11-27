@@ -57,7 +57,7 @@ A successful ONVIF probe does not prove activation, network configuration or fir
 
 ## Protocol implementation status
 
-The development branch `feat/onvif-camera-network-configuration` connects ONVIF DHCP, DNS and reboot requests to the desktop workflow, with response validation, read-back checks for DHCP/DNS, confirmation dialogs, and adapter-level operation declarations. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
+ONVIF DHCP enable/disable, DNS configuration and reboot requests are connected to the desktop workflow with response validation, read-back checks for DHCP/DNS, confirmation dialogs and adapter-level operation declarations. Static IPv4 verifies the selected interface address and subnet prefix; PR #28 adds explicit DHCP-disabled and gateway read-back verification, pending CI. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
 
 
 ## Operation-level compatibility reporting
