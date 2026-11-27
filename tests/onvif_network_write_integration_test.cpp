@@ -73,12 +73,12 @@ QString usableLocalIpv4Address()
     return QString();
 }
 
-QString nearbyGatewayAddress(const QString &address)
+QString nearbyGatewayAddress(const QString &address, quint32 offset = 1U)
 {
     QHostAddress parsed;
     if (!parsed.setAddress(address))
         return QString();
-    return QHostAddress(parsed.toIPv4Address() + 1U).toString();
+    return QHostAddress(parsed.toIPv4Address() + offset).toString();
 }
 
 DeviceRecord onvifDevice(const QString &endpoint)
@@ -258,15 +258,17 @@ void OnvifNetworkWriteIntegrationTest::gatewayFailureReportsVerifiedAddressAsPar
     const QString newAddress = usableLocalIpv4Address();
     QVERIFY2(!newAddress.isEmpty(), "A non-loopback IPv4 interface is required for the gateway test.");
     const QString gatewayAddress = nearbyGatewayAddress(newAddress);
+    const QString reportedGatewayAddress = nearbyGatewayAddress(newAddress, 2U);
     QVERIFY(!gatewayAddress.isEmpty() && gatewayAddress != newAddress);
+    QVERIFY(!reportedGatewayAddress.isEmpty() && reportedGatewayAddress != gatewayAddress);
     SoapPeerFixture camera;
-    camera.respond = [newAddress, gatewayAddress](const QByteArray &soap) {
+    camera.respond = [newAddress, reportedGatewayAddress](const QByteArray &soap) {
         if (soap.contains("SetNetworkInterfaces"))
             return QByteArrayLiteral("<Envelope><SetNetworkInterfacesResponse><RebootNeeded>false</RebootNeeded></SetNetworkInterfacesResponse></Envelope>");
         if (soap.contains("SetNetworkDefaultGateway"))
             return QByteArrayLiteral("<Envelope><SetNetworkDefaultGatewayResponse/></Envelope>");
         if (soap.contains("GetNetworkInterfaces"))
-            return networkInterfaceResponse(newAddress, gatewayAddress);
+            return networkInterfaceResponse(newAddress, reportedGatewayAddress);
         return QByteArrayLiteral("<Envelope/>");
     };
     QVERIFY(camera.listen());
