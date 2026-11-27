@@ -9,6 +9,7 @@ class DiagnosticLoggerTest final : public QObject
     Q_OBJECT
 private slots:
     void redactsCommonCredentialForms();
+    void redactsNamespacedOnvifXmlCredentials();
     void writesAndExportsSanitizedDiagnostics();
 };
 
@@ -29,6 +30,28 @@ void DiagnosticLoggerTest::redactsCommonCredentialForms()
     QVERIFY(!output.contains(QStringLiteral("bearer-secret")));
     QVERIFY(!output.contains(QStringLiteral("json-secret")));
     QVERIFY(!output.contains(QStringLiteral("soap-secret")));
+    QVERIFY(output.contains(QStringLiteral("[REDACTED]")));
+}
+
+void DiagnosticLoggerTest::redactsNamespacedOnvifXmlCredentials()
+{
+    const QString input = QStringLiteral(
+        R"(<s:Envelope xmlns:s="urn:soap" xmlns:wsse="urn:security">)"
+        R"(<wsse:Security><wsse:UsernameToken>)"
+        R"(<wsse:Username>camera-admin</wsse:Username>)"
+        R"(<wsse:Password Type="urn:digest">multi)"
+        R"(-line-secret</wsse:Password>)"
+        R"(</wsse:UsernameToken><tt:Token>session-secret</tt:Token>)"
+        R"(</wsse:Security></s:Envelope>)");
+
+    const QString output = DiagnosticLogger::redact(input);
+    QVERIFY(!output.contains(QStringLiteral("camera-admin")));
+    QVERIFY(!output.contains(QStringLiteral("multi")));
+    QVERIFY(!output.contains(QStringLiteral("line-secret")));
+    QVERIFY(!output.contains(QStringLiteral("session-secret")));
+    QVERIFY(output.contains(QStringLiteral("<wsse:Password Type=")));
+    QVERIFY(output.contains(QStringLiteral("</wsse:Password>")));
+    QVERIFY(output.contains(QStringLiteral("<tt:Token>")));
     QVERIFY(output.contains(QStringLiteral("[REDACTED]")));
 }
 
