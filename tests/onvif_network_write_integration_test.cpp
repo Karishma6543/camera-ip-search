@@ -214,7 +214,7 @@ void OnvifNetworkWriteIntegrationTest::staticIpv4ReconnectsAndVerifiesAtChangedA
             finished = true; verified = ok; detail = message;
         });
     QObject::connect(&service, &DiscoveryService::deviceFound, &service,
-        [&result](const DeviceRecord &device) { if (device.ipAddress == newAddress) result = device; });
+        [&result, &newAddress](const DeviceRecord &device) { if (device.ipAddress == newAddress) result = device; });
     service.applyStaticIpv4(onvifDevice(camera.endpoint()), newAddress,
                             QStringLiteral("255.0.0.0"), QString());
     QTRY_VERIFY_WITH_TIMEOUT(finished, 5000);
@@ -228,6 +228,8 @@ void OnvifNetworkWriteIntegrationTest::staticIpv4ReconnectsAndVerifiesAtChangedA
 
 void OnvifNetworkWriteIntegrationTest::staticIpv4RejectsStaleReadback()
 {
+    const QString newAddress = usableLocalIpv4Address();
+    QVERIFY2(!newAddress.isEmpty(), "A non-loopback IPv4 interface is required for the stale-readback test.");
     SoapPeerFixture camera;
     camera.respond = [](const QByteArray &soap) {
         if (soap.contains("SetNetworkInterfaces"))
@@ -244,7 +246,7 @@ void OnvifNetworkWriteIntegrationTest::staticIpv4RejectsStaleReadback()
         [&finished, &verified, &detail](const DeviceRecord &, bool ok, const QString &message) {
             finished = true; verified = ok; detail = message;
         });
-    service.applyStaticIpv4(onvifDevice(camera.endpoint()), QStringLiteral("127.0.0.2"),
+    service.applyStaticIpv4(onvifDevice(camera.endpoint()), newAddress,
                             QStringLiteral("255.0.0.0"), QString());
     QTRY_VERIFY_WITH_TIMEOUT(finished, 5000);
     QVERIFY(!verified);
@@ -277,7 +279,7 @@ void OnvifNetworkWriteIntegrationTest::gatewayFailureReportsVerifiedAddressAsPar
             finished = true; verified = ok; detail = message;
         });
     QObject::connect(&service, &DiscoveryService::deviceFound, &service,
-        [&updated](const DeviceRecord &device) { if (device.ipAddress == newAddress) updated = device; });
+        [&updated, &newAddress](const DeviceRecord &device) { if (device.ipAddress == newAddress) updated = device; });
     service.applyStaticIpv4(onvifDevice(camera.endpoint()), newAddress,
                             QStringLiteral("255.0.0.0"), gatewayAddress);
     QTRY_VERIFY_WITH_TIMEOUT(finished, 5000);
