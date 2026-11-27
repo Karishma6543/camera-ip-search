@@ -168,10 +168,27 @@ class ContractBSimulatorTests(unittest.TestCase):
         self.assertEqual(status, 404)
 
     def test_simulator_rejects_oversized_soap_request_body(self):
-        status, _, _ = self._post_simulator_request(
-            "normal", body=b"x" * (1024 * 1024 + 1)
+        args = Namespace(
+            scenario="normal", advertised_ip="127.0.0.1", http_port=0,
+            mac="02:00:00:00:00:01", bind="127.0.0.1", interface_ip="127.0.0.1"
         )
-        self.assertEqual(status, 413)
+        simulator = simulator_module.Scenario(args)
+        connection = None
+        try:
+            simulator.start_http()
+            port = simulator.http.server_address[1]
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+            connection.putrequest("POST", "/onvif/device_service")
+            connection.putheader("Content-Type", "application/soap+xml")
+            connection.putheader("Content-Length", str(1024 * 1024 + 1))
+            connection.endheaders()
+            response = connection.getresponse()
+            self.assertEqual(response.status, 413)
+            response.read()
+        finally:
+            if connection is not None:
+                connection.close()
+            simulator.shutdown()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
