@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QTemporaryDir>
 #include <QFileInfo>
 #include <QTabWidget>
 #include <QTabBar>
