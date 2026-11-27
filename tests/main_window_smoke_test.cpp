@@ -322,8 +322,7 @@ void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
     const QByteArray contents = csv.readAll();
     QVERIFY(contents.startsWith(QByteArray::fromHex("efbbbf")));
     QVERIFY(contents.contains(QByteArrayLiteral("\"192.168.10.25\",\"Front \"\"east\"\", gate\",\"Oxita\"")));
-    QVERIFY(contents.contains(QByteArrayLiteral("\"IP\"")) ||
-            contents.contains(QByteArrayLiteral("\"IP Address\"")));
+    QVERIFY(contents.contains(QByteArrayLiteral("\"IP ADDRESS\"")));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
