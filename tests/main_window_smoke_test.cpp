@@ -388,9 +388,11 @@ void MainWindowSmokeTest::discoveryServiceStartsAndCancelsOnSelectedPhysicalInte
         }
     }
     QVERIFY(probeStatusSeen);
+    QVERIFY(!service.findChildren<QUdpSocket *>().isEmpty());
     service.cancel();
     QVERIFY(!service.isRunning());
     QCOMPARE(cancelled.count(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(service.findChildren<QUdpSocket *>().size(), 0, 1000);
 }
 
 void MainWindowSmokeTest::leavesCorruptInventoryDatabaseUntouched()

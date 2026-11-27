@@ -18,7 +18,7 @@ The application uses standards-based ONVIF WS-Discovery and Device-service reque
 | Reboot | ONVIF SystemReboot request with response validation | Camera may disconnect; successful response means accepted, not proof that reboot completed |
 | Time and user management | Not implemented | Not advertised as supported |
 | Vendor-specific APIs | Adapter extension point exists; no CP Plus/Prama/Hikvision proprietary adapter is currently validated | Add only against official SDK/protocol documentation and physical model tests |
-| Factory reset | Request code exists, but UI action is disabled pending model/firmware support verification | ONVIF discovery alone is not sufficient proof |
+| Factory reset | Request builder and loopback protocol test exist; UI action is intentionally disabled | Enable only after exact-model/firmware support, permissions and recovery behavior are hardware-validated |
 
 No physical CP Plus, Prama or Hikvision model/firmware combination is certified by CI. The compatibility matrix must be updated only after testing exact hardware and firmware versions.
 
@@ -57,7 +57,7 @@ A successful ONVIF probe does not prove activation, network configuration or fir
 
 ## Protocol implementation status
 
-ONVIF DHCP enable/disable, DNS configuration and reboot requests are connected to the desktop workflow with response validation, read-back checks for DHCP/DNS, confirmation dialogs and adapter-level operation declarations. Static IPv4 verifies the selected interface address and subnet prefix; PR #28 adds explicit DHCP-disabled and gateway read-back verification, pending CI. These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
+ONVIF DHCP enable/disable, DNS configuration and reboot requests are connected to the desktop workflow with response validation, read-back checks for DHCP/DNS, confirmation dialogs and adapter-level operation declarations. Static IPv4 verifies the selected interface address, subnet prefix and DHCP-disabled state; a configured gateway is verified by a second GetNetworkInterfaces read-back (PR #28 merged and CI-passing). These are protocol-level implementations, not model-level certification. A camera can reject an operation because of firmware, account permissions or incomplete ONVIF support. No CP Plus or Prama physical camera has been hardware-tested by CI. DHCP address changes and reboot may require rediscovery. Date/time and user-management operations remain unimplemented.
 
 
 ## Operation-level compatibility reporting

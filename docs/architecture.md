@@ -67,7 +67,7 @@ Discovery is local-link IPv4 only; multicast and limited broadcast do not cross 
 - A successful new-address check followed by a failed gateway stage is reported as a partial outcome with recovery guidance; automatic rollback is not guaranteed.
 - Batch operations require stable device identity, duplicate detection, explicit target results and preflight before execution.
 - Firmware candidate checks are not signature verification. Firmware flashing remains unavailable.
-- No undocumented vendor commands are guessed. Preview, reboot, activation/password, bulk image/IR and NVR operations remain unavailable unless a verified adapter implements them.
+- No undocumented vendor commands are guessed. ONVIF reboot is implemented with response validation; activation/password changes, firmware updates, stream preview/snapshot, imaging/PTZ, event management and NVR operations remain unavailable unless a verified adapter implements them. Factory reset request code is present but the UI control remains disabled pending hardware validation.
 
 ## Reliability and security
 

@@ -42,7 +42,7 @@ Use discovery first. Subnet scanning can take longer and a TCP response does not
 
 ## 4. Lower device workspace
 
-The top workspace navigation has three tabs: **Device Info**, **Configuration** and **Operation Operation History**. Selecting a tab updates the right-hand inspector while keeping the camera inventory visible. Configure is further divided into **Device**, **Network** and **Storage**, so camera access/maintenance, IP provisioning and local inventory recovery do not compete in one long panel.
+The top workspace navigation has three tabs: **Device Info**, **Configuration** and **Operation History**. Selecting a tab updates the right-hand inspector while keeping the camera inventory visible. Configure is further divided into **Device**, **Network** and **Storage**, so camera access/maintenance, IP provisioning and local inventory recovery do not compete in one long panel.
 
 ### Device details
 
@@ -54,7 +54,7 @@ Select a row in the inventory to see the device-reported profile, identity, disc
 |---|---|
 | **Refresh device info** | Queries the selected device's reachable ONVIF device service for information such as manufacturer, model, firmware, serial number, capabilities and network interfaces. Select a device first. A compatible endpoint and any required authentication are necessary. |
 | **Open web interface** | Opens the selected device's HTTP web page in the computer's default browser. The camera may use HTTPS or a non-standard port; availability depends on the device. |
-| **Factory reset camera** | Sends ONVIF SetSystemFactoryDefault only when a verified ONVIF service is available and the camera authorizes it. **Soft** restores user-configuration defaults; **Hard** requests factory defaults. This can erase settings/users, reboot the camera or change its IP. Use only when you have physical/network recovery access. |
+| **Factory reset camera** | The control is present but intentionally disabled in the UI until support is verified on exact camera models/firmware. The request builder and loopback protocol test exist; do not enable it based on ONVIF discovery alone. |
 | **Preview IP configuration** | Validates a proposed IPv4 address, subnet mask, optional gateway and DNS locally. It sends no network request and does not change the camera. This is the recommended first step before an IP change. |
 | **Apply static IPv4 (ONVIF)** | Sends an ONVIF static IPv4 configuration request for the selected camera. Requires refreshed ONVIF interface details and permissions. It validates values and checks known local/inventory reservations, then asks for confirmation. The camera can disconnect immediately. There is no automatic rollback; DNS is not changed by this single-device action. |
 | **Configure checked cameras** | Sequential bulk static-IPv4 configuration. Check at least two cameras in the first inventory column (or select at least two rows), refresh every camera first, enter a unique new address/mask/gateway for each, review the list and confirm. Each camera is changed and verified one at a time. A partial failure can leave earlier cameras changed; no guaranteed rollback exists. |
@@ -105,4 +105,4 @@ Before factory reset:
 
 ## 7. Not available in this release
 
-The following are not currently exposed as working camera operations: camera activation, DHCP toggle, DNS configuration, firmware upload/update/recovery, vendor-specific reboot, CP Plus/Hikvision/Prama proprietary adapters, SNMP/LLDP/mDNS discovery and routed/VLAN topology discovery. Do not interpret a panel label or device-reported field as proof that the related write operation exists.
+The following are not implemented as working operations: camera activation, firmware upload/update/recovery, password changes, RTSP preview/snapshot, imaging/PTZ controls, event management, NVR channel management, proprietary CP PLUS/Hikvision/Prama adapters, SNMP/LLDP/mDNS discovery and routed/VLAN topology discovery. Factory reset is intentionally disabled in the UI pending exact-model/firmware hardware validation. DHCP enable, DNS configuration, reboot and static IPv4 are implemented through ONVIF but remain dependent on camera support, account permissions and read-back verification. Do not interpret a panel label or device-reported field as proof that a related write operation is supported by a particular camera.

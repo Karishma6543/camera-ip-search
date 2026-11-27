@@ -11,7 +11,7 @@ This is a review aid, not a security certification. Complete it against the exac
 - Device identity merging avoids merging conflicting MAC addresses.
 - Network writes require a matching ONVIF interface token and adapter-declared implemented operations.
 - No default camera credentials or credential guessing are included.
-- Application logs rotate at 2 MiB with three archives and redact common key/value, Bearer, URL user-info and XML secret patterns.
+- Application logs are size-bounded at approximately 5 MiB with one rotated archive (`diagnostics.log.1`) and redact common key/value, Bearer, URL user-info and XML secret patterns.
 - Diagnostic export requires an explicit user confirmation and excludes the inventory database and ONVIF interface tokens.
 - SQLite integrity is checked before schema changes; an invalid database is left untouched.
 
@@ -35,7 +35,8 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
 - [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard (execution still awaits a functioning CI runner).
 - [ ] Verify that cancellation and shutdown abort pending sockets/replies and do not leave worker threads running.
-- [ ] Add service-level static IPv4 read-back tests for wrong prefix/gateway, stale address, changed-IP reconnect and post-write transport loss; DHCP/DNS mismatch loopback tests and parser-level static mismatch tests are included in PR #28 pending CI.
+- [x] Add parser-level static IPv4 mismatch tests and service-level DHCP/DNS read-back mismatch loopback tests (PR #28 merged; CI passed on the PR head).
+- [ ] Add full static-IP service-level tests for changed-IP reconnect, stale address, gateway mismatch/partial failure and post-write transport loss.
 
 ## Credential-vault policy
 

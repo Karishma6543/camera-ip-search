@@ -51,6 +51,6 @@ Keep physical-camera validation separate from CI. Record exact model, hardware r
 
 ## Current scope and release boundaries
 
-The application currently includes ONVIF and project-firmware discovery, bounded local subnet candidate scanning, device-information enrichment, a SQLite inventory, reachability checks, operation history, diagnostics export and a guarded ONVIF static-IPv4 workflow.
+The application currently includes ONVIF WS-Discovery, SSDP/UPnP and project Contract B discovery, bounded local subnet candidate scanning, ONVIF device/service/network/DNS enrichment, a SQLite inventory with backup/restore, reachability checks, operation history, diagnostics export, guarded static IPv4 (including address/prefix/DHCP/gateway read-back), DHCP enable, DNS configuration and reboot requests. Bulk static IPv4 is sequential and per-device verified.
 
-Vendor-specific provisioning, activation/password workflows, reboot, firmware flashing, preview/snapshot, bulk image/IR settings and NVR channel management remain unavailable until the exact protocol/SDK, authorization, compatibility and recovery behavior are verified.
+Camera activation, password changes, firmware flashing, RTSP preview/snapshot, imaging/PTZ, event management, NVR channel management and vendor-specific proprietary adapters remain unavailable. Factory-reset request code exists but its UI action is disabled pending exact-model/firmware hardware validation.
