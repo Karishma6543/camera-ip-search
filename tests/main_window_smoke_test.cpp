@@ -286,6 +286,9 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
 void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
 {
     QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+
     MainWindow window;
     auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
     auto *exportButton = window.findChild<QPushButton *>(QStringLiteral("exportCsvButton"));
