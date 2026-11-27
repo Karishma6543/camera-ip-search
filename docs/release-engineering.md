@@ -34,3 +34,6 @@ The inventory and application settings must survive supported upgrades. Uninstal
 ## Release channels
 
 Use separate development/preview and stable release channels. A release is eligible for stable only when all P0 gates in [production-readiness.md](production-readiness.md) are evidenced for the exact release commit. CI green alone is not a production approval.
+## Artifact integrity files
+
+The desktop artifact workflow verifies that the expected installed executable exists and that each archive is non-empty. It publishes a SHA-256 sidecar next to each ZIP/tarball (for example, `.sha256`). Consumers should verify the checksum after download before extracting the artifact. A checksum detects accidental corruption or a mismatched download; it does not authenticate the publisher and is not a substitute for code signing or macOS notarization.
