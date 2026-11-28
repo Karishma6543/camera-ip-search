@@ -28,7 +28,7 @@ The device list is split into two independent workspaces:
 - **Live Scan Results** starts empty every time the application opens. SQLite history is never loaded into this table.
 - Starting **Discover cameras** clears the previous live set before ONVIF/Oxita/SSDP discovery begins. Only responses from the active run populate the live table. A later scan replaces that set, so a device that does not answer again disappears from the live view.
 - Starting **Scan subnet** also replaces the live set. Its TCP-only results are marked as unverified candidates and are not promoted to confirmed cameras merely because a port is open.
-- **Saved Inventory** contains persistent historical records, including devices from earlier scans and manual entries. They are labelled **Stale — historical** and are never evidence that a device is currently online.
+- **Saved Inventory** contains persistent historical records, including devices from earlier scans and manual entries. Previously observed devices are labelled **Stale — historical**; manual entries show **Not verified** until a scan observes them. Neither state is proof of current reachability.
 - Saved records can be deleted individually or cleared entirely. The retention control supports Keep forever, 30 days, 90 days or 1 year; applying a finite policy asks for confirmation and deletes records whose last-seen timestamp is older than the selected period.
 - Discovery observations continue to update the corresponding saved record. Deleting or pruning a saved record does not remove a device from a live scan currently in progress.
 
