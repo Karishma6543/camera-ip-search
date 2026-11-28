@@ -1,4 +1,5 @@
 #include "camera_browser_dialog.h"
+#include "camera_browser_policy.h"
 
 #include <QAuthenticator>
 #include <QDialogButtonBox>
@@ -28,14 +29,8 @@ public:
     void interceptRequest(QWebEngineUrlRequestInfo &info) override
     {
         const QUrl url = info.requestUrl();
-        const QString scheme = url.scheme().toLower();
-        if (scheme == QStringLiteral("data") || scheme == QStringLiteral("blob") ||
-            scheme == QStringLiteral("about"))
-            return;
-        const bool webSocket = scheme == QStringLiteral("ws") || scheme == QStringLiteral("wss");
-        const bool webRequest = scheme == QStringLiteral("http") || scheme == QStringLiteral("https");
-        const bool sameHost = url.host().compare(allowedHost_, Qt::CaseInsensitive) == 0;
-        if ((!webRequest && !webSocket) || !sameHost) info.block(true);
+        if (!CameraBrowserPolicy::allowsResourceRequest(url, allowedHost_))
+            info.block(true);
     }
 
 private:
@@ -57,10 +52,8 @@ protected:
     {
         Q_UNUSED(type);
         if (!isMainFrame) return true;
-        const bool safeScheme = url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) == 0 ||
-                                url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0;
-        const bool sameHost = url.host().compare(allowedHost_, Qt::CaseInsensitive) == 0;
-        if (safeScheme && sameHost) return true;
+        if (CameraBrowserPolicy::allowsMainFrameNavigation(url, allowedHost_))
+            return true;
         emit externalNavigationBlocked(url);
         return false;
     }
