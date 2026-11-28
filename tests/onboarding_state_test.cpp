@@ -13,6 +13,10 @@ private slots:
     void prioritizesAuthenticationAfterActivationCheck();
     void requiresVerifiedNetworkConfigurationForReady();
     void reportsReadyOnlyAfterVerification();
+    void reportsInitializationInProgress();
+    void reportsInitializedBeforeNetworkVerification();
+    void reportsConfigurationRequiredAndConfiguring();
+    void reportsFailureWithoutClaimingReady();
 };
 
 void OnboardingStateTest::doesNotInferActivationFromDiscovery()
@@ -93,6 +97,61 @@ void OnboardingStateTest::reportsReadyOnlyAfterVerification()
     evidence.supportedAdapterAvailable = true;
     evidence.networkConfigurationVerified = true;
     QCOMPARE(OnboardingState::evaluate(evidence).state, OnboardingState::State::Ready);
+}
+
+void OnboardingStateTest::reportsInitializationInProgress()
+{
+    OnboardingEvidence evidence;
+    evidence.observedOnNetwork = true;
+    evidence.networkReachable = true;
+    evidence.identityVerified = true;
+    evidence.activationInProgress = true;
+    evidence.supportedAdapterAvailable = true;
+    QCOMPARE(OnboardingState::evaluate(evidence).state,
+             OnboardingState::State::InitializationInProgress);
+}
+
+void OnboardingStateTest::reportsInitializedBeforeNetworkVerification()
+{
+    OnboardingEvidence evidence;
+    evidence.observedOnNetwork = true;
+    evidence.networkReachable = true;
+    evidence.identityVerified = true;
+    evidence.activationStatusKnown = true;
+    evidence.activationVerified = true;
+    evidence.supportedAdapterAvailable = true;
+    QCOMPARE(OnboardingState::evaluate(evidence).state, OnboardingState::State::Initialized);
+}
+
+void OnboardingStateTest::reportsConfigurationRequiredAndConfiguring()
+{
+    OnboardingEvidence evidence;
+    evidence.observedOnNetwork = true;
+    evidence.networkReachable = true;
+    evidence.identityVerified = true;
+    evidence.activationStatusKnown = true;
+    evidence.activationVerified = true;
+    evidence.supportedAdapterAvailable = true;
+    evidence.configurationRequired = true;
+    QCOMPARE(OnboardingState::evaluate(evidence).state,
+             OnboardingState::State::ConfigurationRequired);
+
+    evidence.configurationInProgress = true;
+    QCOMPARE(OnboardingState::evaluate(evidence).state, OnboardingState::State::Configuring);
+}
+
+void OnboardingStateTest::reportsFailureWithoutClaimingReady()
+{
+    OnboardingEvidence evidence;
+    evidence.observedOnNetwork = true;
+    evidence.networkReachable = true;
+    evidence.identityVerified = true;
+    evidence.activationStatusKnown = true;
+    evidence.activationVerified = true;
+    evidence.networkConfigurationVerified = true;
+    evidence.supportedAdapterAvailable = true;
+    evidence.operationFailed = true;
+    QCOMPARE(OnboardingState::evaluate(evidence).state, OnboardingState::State::Failed);
 }
 
 QTEST_APPLESS_MAIN(OnboardingStateTest)
