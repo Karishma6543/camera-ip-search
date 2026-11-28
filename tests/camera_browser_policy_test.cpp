@@ -30,6 +30,9 @@ void CameraBrowserPolicyTest::rejectsCrossHostAndUnsafeNavigation()
         QUrl(QStringLiteral("javascript:alert(1)")), QStringLiteral("192.168.1.20")));
     QVERIFY(!CameraBrowserPolicy::allowsMainFrameNavigation(
         QUrl(QStringLiteral("http://admin:secret@192.168.1.20/")), QStringLiteral("192.168.1.20")));
+    QUrl invalidPort(QStringLiteral("http://192.168.1.20/"));
+    invalidPort.setPort(70000);
+    QVERIFY(!CameraBrowserPolicy::allowsMainFrameNavigation(invalidPort, QStringLiteral("192.168.1.20")));
 }
 
 void CameraBrowserPolicyTest::allowsSameHostResourcesAndWebSockets()
