@@ -15,7 +15,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Require protocol evidence before promoting a TCP-only candidate.
 - [x] Add conservative device-type classification and confidence labels for Camera, NVR, Router, Switch, Printer, Computer and Unknown.
 - [x] Add combined device-type, manufacturer/discovery-source, reachability/activation and text filters; expose classification in the inventory.
-- [ ] Separate application coordinator and normalized observation/error models.
+- [x] Add an evidence-based camera onboarding state evaluator with explicit unsupported/authentication/verification states and regression tests.\n- [ ] Separate application coordinator and normalized observation/error models.
 - [ ] Move all persistence out of the UI layer into a testable repository.
 - [x] Add rotating application logs with best-effort secret redaction and regression tests.
 - [x] Add user-confirmed diagnostic export with OS/application/interface details, recent operation history and recent logs.
@@ -118,3 +118,4 @@ Do not mark a whole brand as supported based on one model.
 - [x] Add end-to-end changed-IP reconnect, stale-address read-back mismatch and gateway-failure partial-outcome fixtures (this PR). Remaining: transport-loss/reboot-required and wrong-prefix/gateway-read-back edge cases.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.
+\n\n## Milestone 8 — New-camera Ethernet onboarding\n\nSee [new-camera Ethernet initialization plan](new-camera-ethernet-initialization-plan.md) for the complete work breakdown and acceptance criteria. The first implementation slice adds a typed, evidence-based onboarding state evaluator. It deliberately does not infer factory activation from vendor name, reachability, open ports or missing credentials.\n
