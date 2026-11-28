@@ -45,6 +45,7 @@ private slots:
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
     void initializeActionUsesEmbeddedCameraSetupWorkflow();
+    void networkInterfaceHotplugMonitorIsEnabled();
     void initializeActionUsesEmbeddedCameraSetupWorkflow();
     void manualEntriesAreSavedOutsideLiveResults();
     void exportsInventoryAsUtf8CsvWithEscapedFields();
@@ -89,6 +90,17 @@ void MainWindowSmokeTest::initializeActionUsesEmbeddedCameraSetupWorkflow()
     QVERIFY(initialize->text().contains(QStringLiteral("Initialize"), Qt::CaseInsensitive));
     QVERIFY(initialize->toolTip().contains(QStringLiteral("inside Oxita"), Qt::CaseInsensitive));
     QVERIFY(!initialize->isEnabled());
+}
+
+void MainWindowSmokeTest::networkInterfaceHotplugMonitorIsEnabled()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *monitor = window.findChild<QTimer *>(
+        QStringLiteral("interfaceRefreshTimer"));
+    QVERIFY(monitor);
+    QCOMPARE(monitor->interval(), 3000);
+    QVERIFY(monitor->isActive());
 }
 
 void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
