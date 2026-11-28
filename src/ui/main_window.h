@@ -95,4 +95,5 @@ private:
     DeviceRecord pendingCameraVerification_;
     bool pendingCameraVerificationActive_{false};
     bool pendingCameraIdentityMatched_{false};
+    quint64 pendingCameraVerificationGeneration_{0};
 };
