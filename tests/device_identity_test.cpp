@@ -11,6 +11,8 @@ private slots:
     void doesNotMergeDifferentMacsAtSameAddress();
     void doesNotMergeDifferentMacsWithSameEndpointOrSerial();
     void matchesStableOnvifEndpoint();
+    void strongIdentityMatchesAfterAddressChange();
+    void strongIdentityRejectsIpOnlyAndConflictingMacs();
     void preservesVerifiedFieldsAndCombinesSourcesAndPorts();
     void refreshesOnvifNetworkStateAfterAddressChange();
     void revokesStaleOnvifInterfaceToken();
@@ -114,6 +116,52 @@ void DeviceIdentityTest::matchesStableOnvifEndpoint()
     current.ipAddress = QStringLiteral("192.168.1.50");
     current.onvifEndpoint = previous.onvifEndpoint;
     QCOMPARE(DeviceIdentity::findMatchingKey(inventory, current), previous.ipAddress);
+}
+
+void DeviceIdentityTest::strongIdentityMatchesAfterAddressChange()
+{
+    DeviceRecord expected;
+    expected.ipAddress = QStringLiteral("192.168.1.20");
+    expected.macAddress = QStringLiteral("00:11:22:33:44:55");
+    DeviceRecord observed;
+    observed.ipAddress = QStringLiteral("192.168.1.45");
+    observed.macAddress = expected.macAddress;
+    QVERIFY(DeviceIdentity::hasStrongMatch(expected, observed));
+
+    expected.macAddress.clear();
+    expected.serialNumber = QStringLiteral("SERIAL-123");
+    expected.manufacturer = QStringLiteral("Example");
+    observed.macAddress.clear();
+    observed.serialNumber = expected.serialNumber;
+    observed.manufacturer = expected.manufacturer;
+    QVERIFY(DeviceIdentity::hasStrongMatch(expected, observed));
+
+    expected.serialNumber.clear();
+    expected.manufacturer.clear();
+    expected.onvifEndpoint = QStringLiteral("urn:uuid:camera-identity");
+    observed.serialNumber.clear();
+    observed.manufacturer.clear();
+    observed.onvifEndpoint = expected.onvifEndpoint;
+    QVERIFY(DeviceIdentity::hasStrongMatch(expected, observed));
+}
+
+void DeviceIdentityTest::strongIdentityRejectsIpOnlyAndConflictingMacs()
+{
+    DeviceRecord expected;
+    expected.ipAddress = QStringLiteral("192.168.1.20");
+    DeviceRecord observed;
+    observed.ipAddress = expected.ipAddress;
+    QVERIFY(!DeviceIdentity::hasStrongMatch(expected, observed));
+
+    expected.macAddress = QStringLiteral("00:11:22:33:44:55");
+    expected.serialNumber = QStringLiteral("SERIAL-123");
+    expected.manufacturer = QStringLiteral("Example");
+    expected.onvifEndpoint = QStringLiteral("urn:uuid:camera-identity");
+    observed.macAddress = QStringLiteral("00:11:22:33:44:66");
+    observed.serialNumber = expected.serialNumber;
+    observed.manufacturer = expected.manufacturer;
+    observed.onvifEndpoint = expected.onvifEndpoint;
+    QVERIFY(!DeviceIdentity::hasStrongMatch(expected, observed));
 }
 
 void DeviceIdentityTest::preservesVerifiedFieldsAndCombinesSourcesAndPorts()
