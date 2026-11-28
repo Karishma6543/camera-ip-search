@@ -1022,6 +1022,8 @@ void MainWindow::buildUi()
                "<b>Scan selected subnet</b><br>Checks candidate addresses on the selected IPv4 interface. "
                "A TCP response is reachability evidence, not proof of ONVIF compatibility or camera identity.<br><br>"
                "<b>Device information</b><br>Select a device and use Refresh device info to query its reachable ONVIF device service. "
+                "<b>Initialize / open camera setup</b><br>Opens the selected device web interface inside Oxita. Complete activation on the camera page itself. " 
+                "The Done action starts fresh discovery; it does not by itself prove that activation succeeded. "
                "Reported fields depend on the camera and its firmware.<br><br>"
                "<b>Network configuration</b><br>Static IPv4 changes require a verified ONVIF interface token and current interface details. "
                "Bulk IPv4 mode assigns a different address to each checked camera and processes them sequentially. "
