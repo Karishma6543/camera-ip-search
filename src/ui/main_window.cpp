@@ -1590,13 +1590,28 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         if (rows.isEmpty()) { updateStatus(tr("Select saved devices to delete.")); return; }
         if (QMessageBox::question(this, tr("Delete saved devices"),
                 tr("Permanently delete %1 selected saved record(s)? Live results are not affected.").arg(rows.size())) != QMessageBox::Yes) return;
+        if (!inventoryDb_.transaction()) {
+            updateStatus(tr("Could not start saved-inventory deletion: %1").arg(inventoryDb_.lastError().text()));
+            return;
+        }
         QSqlQuery remove(inventoryDb_);
         remove.prepare(QStringLiteral("DELETE FROM devices WHERE device_key=:key"));
         for (const QModelIndex &index : rows) {
             const auto *item = savedInventoryTable_->item(index.row(), 0);
             if (!item) continue;
             remove.bindValue(QStringLiteral(":key"), item->data(Qt::UserRole).toString());
-            if (!remove.exec()) { updateStatus(tr("Delete failed: %1").arg(remove.lastError().text())); return; }
+            if (!remove.exec()) {
+                const QString error = remove.lastError().text();
+                inventoryDb_.rollback();
+                updateStatus(tr("Delete failed; no selected records were removed: %1").arg(error));
+                return;
+            }
+        }
+        if (!inventoryDb_.commit()) {
+            const QString error = inventoryDb_.lastError().text();
+            inventoryDb_.rollback();
+            updateStatus(tr("Could not commit saved-inventory deletion: %1").arg(error));
+            return;
         }
         refreshSavedInventory();
         recordOperation(tr("Saved inventory deletion"), QString(), tr("Completed"), tr("%1 record(s) deleted").arg(rows.size()));
