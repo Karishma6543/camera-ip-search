@@ -41,6 +41,7 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Keep the live scan result set session-only and empty on application startup; never hydrate it from persisted inventory.
 - [x] Separate Saved Inventory from Live Scan Results; discovery and subnet scans replace only the live set.
 - [x] Add explicit saved-record deletion and user-confirmed retention policies (forever, 30, 90 or 365 days).
+- [x] Add startup/live-history isolation, saved-inventory migration and age-retention smoke coverage.
 - [ ] Add repeated-scan, missing-device, cancellation-race and large-inventory acceptance tests.
 - [x] ONVIF GetDeviceInformation request/response handling.
 - [x] ONVIF GetCapabilities, GetNetworkInterfaces and GetDNS request/response handling.
@@ -48,7 +49,8 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [x] Validate advertised ONVIF endpoints against the responding host and reject embedded credentials/query strings.
 - [x] Bind project discovery addresses to the UDP source except for explicitly unconfigured 0.0.0.0 responses.
 - [x] Local SQLite inventory, manual device entry, labels and CSV export.
-- [ ] Add schema-versioned migrations and database recovery tests.
+- [x] Add schema-versioned SQLite migrations (including creation timestamps for unobserved manual records).
+- [ ] Expand database corruption, interrupted-migration, disk-full and recovery tests.
 - [x] Run SQLite quick_check before inventory schema changes; corrupted databases are left untouched and reported.
 - [ ] Expand UI tests for device selection, filters, import/export, persistence and empty/error states.
 - [x] Add a desktop startup smoke test for the Operation History workspace.
