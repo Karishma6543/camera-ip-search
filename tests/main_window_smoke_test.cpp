@@ -45,6 +45,7 @@ private slots:
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
     void initializeActionUsesEmbeddedCameraSetupWorkflow();
+    void initializeActionUsesEmbeddedCameraSetupWorkflow();
     void manualEntriesAreSavedOutsideLiveResults();
     void exportsInventoryAsUtf8CsvWithEscapedFields();
     void savedInventoryIsIsolatedAndRetentionWorks();
@@ -65,6 +66,18 @@ private slots:
     void shutdownAbortsActiveOnvifEnrichment();
     void sendsAndVerifiesOnvifFactoryResetRequest();
 };
+
+void MainWindowSmokeTest::initializeActionUsesEmbeddedCameraSetupWorkflow()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *initialize = window.findChild<QPushButton *>(
+        QStringLiteral("initializeCameraButton"));
+    QVERIFY2(initialize, "A dedicated Initialize action must be available in the device workspace.");
+    QVERIFY(initialize->text().contains(QStringLiteral("Initialize"), Qt::CaseInsensitive));
+    QVERIFY(initialize->toolTip().contains(QStringLiteral("inside Oxita"), Qt::CaseInsensitive));
+    QVERIFY(!initialize->isEnabled());
+}
 
 void MainWindowSmokeTest::initializeActionUsesEmbeddedCameraSetupWorkflow()
 {
