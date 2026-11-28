@@ -2960,9 +2960,8 @@ QUrl MainWindow::selectedCameraWebUrl() const
         (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")))
         return {};
 
-    const QString portsText = item->data(Qt::UserRole + 6).toString();
-    const QSet<QString> openPorts(portsText.split(QStringLiteral(", "), Qt::SkipEmptyParts).cbegin(),
-                                  portsText.split(QStringLiteral(", "), Qt::SkipEmptyParts).cend());
+    const QStringList openPorts = item->data(Qt::UserRole + 6).toString()
+        .split(QStringLiteral(", "), Qt::SkipEmptyParts);
     if (!host.startsWith(QStringLiteral("http"), Qt::CaseInsensitive)) {
         if (openPorts.contains(QStringLiteral("443"))) {
             url.setScheme(QStringLiteral("https"));
