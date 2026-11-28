@@ -159,6 +159,16 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     view_->setUrl(cameraUrl);
 }
 
+CameraBrowserDialog::~CameraBrowserDialog()
+{
+    // The page references its profile. Destroy the view/page first, then the
+    // profile, rather than relying on QObject child destruction order.
+    delete view_;
+    view_ = nullptr;
+    delete profile_;
+    profile_ = nullptr;
+}
+
 QUrl CameraBrowserDialog::currentUrl() const
 {
     return view_ ? view_->url() : QUrl();
