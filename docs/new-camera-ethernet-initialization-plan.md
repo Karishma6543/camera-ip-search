@@ -35,7 +35,7 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 ## Workstream A — Ethernet and interface readiness
 
 - [x] Detect adapter link/address changes with a non-blocking 3-second Qt interface inventory refresh. OS event-driven notifications remain a future optimization.
-- [ ] Show interface name, adapter description, link state, IPv4/IPv6 addresses, prefix, gateway, DHCP state and metric. Current selected-interface summary shows name, hardware address, link state, IPv4/prefix and broadcast; gateway, DHCP and route metric remain pending.
+- [ ] Show interface name, adapter description, link state, IPv4/IPv6 addresses, prefix, gateway, DHCP state and metric. Current selected-interface summary shows name, hardware address, link state, IPv4/prefix, IPv6/prefix and broadcast; gateway, DHCP and route metric remain pending.
 - [ ] Distinguish physical Ethernet from Wi-Fi, VPN, loopback, virtual adapters and disconnected interfaces.
 - [ ] Detect when a newly connected camera causes a new neighbor/ARP observation or subnet change.
 - [x] Refresh interface inventory on link/address changes via polling; manual refresh remains available through the existing interface refresh workflow.
