@@ -173,10 +173,15 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
         updateAddress(url);
         schemeButton->setText(url.scheme() == QStringLiteral("https") ? tr("Try HTTP") : tr("Try HTTPS"));
     });
+    connect(view_, &QWebEngineView::loadStarted, this, [this] {
+        certificateRejected_ = false;
+        navigationBlocked_ = false;
+    });
     connect(view_, &QWebEngineView::loadProgress, this, [this](int progress) {
         statusLabel_->setText(tr("Loading camera page… %1%").arg(progress));
     });
     connect(view_, &QWebEngineView::loadFinished, this, [this](bool ok) {
+        if (!ok && (certificateRejected_ || navigationBlocked_)) return;
         statusLabel_->setText(ok
             ? tr("Camera page loaded. Complete the camera's own setup, then choose “Done — verify camera”.")
             : tr("The camera page could not be loaded. Check cable/power, address, authentication and try HTTP/HTTPS. Some legacy cameras require ActiveX/NPAPI or Internet Explorer components that this modern embedded browser cannot run; use a documented vendor setup method for those models."));
@@ -191,12 +196,14 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
             [this](const QWebEngineCertificateError &error) {
         QWebEngineCertificateError rejected = error;
         rejected.rejectCertificate();
+        certificateRejected_ = true;
         statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
                                   .arg(error.description()));
     });
 #else
     connect(page, &CameraBrowserInternal::CameraWebPage::certificateRejected, this,
             [this](const QString &description) {
+        certificateRejected_ = true;
         statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
                                   .arg(description));
     });
