@@ -178,7 +178,8 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
         navigationBlocked_ = false;
     });
     connect(view_, &QWebEngineView::loadProgress, this, [this](int progress) {
-        statusLabel_->setText(tr("Loading camera page… %1%").arg(progress));
+        if (!certificateRejected_ && !navigationBlocked_)
+            statusLabel_->setText(tr("Loading camera page… %1%").arg(progress));
     });
     connect(view_, &QWebEngineView::loadFinished, this, [this](bool ok) {
         if (!ok && (certificateRejected_ || navigationBlocked_)) return;
@@ -186,7 +187,8 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
             ? tr("Camera page loaded. Complete the camera's own setup, then choose “Done — verify camera”.")
             : tr("The camera page could not be loaded. Check cable/power, address, authentication and try HTTP/HTTPS. Some legacy cameras require ActiveX/NPAPI or Internet Explorer components that this modern embedded browser cannot run; use a documented vendor setup method for those models."));
     });
-    connect(page, &CameraWebPage::externalNavigationBlocked, this, [this](const QUrl &url) {
+    connect(page, &CameraBrowserInternal::CameraWebPage::externalNavigationBlocked, this, [this](const QUrl &url) {
+        navigationBlocked_ = true;
         statusLabel_->setText(tr("Blocked navigation away from the selected camera: %1").arg(url.toString()));
     });
     connect(page, &QWebEnginePage::authenticationRequired,
