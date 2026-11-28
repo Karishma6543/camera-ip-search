@@ -487,7 +487,7 @@ void MainWindowSmokeTest::migratesLegacyInventorySchema()
     QSqlQuery version(database);
     QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
     QVERIFY(version.next());
-    QCOMPARE(version.value(0).toInt(), 1);
+    QCOMPARE(version.value(0).toInt(), 2);
 
     QSqlQuery columns(database);
     QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(devices)")));
