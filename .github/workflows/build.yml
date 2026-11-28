@@ -33,7 +33,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
-          modules: 'qtwebengine'
+          modules: 'qtwebengine qtwebchannel'
           cache: true
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -60,7 +60,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
-          modules: 'qtwebengine'
+          modules: 'qtwebengine qtwebchannel'
           cache: true
       - name: Configure with AddressSanitizer and UndefinedBehaviorSanitizer
         run: >-
