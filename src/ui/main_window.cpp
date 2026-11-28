@@ -2306,14 +2306,21 @@ void MainWindow::updateLocalNetworkSummary()
         interface.hardwareAddress().isEmpty() ? tr("Not reported") : interface.hardwareAddress());
     details << tr("MTU: %1").arg(tr("Not reported"));
     bool foundIpv4 = false;
+    QStringList ipv6Addresses;
     for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
-        if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol || entry.ip().isLoopback()) continue;
-        foundIpv4 = true;
-        details << tr("IPv4 address: %1").arg(entry.ip().toString());
-        details << tr("Subnet prefix: /%1").arg(entry.prefixLength());
-        if (!entry.broadcast().isNull())
-            details << tr("Broadcast: %1").arg(entry.broadcast().toString());
+        if (entry.ip().isLoopback()) continue;
+        if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+            foundIpv4 = true;
+            details << tr("IPv4 address: %1").arg(entry.ip().toString());
+            details << tr("Subnet prefix: /%1").arg(entry.prefixLength());
+            if (!entry.broadcast().isNull())
+                details << tr("Broadcast: %1").arg(entry.broadcast().toString());
+        } else if (entry.ip().protocol() == QAbstractSocket::IPv6Protocol) {
+            ipv6Addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
+        }
     }
+    if (!ipv6Addresses.isEmpty())
+        details << tr("IPv6 addresses: %1").arg(ipv6Addresses.join(QStringLiteral(", ")));
     const auto interfaceFlags = interface.flags();
     const QString linkState = !interfaceFlags.testFlag(QNetworkInterface::IsUp)
         ? tr("Disabled")
