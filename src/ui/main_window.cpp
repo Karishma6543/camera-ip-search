@@ -2314,12 +2314,19 @@ void MainWindow::updateLocalNetworkSummary()
         if (!entry.broadcast().isNull())
             details << tr("Broadcast: %1").arg(entry.broadcast().toString());
     }
-    if (!foundIpv4) details << tr("IPv4 address: Not available");
     const auto interfaceFlags = interface.flags();
     const QString linkState = !interfaceFlags.testFlag(QNetworkInterface::IsUp)
         ? tr("Disabled")
         : (interfaceFlags.testFlag(QNetworkInterface::IsRunning) ? tr("Up") : tr("Link down"));
     details << tr("Link state: %1").arg(linkState);
+    if (!foundIpv4) {
+        details << tr("IPv4 address: Not available");
+        if (!interfaceFlags.testFlag(QNetworkInterface::IsRunning)) {
+            details << tr("Check the Ethernet cable, camera power/PoE and selected PC adapter.");
+        } else {
+            details << tr("Wait for DHCP or automatic link-local addressing. If the camera uses a factory static IP, consult its exact model manual and set a temporary PC adapter address in the same subnet yourself. Oxita will not change PC network settings silently.");
+        }
+    }
     localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
 }
 
