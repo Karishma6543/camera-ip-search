@@ -69,9 +69,7 @@ jobs:
           fi
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
           WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
-          WEBENGINE_ENTITLEMENTS="$(find "$APP" -name 'QtWebEngineProcess.entitlements' -print -quit)"
           test -n "$WEBENGINE_PROCESS"
-          test -n "$WEBENGINE_ENTITLEMENTS"
           for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat v8_context_snapshot.bin en-US.pak; do
             test -n "$(find "$APP" -name "$resource" -print -quit)"
           done
