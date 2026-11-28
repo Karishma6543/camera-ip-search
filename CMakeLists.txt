@@ -11,7 +11,7 @@ set(CMAKE_AUTORCC ON)
 
 include(CTest)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent WebEngineWidgets)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 endif()
@@ -35,6 +35,8 @@ set(CAMERA_CORE_SOURCES
     src/app/batch_operation_runner.h
     src/app/batch_operation_runner.cpp
     src/core/device_record.h
+    src/core/onboarding_state.h
+    src/core/onboarding_state.cpp
     src/core/device_classifier.h
     src/core/device_classifier.cpp
     src/core/operation_compatibility.h
@@ -78,6 +80,10 @@ set(CAMERA_CORE_SOURCES
     src/discovery/ip_conflict_probe.cpp
     src/discovery/ip_assignment_planner.h
     src/discovery/ip_assignment_planner.cpp
+    src/ui/camera_browser_policy.h
+    src/ui/camera_browser_policy.cpp
+    src/ui/camera_browser_dialog.h
+    src/ui/camera_browser_dialog.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
     src/ui/oxita_theme.h
@@ -85,7 +91,7 @@ set(CAMERA_CORE_SOURCES
 
 add_library(camera-core STATIC ${CAMERA_CORE_SOURCES})
 target_include_directories(camera-core PUBLIC src)
-target_link_libraries(camera-core PUBLIC Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent)
+target_link_libraries(camera-core PUBLIC Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent Qt6::WebEngineWidgets)
 
 if(WIN32)
     target_link_libraries(camera-core PUBLIC iphlpapi)
@@ -122,7 +128,9 @@ if(BUILD_TESTING)
     add_camera_test(subnet-scanner-tests tests/subnet_scanner_test.cpp)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
     add_camera_test(device-identity-tests tests/device_identity_test.cpp)
+    add_camera_test(camera-browser-policy-tests tests/camera_browser_policy_test.cpp)
     add_camera_test(device-classifier-tests tests/device_classifier_test.cpp)
+    add_camera_test(onboarding-state-tests tests/onboarding_state_test.cpp)
     add_camera_test(operation-compatibility-tests tests/operation_compatibility_test.cpp)
     add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)

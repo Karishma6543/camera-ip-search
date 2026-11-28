@@ -30,6 +30,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
@@ -45,13 +46,85 @@ jobs:
           if (!(Test-Path $exe -PathType Leaf)) { throw 'Installed application executable is missing' }
           & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations --compiler-runtime --dir (Split-Path $exe) $exe
           if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
+          $webEngineProcess = Get-ChildItem 'package' -Recurse -Filter 'QtWebEngineProcess.exe' | Select-Object -First 1
+          if (!$webEngineProcess) { throw 'QtWebEngineProcess.exe is missing from the Windows package' }
+          foreach ($resource in @('qtwebengine_resources.pak', 'qtwebengine_resources_100p.pak', 'qtwebengine_resources_200p.pak', 'icudtl.dat', 'v8_context_snapshot.bin')) {
+            if (!(Get-ChildItem 'package' -Recurse -Filter $resource | Select-Object -First 1)) {
+              throw "Qt WebEngine resource is missing from the Windows package: $resource"
+            }
+          }
+          $webEngineLocale = Get-ChildItem 'package' -Recurse -Filter 'en-US.pak' | Select-Object -First 1
+          if (!$webEngineLocale) { throw 'Qt WebEngine locale data is missing from the Windows package' }
       - name: Deploy Qt runtime (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
+          set -euo pipefail
           APP="package/camera-ip-search.app"
           test -d "$APP"
           test -x "$APP/Contents/MacOS/camera-ip-search"
-          "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
+
+          # This application uses SQLite only. Keep the SQLite driver available
+          # while avoiding unrelated SQL plugins with unavailable dependencies.
+          if [ -d "$QT_ROOT_DIR/plugins/sqldrivers" ]; then
+            find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name 'libqsqlite.dylib' -delete
+          fi
+
+          "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite -verbose=2
+
+          # macdeployqt deploys frameworks/plugins, but Qt WebEngine's Chromium
+          # runtime assets must also be present in the application bundle.
+          RESOURCES="$APP/Contents/Resources"
+          HELPERS="$APP/Contents/Helpers"
+          mkdir -p "$RESOURCES" "$HELPERS"
+
+          for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat; do
+            source_file="$(find "$QT_ROOT_DIR" -type f -name "$resource" -print -quit)"
+            if [ -z "$source_file" ]; then
+              echo "::error::Qt installation does not contain required WebEngine resource: $resource"
+              find "$QT_ROOT_DIR" -type f -name 'qtwebengine_resources*.pak' -o -name 'icudtl.dat' | head -80
+              exit 1
+            fi
+            cp -f "$source_file" "$RESOURCES/$resource"
+          done
+
+          snapshot="$(find "$QT_ROOT_DIR" -type f -name 'v8_context_snapshot*.bin' ! -name '*.debug.bin' -print -quit)"
+          if [ -z "$snapshot" ]; then
+            echo "::error::Qt installation does not contain a release V8 context snapshot"
+            exit 1
+          fi
+          cp -f "$snapshot" "$RESOURCES/$(basename "$snapshot")"
+
+          locale="$(find "$QT_ROOT_DIR" -type f -path '*/qtwebengine_locales/en-US.pak' -print -quit)"
+          if [ -z "$locale" ]; then
+            locale="$(find "$QT_ROOT_DIR" -type f -name 'en-US.pak' -print -quit)"
+          fi
+          if [ -z "$locale" ]; then
+            echo "::error::Qt installation does not contain Qt WebEngine en-US locale data"
+            exit 1
+          fi
+          cp -f "$locale" "$RESOURCES/en-US.pak"
+
+          # Qt's documented macOS lookup location is APP.app/Contents/Helpers.
+          helper_app="$(find "$QT_ROOT_DIR" -type d -path '*/QtWebEngineProcess.app' -print -quit)"
+          if [ -n "$helper_app" ]; then
+            ditto "$helper_app" "$HELPERS/QtWebEngineProcess.app"
+          else
+            helper_exe="$(find "$QT_ROOT_DIR" -type f -name 'QtWebEngineProcess' -perm -111 -print -quit)"
+            if [ -z "$helper_exe" ]; then
+              echo "::error::Qt installation does not contain QtWebEngineProcess"
+              exit 1
+            fi
+            mkdir -p "$HELPERS/QtWebEngineProcess.app/Contents/MacOS"
+            cp -f "$helper_exe" "$HELPERS/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess"
+          fi
+
+          test -x "$HELPERS/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess"
+          for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat en-US.pak; do
+            test -s "$RESOURCES/$resource"
+          done
+          test -s "$(find "$RESOURCES" -maxdepth 1 -name 'v8_context_snapshot*.bin' -print -quit)"
+
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
           test -s "camera-ip-search-macos.zip"
           shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"

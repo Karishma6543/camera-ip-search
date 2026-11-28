@@ -91,6 +91,20 @@ QString findMatchingKey(const QHash<QString, DeviceRecord> &devices,
     return {};
 }
 
+bool hasStrongMatch(const DeviceRecord &expected, const DeviceRecord &observation)
+{
+    const QString expectedMac = normalizedMac(expected.macAddress);
+    const QString observedMac = normalizedMac(observation.macAddress);
+    if (!expectedMac.isEmpty() && !observedMac.isEmpty() && expectedMac == observedMac)
+        return true;
+    if (conflictingMacs(expected.macAddress, observation.macAddress))
+        return false;
+    if (sameNonEmpty(expected.onvifEndpoint, observation.onvifEndpoint))
+        return true;
+    return sameNonEmpty(expected.serialNumber, observation.serialNumber) &&
+           sameNonEmpty(expected.manufacturer, observation.manufacturer);
+}
+
 DeviceRecord mergeObservations(const DeviceRecord &existing,
                                const DeviceRecord &observation)
 {

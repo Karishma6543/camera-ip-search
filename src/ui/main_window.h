@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/device_record.h"
+#include <QUrl>
 
 #include <QMainWindow>
 #include <QSqlDatabase>
@@ -12,6 +13,7 @@ class QPushButton;
 class QLineEdit;
 class QComboBox;
 class QProgressBar;
+class QTimer;
 class DiscoveryService;
 class SubnetScanner;
 class ReachabilityChecker;
@@ -42,6 +44,7 @@ private:
     void refreshSavedInventory();
     void addManualDevice();
     void openSelectedWebInterface();
+    QUrl selectedCameraWebUrl() const;
     void applyFilters();
     void editSelectedLabel();
     DiscoveryService *discovery_{nullptr};
@@ -87,4 +90,10 @@ private:
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};
     QSqlDatabase inventoryDb_;
+    QTimer *interfaceRefreshTimer_{nullptr};
+    QString interfaceInventoryFingerprint_;
+    DeviceRecord pendingCameraVerification_;
+    bool pendingCameraVerificationActive_{false};
+    bool pendingCameraIdentityMatched_{false};
+    quint64 pendingCameraVerificationGeneration_{0};
 };

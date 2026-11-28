@@ -14,6 +14,10 @@ This is a review aid, not a security certification. Complete it against the exac
 - Application logs are size-bounded at approximately 5 MiB with one rotated archive (`diagnostics.log.1`) and redact common key/value, Bearer, URL user-info and XML secret patterns.
 - Diagnostic export requires an explicit user confirmation and excludes the inventory database and ONVIF interface tokens.
 - SQLite integrity is checked before schema changes; an invalid database is left untouched.
+- The embedded camera browser uses an off-the-record profile, no persistent cookies and no HTTP cache; authentication prompts are session-only.
+- Top-level browser navigation is restricted to HTTP(S) on the selected camera host; pop-up windows are rejected and network subresource/WebSocket requests are restricted to that same host.
+- Invalid HTTPS certificates are never silently accepted. For overridable certificate errors, the embedded browser asks the operator whether to continue once for the selected local camera; the decision is request/session-only and is not persisted. Non-overridable errors remain blocked.
+- Camera pages execute device-supplied HTML/JavaScript. The browser does not inject scripts, automate login or activation, or attempt to bypass device authentication.
 
 ## Release blockers
 
@@ -31,6 +35,8 @@ This is a review aid, not a security certification. Complete it against the exac
 - [ ] Review database file permissions and whether local inventory metadata is sensitive in the deployment environment.
 - [ ] Review support-bundle contents on each OS and ensure users can inspect the file before sharing.
 - [ ] Run dependency/SBOM and license review for the exact release build.
+- [ ] Test embedded-browser same-origin restrictions, authentication cancellation, explicit one-request certificate acceptance/rejection, pop-up blocking and WebEngine sandbox behavior on Windows/macOS/Linux.
+- [ ] Verify Qt WebEngine and Chromium third-party license notices and LGPL/GPL compliance for the intended distribution model.
 - [ ] Run static analysis and compiler sanitizers where supported. An Ubuntu ASan/UBSan CI job now exercises the full CTest suite; cross-platform sanitizer and static-analysis coverage remains outstanding.
 - [ ] Test malformed, oversized, truncated and adversarial network inputs on all supported platforms.
 - [x] Add a local oversized-SOAP regression test for the 1 MiB ONVIF response guard; the complete CTest suite passed on the PR #16 head CI matrix.
