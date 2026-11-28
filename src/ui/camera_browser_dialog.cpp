@@ -18,7 +18,7 @@
 #include <QWebEngineView>
 #include <utility>
 
-namespace {
+namespace CameraBrowserInternal {
 class CameraRequestInterceptor final : public QWebEngineUrlRequestInterceptor
 {
 public:
@@ -117,14 +117,14 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     profile_ = new QWebEngineProfile(this);
     profile_->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
     profile_->setHttpCacheType(QWebEngineProfile::NoCache);
-    profile_->setUrlRequestInterceptor(new CameraRequestInterceptor(allowedHost_, profile_));
+    profile_->setUrlRequestInterceptor(new CameraBrowserInternal::CameraRequestInterceptor(allowedHost_, profile_));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     profile_->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
 #endif
 
     view_ = new QWebEngineView(this);
     view_->setObjectName(QStringLiteral("cameraBrowserView"));
-    auto *page = new CameraWebPage(profile_, allowedHost_, view_);
+    auto *page = new CameraBrowserInternal::CameraWebPage(profile_, allowedHost_, view_);
     view_->setPage(page);
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, false);
