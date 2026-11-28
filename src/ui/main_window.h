@@ -39,6 +39,7 @@ private:
     void initializeInventory();
     void persistDevice(const DeviceRecord &device);
     void loadInventory();
+    void refreshSavedInventory();
     void addManualDevice();
     void openSelectedWebInterface();
     void applyFilters();
@@ -46,6 +47,8 @@ private:
     DiscoveryService *discovery_{nullptr};
     SubnetScanner *subnetScanner_{nullptr};
     QTableWidget *deviceTable_{nullptr};
+    QTableWidget *savedInventoryTable_{nullptr};
+    QLabel *savedInventoryEmptyState_{nullptr};
     QTableWidget *historyTable_{nullptr};
     QLabel *statusLabel_{nullptr};
     QProgressBar *operationProgress_{nullptr};

@@ -21,17 +21,18 @@ A cross-platform Qt 6 desktop utility for discovering IP cameras and other netwo
 
 The desktop client is written in C++/Qt; it is not a Flutter application and does not currently require a hosted backend or cloud service. Discovery and supported camera operations run locally on the user's network. Device inventory and operation history are stored in a local SQLite database.
 
-## Live scan results versus saved data
+## Live scan results versus saved inventory
 
-The application currently has **persistent inventory**, not a fully separate live-only results workspace. It is important to understand the distinction:
+The device list is split into two independent workspaces:
 
-- When the user starts **Discover cameras**, the current device table is cleared before the new ONVIF/Oxita/SSDP discovery run starts. The new results shown during that run come from current discovery responses.
-- Clearing the table does **not** delete saved SQLite inventory or operation history.
-- On application startup, saved inventory is loaded back into the device table and its reachability status is marked **Stale**. A stale row is historical information, not proof that the device is currently online or was found by the latest scan.
-- **Scan subnet** is a separate, opt-in TCP port scan. It adds unverified network candidates; an open port is not proof that the endpoint is a camera.
-- The current UI does not yet provide fully independent **Live Scan Results** and **Saved Inventory / History** workspaces. In particular, startup-loaded stale inventory and current scan results are not yet separated into distinct views. If the product requirement is to show only devices found in the latest scan, that UI/data-flow separation is still development work.
+- **Live Scan Results** starts empty every time the application opens. SQLite history is never loaded into this table.
+- Starting **Discover cameras** clears the previous live set before ONVIF/Oxita/SSDP discovery begins. Only responses from the active run populate the live table. A later scan replaces that set, so a device that does not answer again disappears from the live view.
+- Starting **Scan subnet** also replaces the live set. Its TCP-only results are marked as unverified candidates and are not promoted to confirmed cameras merely because a port is open.
+- **Saved Inventory** contains persistent historical records, including devices from earlier scans and manual entries. Previously observed devices are labelled **Stale — historical**; manual entries show **Not verified** until a scan observes them. Neither state is proof of current reachability.
+- Saved records can be deleted individually or cleared entirely. The retention control supports Keep forever, 30 days, 90 days or 1 year; applying a finite policy asks for confirmation and deletes records whose last-seen timestamp is older than the selected period, or (for never-observed manual entries) whose creation timestamp is older than that period. The SQLite schema tracks creation time separately so unverified manual entries are covered too.
+- Discovery observations continue to update the corresponding saved record. Deleting or pruning a saved record does not remove a device from a live scan currently in progress.
 
-The selected-device details can show a last-seen UTC timestamp. Manual entries do not receive a fabricated last-seen time. Historical inventory and operation history remain stored locally unless the user explicitly uses the supported inventory-management workflow.
+The two workspaces deliberately have different meanings: the live table answers “what did this scan find?”, while Saved Inventory answers “what has this application recorded before?”. Operation History remains a separate audit trail.
 
 ## Implemented in this build
 
@@ -55,8 +56,8 @@ The selected-device details can show a last-seen UTC timestamp. Manual entries d
 ## Quick start and common workflow
 
 1. Start the application and choose **All active IPv4 interfaces** or a specific Ethernet/Wi-Fi adapter.
-2. Select **Discover cameras** for ONVIF WS-Discovery, Oxita Contract B and SSDP/UPnP discovery. Starting this action clears the current device table before collecting the new discovery results.
-3. Optionally select **Scan subnet** to look for hosts that did not answer discovery probes. This is a TCP port scan; results are unverified candidates and may include non-camera devices.
+2. Select **Discover cameras** for ONVIF WS-Discovery, Oxita Contract B and SSDP/UPnP discovery. Starting this action clears the Live Scan Results table before collecting the new results. Previous observations remain in Saved Inventory.
+3. Optionally select **Scan subnet** to look for hosts that did not answer discovery probes. This replaces the live result set with TCP-only unverified candidates and may include non-camera devices.
 4. Select a row to inspect it in the **Device Info** workspace. Use **Configuration** for the supported device/network workflows and **Operation History** for recorded activity.
 5. Use filters/search to narrow the currently displayed inventory, **Rename** to set a local friendly label, and **Export CSV** to save an inventory snapshot.
 6. Use **Check reachability** to test selected/checked devices or the whole displayed inventory.
@@ -93,7 +94,7 @@ ctest --test-dir build --build-config Debug --output-on-failure
 
 The detailed, maintained checklist is [Implementation roadmap](docs/implementation-roadmap.md) and the release gate is [Production readiness](docs/production-readiness.md). The highest-priority open work is:
 
-1. **Separate live and historical data in the UI.** Add distinct Live Scan Results and Saved Inventory/History views. Ensure each new discovery/refresh run creates a new live result set, subnet candidates are clearly distinguished, and stale saved records never appear as current scan results. Define explicit retention/deletion controls for historical records.
+1. **Validate the new live/history separation.** The UI now has independent Live Scan Results and Saved Inventory workspaces, fresh discovery and subnet scans replace the live set, and saved records have deletion and retention controls. Add stress/repeated-scan and UI acceptance coverage before release.
 2. **Complete discovery integration validation.** Add full DiscoveryService tests for interface selection, multiple NICs, multicast/broadcast delivery, duplicate responses, timeouts, cancellation races and enrichment. Validate Windows/macOS/Linux behavior on physical Ethernet and Wi-Fi networks, including VLANs and firewalls.
 3. **Expand UI and scanner acceptance coverage.** Test every workspace, filters, dialogs, CSV export, empty/error states, repeated scans, large inventories, full-subnet/window selection, cancellation and false-positive handling.
 4. **Validate real cameras.** Test exact CP PLUS and Prama models (and additional target vendors) with model, hardware revision, firmware, account role and network topology recorded in the compatibility matrix. Simulator and CI results are not hardware evidence.
@@ -124,7 +125,7 @@ The detailed, maintained checklist is [Implementation roadmap](docs/implementati
 
 - Discovery is local-link IPv4 only; limited broadcast and link-local multicast do not cross routers. The application does not promise discovery across VLANs or routed subnets.
 - The fallback scanner is bounded, user initiated and TCP-only. UDP-only services may be missed; a positive TCP connection is only an unverified candidate.
-- Persisted inventory is loaded as **Stale** on startup. The device table is not yet a dedicated live-only view; see [Live scan results versus saved data](#live-scan-results-versus-saved-data).
+- Live Scan Results always starts empty. Historical rows are shown only in Saved Inventory as **Stale — historical**; see [Live scan results versus saved inventory](#live-scan-results-versus-saved-inventory).
 - Camera credentials are requested interactively when challenged and are session-only. OS-backed credential-vault integration is not implemented.
 - ONVIF write operations can disconnect a camera. Confirm reachability and network topology before changing its address; there is no automatic rollback.
 - There is no project-camera activation or firmware-upgrade command in the Contract B protocol.

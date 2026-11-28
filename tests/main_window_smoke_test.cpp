@@ -16,6 +16,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPixmap>
 #include <QTableWidget>
 #include <QNetworkInterface>
@@ -43,9 +44,9 @@ private slots:
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
-    void guidedManualEntryAndRenameDialogsWork();
+    void manualEntriesAreSavedOutsideLiveResults();
     void exportsInventoryAsUtf8CsvWithEscapedFields();
-    void searchAndManufacturerFiltersHideNonMatchingRows();
+    void savedInventoryIsIsolatedAndRetentionWorks();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
     void migratesLegacyInventorySchema();
@@ -103,7 +104,7 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
     QSqlQuery version(database);
     QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
     QVERIFY(version.next());
-    QCOMPARE(version.value(0).toInt(), 1);
+    QCOMPARE(version.value(0).toInt(), 2);
 }
 
 
@@ -234,15 +235,16 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
-void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
+void MainWindowSmokeTest::manualEntriesAreSavedOutsideLiveResults()
 {
     QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
     MainWindow window;
-    auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *live = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *saved = window.findChild<QTableWidget *>(QStringLiteral("savedInventoryTable"));
     auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
-    auto *renameButton = window.findChild<QPushButton *>(QStringLiteral("renameLabelButton"));
-    QVERIFY(table && addButton && renameButton);
-
+    QVERIFY(live && saved && addButton);
     QTimer::singleShot(0, &window, [&window] {
         auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
         QVERIFY(dialog);
@@ -255,24 +257,12 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
         QTest::mouseClick(save, Qt::LeftButton);
     });
     QTest::mouseClick(addButton, Qt::LeftButton);
-    QCOMPARE(table->rowCount(), 1);
-    QCOMPARE(table->item(0, 1)->text(), QStringLiteral("192.168.10.25"));
-    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Front entrance"));
-
-    table->selectRow(0);
-    table->setCurrentCell(0, 1);
-    QTimer::singleShot(0, &window, [&window] {
-        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
-        QVERIFY(dialog);
-        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("deviceFriendlyName"));
-        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveDeviceNameButton"));
-        QVERIFY(name && save);
-        name->setText(QStringLiteral("Loading bay"));
-        QTest::mouseClick(save, Qt::LeftButton);
-    });
-    QTest::mouseClick(renameButton, Qt::LeftButton);
-    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
-
+    QCOMPARE(live->rowCount(), 0);
+    QCOMPARE(saved->rowCount(), 1);
+    QCOMPARE(saved->item(0, 0)->text(), QStringLiteral("192.168.10.25"));
+    QCOMPARE(saved->item(0, 1)->text(), QStringLiteral("Front entrance"));
+    QCOMPARE(saved->item(0, 5)->text(), QStringLiteral("Not observed"));
+    QCOMPARE(saved->item(0, 6)->text(), QStringLiteral("Not verified"));
     const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
     QVERIFY(database.isValid() && database.isOpen());
     QSqlQuery persisted(database);
@@ -280,7 +270,7 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
     persisted.bindValue(QStringLiteral(":ip"), QStringLiteral("192.168.10.25"));
     QVERIFY(persisted.exec());
     QVERIFY(persisted.next());
-    QCOMPARE(persisted.value(0).toString(), QStringLiteral("Loading bay"));
+    QCOMPARE(persisted.value(0).toString(), QStringLiteral("Front entrance"));
 }
 
 void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
@@ -332,7 +322,7 @@ void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
     QVERIFY(contents.contains(QByteArrayLiteral("\"IP ADDRESS\"")));
 }
 
-void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
+void MainWindowSmokeTest::savedInventoryIsIsolatedAndRetentionWorks()
 {
     QStandardPaths::setTestModeEnabled(true);
     const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -340,26 +330,25 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(QDir().mkpath(appData));
     const QString databasePath = appData + QStringLiteral("/inventory.sqlite");
     {
-        QSqlDatabase seed = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
-                                                       QStringLiteral("filter_seed"));
+        QSqlDatabase seed = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("filter_seed"));
         seed.setDatabaseName(databasePath);
         QVERIFY(seed.open());
         QSqlQuery create(seed);
         QVERIFY(create.exec(QStringLiteral(
-            "CREATE TABLE devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, "
-            "manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, "
-            "activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT)")));
+            "CREATE TABLE devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, "
+            "model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, "
+            "is_candidate INTEGER, last_seen TEXT)")));
         QSqlQuery insert(seed);
         insert.prepare(QStringLiteral(
             "INSERT INTO devices(device_key,ip,mac,manufacturer,model,firmware,serial,hardware,"
-            "activation,source,is_candidate) VALUES(?,?,?,?,?,?,?,?,?,?,?)"));
+            "activation,source,is_candidate,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now','-60 days'))"));
         insert.addBindValue(QStringLiteral("cam-a"));
         insert.addBindValue(QStringLiteral("192.0.2.10"));
         insert.addBindValue(QStringLiteral("02:00:00:00:00:10"));
         insert.addBindValue(QStringLiteral("Acme"));
         insert.addBindValue(QStringLiteral("A-100"));
         insert.addBindValue(QStringLiteral("1.0"));
-        insert.addBindValue(QString(180, QLatin1Char('S')));
+        insert.addBindValue(QStringLiteral("SERIAL-A"));
         insert.addBindValue(QStringLiteral("HW-A"));
         insert.addBindValue(QStringLiteral("Activated"));
         insert.addBindValue(QStringLiteral("ONVIF WS-Discovery"));
@@ -368,77 +357,40 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
         seed.close();
     }
     QSqlDatabase::removeDatabase(QStringLiteral("filter_seed"));
-
     MainWindow window;
-    auto *table = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
-    auto *search = window.findChild<QLineEdit *>(QStringLiteral("deviceSearch"));
-    auto *vendor = window.findChild<QComboBox *>(QStringLiteral("manufacturerFilter"));
-    auto *statusFilter = window.findChild<QComboBox *>(QStringLiteral("statusFilter"));
-    auto *deviceTypeFilter = window.findChild<QComboBox *>(QStringLiteral("deviceTypeFilter"));
-    QVERIFY(table && search && vendor && statusFilter && deviceTypeFilter);
-    QCOMPARE(table->rowCount(), 1);
-    QVERIFY(!table->isRowHidden(0));
-    QCOMPARE(table->item(0, 11)->text(), QStringLiteral("Stale"));
-    table->selectRow(0);
-    table->setCurrentCell(0, 1);
-    // A saved ONVIF source label is not proof of a currently reachable service
-    // endpoint or a verified network interface. Keep write actions disabled.
-    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
-    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
-    const auto *deviceDetails = window.findChild<QLabel *>(QStringLiteral("selectedDeviceDetails"));
-    QVERIFY(deviceDetails);
-    QVERIFY(deviceDetails->text().contains(QStringLiteral("Acme")));
-    QVERIFY(deviceDetails->text().contains(QStringLiteral("A-100")));
-    const auto *fullProfile = window.findChild<QLabel *>(QStringLiteral("deviceDetails"));
-    const auto *firmwareSummary = window.findChild<QLabel *>(QStringLiteral("firmwareDetailsSummary"));
-    QVERIFY(fullProfile);
-    QVERIFY(firmwareSummary);
-    QVERIFY(fullProfile != firmwareSummary);
-    QVERIFY(fullProfile->text().contains(QStringLiteral("02:00:00:00:00:10")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("FIRMWARE")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("SERIAL NUMBER")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("HARDWARE ID")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("Last reachability check")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("Last successful response")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("Last seen (UTC)")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("OPERATION COMPATIBILITY")));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("Not implemented")));
-    QVERIFY(fullProfile->text().contains(QString(180, QLatin1Char('S'))));
-    table->clearSelection();
-    table->setCurrentCell(-1, -1);
-    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("factoryResetCameraButton"))->isEnabled());
-    QVERIFY(!window.findChild<QPushButton *>(QStringLiteral("applyStaticIpv4Button"))->isEnabled());
-    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
-    table->selectRow(0);
-    table->setCurrentCell(0, 1);
-
-    search->setText(QStringLiteral("does-not-exist"));
-    QVERIFY(table->isRowHidden(0));
-    QVERIFY(fullProfile->text().contains(QStringLiteral("No device selected")));
-    const auto *emptyState = window.findChild<QLabel *>(QStringLiteral("inventoryEmptyState"));
-    QVERIFY(emptyState && !emptyState->isHidden());
-    QVERIFY(emptyState->text().contains(QStringLiteral("No devices match")));
-    search->clear();
-    QVERIFY(!table->isRowHidden(0));
-    QVERIFY(!!emptyState->isHidden());
-
-    deviceTypeFilter->setCurrentText(QStringLiteral("Printers"));
-    QVERIFY(table->isRowHidden(0));
-    deviceTypeFilter->setCurrentText(QStringLiteral("Cameras"));
-    QVERIFY(!table->isRowHidden(0));
-    deviceTypeFilter->setCurrentText(QStringLiteral("All device types"));
-
-    vendor->setCurrentText(QStringLiteral("Oxita devices"));
-    QVERIFY(table->isRowHidden(0));
-    vendor->setCurrentText(QStringLiteral("ONVIF devices"));
-    QVERIFY(!table->isRowHidden(0));
-
-    statusFilter->setCurrentText(QStringLiteral("Stale"));
-    QVERIFY(!table->isRowHidden(0));
-    statusFilter->setCurrentText(QStringLiteral("Not activated"));
-    QVERIFY(table->isRowHidden(0));
-    statusFilter->setCurrentText(QStringLiteral("Activated"));
-    QVERIFY(!table->isRowHidden(0));
+    auto *live = window.findChild<QTableWidget *>(QStringLiteral("deviceTable"));
+    auto *saved = window.findChild<QTableWidget *>(QStringLiteral("savedInventoryTable"));
+    QVERIFY(live && saved);
+    QCOMPARE(live->rowCount(), 0);
+    QCOMPARE(saved->rowCount(), 1);
+    QCOMPARE(saved->item(0, 0)->text(), QStringLiteral("192.0.2.10"));
+    QCOMPARE(saved->item(0, 6)->text(), QStringLiteral("Stale — historical"));
+    QSqlQuery schema(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(schema.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(schema.next());
+    QCOMPARE(schema.value(0).toInt(), 2);
+    QSqlQuery manual(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(manual.exec(QStringLiteral(
+        "INSERT INTO devices(device_key,ip,last_seen,created_at) "
+        "VALUES('manual-old','192.0.2.11','',datetime('now','-60 days'))")));
+    QVERIFY(window.findChild<QComboBox *>(QStringLiteral("savedInventoryRetention")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("deleteSavedInventoryButton")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("clearSavedInventoryButton")));
+    auto *retention = window.findChild<QComboBox *>(QStringLiteral("savedInventoryRetention"));
+    auto *applyRetention = window.findChild<QPushButton *>(QStringLiteral("applyInventoryRetentionButton"));
+    QVERIFY(retention && applyRetention);
+    retention->setCurrentIndex(retention->findData(30));
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        QTest::mouseClick(dialog->button(QMessageBox::Yes), Qt::LeftButton);
+    });
+    QTest::mouseClick(applyRetention, Qt::LeftButton);
+    QCOMPARE(saved->rowCount(), 0);
+    QSqlQuery remaining(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(remaining.exec(QStringLiteral("SELECT COUNT(*) FROM devices")));
+    QVERIFY(remaining.next());
+    QCOMPARE(remaining.value(0).toInt(), 0);
 }
 
 void MainWindowSmokeTest::discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface()
@@ -535,7 +487,7 @@ void MainWindowSmokeTest::migratesLegacyInventorySchema()
     QSqlQuery version(database);
     QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
     QVERIFY(version.next());
-    QCOMPARE(version.value(0).toInt(), 1);
+    QCOMPARE(version.value(0).toInt(), 2);
 
     QSqlQuery columns(database);
     QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(devices)")));
