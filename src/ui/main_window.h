@@ -92,4 +92,7 @@ private:
     QSqlDatabase inventoryDb_;
     QTimer *interfaceRefreshTimer_{nullptr};
     QString interfaceInventoryFingerprint_;
+    DeviceRecord pendingCameraVerification_;
+    bool pendingCameraVerificationActive_{false};
+    bool pendingCameraIdentityMatched_{false};
 };
