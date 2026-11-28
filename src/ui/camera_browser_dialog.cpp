@@ -176,7 +176,9 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
             this, &CameraBrowserDialog::showAuthenticationPrompt);
     connect(page, &QWebEnginePage::certificateError, this,
             [this](const QWebEngineCertificateError &error) {
-        statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation.")
+        QWebEngineCertificateError rejected = error;
+        rejected.rejectCertificate();
+        statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
                                   .arg(error.description()));
     });
     connect(page, &QWebEnginePage::renderProcessTerminated, this,
@@ -223,6 +225,7 @@ void CameraBrowserDialog::showAuthenticationPrompt(const QUrl &url, QAuthenticat
         this, tr("Camera authentication"), tr("Password:"),
         QLineEdit::Password, QString(), &accepted);
     if (!accepted) {
+        *authenticator = QAuthenticator();
         statusLabel_->setText(tr("Authentication cancelled. No credentials were saved."));
         return;
     }
