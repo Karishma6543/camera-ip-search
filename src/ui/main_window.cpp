@@ -2719,7 +2719,8 @@ void MainWindow::refreshSavedInventory()
             query.value(1).toString(),
             label.isEmpty() ? (query.value(7).toBool() ? tr("Unverified candidate") : tr("—")) : label,
             query.value(3).toString(), query.value(4).toString(), query.value(5).toString(),
-            lastSeen.isEmpty() ? tr("Not observed") : lastSeen, tr("Stale — historical")
+            lastSeen.isEmpty() ? tr("Not observed") : lastSeen,
+            lastSeen.isEmpty() ? tr("Not verified") : tr("Stale — historical")
         };
         for (int column = 0; column < values.size(); ++column) {
             auto *item = new QTableWidgetItem(values.at(column));
