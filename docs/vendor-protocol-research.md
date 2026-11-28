@@ -21,9 +21,11 @@ Do not infer that all models from a brand share the same ONVIF profile, authenti
 
 
 | CP PLUS official software catalogue | Lists **CPPLUS_IP Finder_Eng_Win V4.0** as a downloadable Orange-series utility; vendor product-documents page describes IP Finder as searching/configuring cameras on the local LAN | Confirms a vendor-supported local discovery/configuration utility exists. The public page does not expose its packet format, activation API, SDK contract or redistribution terms; do not imitate undocumented traffic | Official software catalogue |
+| CP PLUS official camera product specifications | Current camera product pages list **Device Search Tool: IP Finder**, **SDK and API: Support**, HTTP/HTTPS and ONVIF profiles (varies by model), and browser compatibility such as Chrome/Edge | Confirms that official SDK/API access and browser configuration exist for selected product families. It does not provide the SDK package, protocol reference, activation endpoint or redistribution license; obtain these from CP PLUS before writing a proprietary adapter | Official model/product specifications |
 | CP PLUS official Orange-series NVR manual | Describes searching uninitialized devices and a device-initialization workflow in the NVR camera-management interface | Confirms some CP PLUS product families expose a distinct initialization stage beyond normal ONVIF discovery. This NVR workflow is not proof that every standalone IPC exposes the same web page or protocol | Official model-family manual |
 | CP PLUS Orange-series NVR manual, remote-device add screen | Documents the CPUNC private-protocol selection and TCP port 25001 for a remote-device connection | Add port 25001 to bounded TCP candidate scanning only. A successful TCP connect remains an unverified candidate; the manual does not publish the CPUNC packet/API contract or authorize activation requests | Official model-family manual |
 | Prama Online Pro official app guidance | Describes searching for local devices when camera and app are on the same network; otherwise adding by DeviceID | Confirms a Prama-supported local discovery workflow exists in its app. Public evidence reviewed does not disclose a desktop initialization protocol or an activation API | Official Prama app guidance |
+| Prama official support download portal | Exposes separate **Tools**, **SDK**, and **Client software** download categories; the SDK page returned no public package details during this review | Indicates vendor tools/SDK channels exist, but no camera activation API contract or SDK redistribution terms were available in the public page response. Request the applicable SDK for the exact model/firmware from Prama | Official support/download portal |
 
 ## Public source links
 
@@ -31,6 +33,8 @@ Do not infer that all models from a brand share the same ONVIF profile, authenti
 - CP PLUS product page, CP-UVR-0801E1V-I: https://web.cpplusworld.com/cp-uvr-0801e1v-i
 - CP PLUS official user-manual catalogue: https://cpplusworld.com/user-manual
 - CP PLUS official product-document index (states IP Finder searches/configures cameras on the LAN): https://cpplusworld.com/productdocuments
+- CP PLUS official product page example showing IP Finder, SDK/API support and ONVIF/HTTP(S) capabilities: https://cpplusworld.com/cp-unp-e3221l18-daq
+- Prama official SDK/tools download portal: https://www.pramaindia.in/support/download/client-software/
 - CP PLUS official software catalogue (lists CPPLUS_IP Finder_Eng_Win V4.0): https://cpplusworld.com/software
 - CP PLUS Orange-series NVR manual (uninitialized-device search and initialization workflow): https://cpplusworld.com/orange-series/img/User_Manual_NVR.pdf
 - Prama Online Pro official app description (local-network device search): https://www.pramaindia.in/prama-online-pro-app-security-camera-application/
