@@ -102,8 +102,9 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     reloadButton->setObjectName(QStringLiteral("cameraBrowserReload"));
     addressBar_ = new QLineEdit(this);
     addressBar_->setObjectName(QStringLiteral("cameraBrowserAddress"));
-    addressBar_->setReadOnly(true);
+    addressBar_->setReadOnly(false);
     addressBar_->setClearButtonEnabled(false);
+    addressBar_->setPlaceholderText(tr("Camera address and port (same camera only)"));
     toolbar->addWidget(backButton);
     toolbar->addWidget(forwardButton);
     toolbar->addWidget(reloadButton);
@@ -142,6 +143,15 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     connect(backButton, &QPushButton::clicked, view_, &QWebEngineView::back);
     connect(forwardButton, &QPushButton::clicked, view_, &QWebEngineView::forward);
     connect(reloadButton, &QPushButton::clicked, view_, &QWebEngineView::reload);
+    connect(addressBar_, &QLineEdit::returnPressed, this, [this] {
+        const QUrl requested = QUrl::fromUserInput(addressBar_->text().trimmed());
+        if (!CameraBrowserPolicy::allowsMainFrameNavigation(requested, allowedHost_)) {
+            statusLabel_->setText(tr("Only HTTP/HTTPS addresses on the selected camera host are allowed. Credentials and external hosts are blocked."));
+            updateAddress(view_->url());
+            return;
+        }
+        view_->setUrl(requested);
+    });
     connect(schemeButton, &QPushButton::clicked, this, [this, schemeButton] {
         QUrl next = view_->url();
         if (next.scheme() == QStringLiteral("https")) {
