@@ -431,7 +431,7 @@ void MainWindow::buildUi()
     addDeviceButton_->setObjectName(QStringLiteral("addDeviceButton"));
     actionRow->addWidget(addDeviceButton_);
     auto *exportButton = actionButton(tr("Export CSV"), toolbar);
-    exportButton->setToolTip(tr("Export the current live scan results to a UTF-8 CSV file."));
+    exportButton->setToolTip(tr("Export live results, or saved inventory when no live results are present, to UTF-8 CSV."));
     exportButton->setObjectName(QStringLiteral("exportCsvButton"));
     actionRow->addWidget(exportButton);
     auto *renameButton = actionButton(tr("Rename"), toolbar);
@@ -895,10 +895,13 @@ void MainWindow::buildUi()
     connect(renameButton, &QPushButton::clicked, this, &MainWindow::editSelectedLabel);
     connect(addDeviceButton_, &QPushButton::clicked, this, &MainWindow::addManualDevice);
     connect(exportButton, &QPushButton::clicked, this, [this] {
-        if (!deviceTable_ || deviceTable_->rowCount() == 0) {
-            updateStatus(tr("There are no devices to export."));
+        QTableWidget *exportTable = deviceTable_ && deviceTable_->rowCount() > 0
+            ? deviceTable_ : savedInventoryTable_;
+        if (!exportTable || exportTable->rowCount() == 0) {
+            updateStatus(tr("There are no live or saved devices to export."));
             return;
         }
+        const int firstColumn = exportTable == deviceTable_ ? 1 : 0;
         const QString path = QFileDialog::getSaveFileName(
             this, tr("Export device inventory"), QStringLiteral("camera-inventory.csv"),
             tr("CSV files (*.csv)"));
@@ -920,15 +923,15 @@ void MainWindow::buildUi()
         };
 
         QStringList headers;
-        for (int column = 1; column < deviceTable_->columnCount(); ++column)
-            headers << csvField(deviceTable_->horizontalHeaderItem(column)->text());
+        for (int column = firstColumn; column < exportTable->columnCount(); ++column)
+            headers << csvField(exportTable->horizontalHeaderItem(column)->text());
         stream << headers.join(QLatin1Char(',')) << Qt::endl;
 
         int exported = 0;
-        for (int row = 0; row < deviceTable_->rowCount(); ++row) {
+        for (int row = 0; row < exportTable->rowCount(); ++row) {
             QStringList fields;
-            for (int column = 1; column < deviceTable_->columnCount(); ++column) {
-                const auto *item = deviceTable_->item(row, column);
+            for (int column = firstColumn; column < exportTable->columnCount(); ++column) {
+                const auto *item = exportTable->item(row, column);
                 fields << csvField(item ? item->text() : QString());
             }
             stream << fields.join(QLatin1Char(',')) << Qt::endl;
