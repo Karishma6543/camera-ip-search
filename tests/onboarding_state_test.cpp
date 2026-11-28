@@ -75,6 +75,12 @@ void OnboardingStateTest::prioritizesAuthenticationAfterActivationCheck()
     evidence.supportedAdapterAvailable = true;
     QCOMPARE(OnboardingState::evaluate(evidence).state,
              OnboardingState::State::AuthenticationRequired);
+
+    evidence.activationStatusKnown = true;
+    evidence.activationRequired = true;
+    // Credentials must be supplied before the activation workflow can proceed.
+    QCOMPARE(OnboardingState::evaluate(evidence).state,
+             OnboardingState::State::AuthenticationRequired);
 }
 
 void OnboardingStateTest::requiresVerifiedNetworkConfigurationForReady()
