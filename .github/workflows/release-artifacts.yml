@@ -47,9 +47,14 @@ jobs:
           & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations --compiler-runtime --dir (Split-Path $exe) $exe
           if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
           $webEngineProcess = Get-ChildItem 'package' -Recurse -Filter 'QtWebEngineProcess.exe' | Select-Object -First 1
-          $webEngineResources = Get-ChildItem 'package' -Recurse -Filter 'qtwebengine_resources.pak' | Select-Object -First 1
           if (!$webEngineProcess) { throw 'QtWebEngineProcess.exe is missing from the Windows package' }
-          if (!$webEngineResources) { throw 'Qt WebEngine Chromium resources are missing from the Windows package' }
+          foreach ($resource in @('qtwebengine_resources.pak', 'qtwebengine_resources_100p.pak', 'qtwebengine_resources_200p.pak', 'icudtl.dat', 'v8_context_snapshot.bin')) {
+            if (!(Get-ChildItem 'package' -Recurse -Filter $resource | Select-Object -First 1)) {
+              throw "Qt WebEngine resource is missing from the Windows package: $resource"
+            }
+          }
+          $webEngineLocale = Get-ChildItem 'package' -Recurse -Filter 'en-US.pak' | Select-Object -First 1
+          if (!$webEngineLocale) { throw 'Qt WebEngine locale data is missing from the Windows package' }
       - name: Deploy Qt runtime (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -58,11 +63,12 @@ jobs:
           test -x "$APP/Contents/MacOS/camera-ip-search"
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
           WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
-          WEBENGINE_RESOURCES="$(find "$APP" -name 'qtwebengine_resources.pak' -print -quit)"
           WEBENGINE_ENTITLEMENTS="$(find "$APP" -name 'QtWebEngineProcess.entitlements' -print -quit)"
           test -n "$WEBENGINE_PROCESS"
-          test -n "$WEBENGINE_RESOURCES"
           test -n "$WEBENGINE_ENTITLEMENTS"
+          for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat v8_context_snapshot.bin en-US.pak; do
+            test -n "$(find "$APP" -name "$resource" -print -quit)"
+          done
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
           test -s "camera-ip-search-macos.zip"
           shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"
