@@ -22,6 +22,10 @@ OnboardingState::Result OnboardingState::evaluate(const OnboardingEvidence &evid
         return {State::InitializationInProgress, QStringLiteral("Initialization in progress"),
                 QStringLiteral("Wait for the documented activation operation to finish or cancel it safely.")};
 
+    if (evidence.authenticationRequired)
+        return {State::AuthenticationRequired, QStringLiteral("Authentication required"),
+                QStringLiteral("Enter credentials for this device; credentials are not inferred or guessed.")};
+
     if (evidence.activationStatusKnown && evidence.activationRequired) {
         if (evidence.supportedAdapterAvailable)
             return {State::InitializationRequired, QStringLiteral("Initialization required"),
@@ -29,10 +33,6 @@ OnboardingState::Result OnboardingState::evaluate(const OnboardingEvidence &evid
         return {State::Unsupported, QStringLiteral("Initialization unsupported"),
                 QStringLiteral("No authorized activation adapter is available for this model and firmware.")};
     }
-
-    if (evidence.authenticationRequired)
-        return {State::AuthenticationRequired, QStringLiteral("Authentication required"),
-                QStringLiteral("Enter credentials for this device; credentials are not inferred or guessed.")};
 
     if (evidence.activationStatusKnown && !evidence.activationRequired &&
         evidence.activationVerified && !evidence.networkConfigurationVerified) {
