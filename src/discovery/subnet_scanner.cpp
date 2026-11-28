@@ -11,7 +11,7 @@ constexpr int kConnectTimeoutMs = 450;
 // TCP response only creates an unverified candidate; it does not identify it.
 const QVector<quint16> kCommonDevicePorts{
     22, 23, 53, 80, 135, 139, 443, 445, 515, 554, 631, 1900,
-    2869, 3389, 5000, 5357, 7547, 8000, 8080, 8443, 8899, 9100, 34567
+    2869, 3389, 5000, 5357, 7547, 8000, 8080, 8443, 8899, 9100, 25001, 34567
 };
 }
 
