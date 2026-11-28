@@ -132,6 +132,8 @@ See [new-camera Ethernet initialization plan](new-camera-ethernet-initialization
 - [x] Start fresh discovery after the user indicates camera setup is complete.
 - [x] Require a strong MAC, serial-plus-manufacturer or ONVIF-endpoint identity match; do not use IP-only matches as proof of the same camera.
 - [x] Add unit tests for same-host browser navigation/resource policy, cross-host rejection and credential-bearing URL rejection.
+- [x] Poll adapter state every three seconds and show disabled, link-down and link-up-without-IPv4 interfaces for direct Ethernet workflows.
+- [x] Explain cable/power/PoE and safe manual same-subnet PC addressing when no IPv4 address is available; never change host network settings silently.
 - [ ] Verify device identity and read back network/device configuration after setup before marking it Ready.
 - [ ] Test the embedded browser against camera web interfaces on Windows, macOS and Linux.
 - [ ] Validate Qt WebEngine runtime deployment, installer size, licensing and legacy camera browser compatibility.
