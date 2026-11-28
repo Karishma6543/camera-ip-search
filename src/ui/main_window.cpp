@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "camera_browser_dialog.h"
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
 #include "core/device_classifier.h"
@@ -1176,7 +1177,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *deviceLayout = new QVBoxLayout(devicePanel);
     deviceLayout->setSpacing(8);
     auto *deviceDescription = mutedLabel(
-        tr("Refresh retrieves available ONVIF device information. Open web interface launches the camera's HTTP page in your default browser."),
+        tr("Initialize opens the selected camera's own setup page inside Oxita. The camera controls its activation process; Oxita verifies the device again after setup."),
         devicePanel);
     deviceLayout->addWidget(deviceDescription);
     auto *deviceActions = new QGridLayout();
@@ -1184,7 +1185,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     deviceActions->setVerticalSpacing(8);
     refreshDeviceButton_ = actionButton(tr("Refresh device info"), devicePanel);
     refreshDeviceButton_->setEnabled(false);
-    openWebButton_ = actionButton(tr("Open web interface"), devicePanel);
+    openWebButton_ = actionButton(tr("Initialize / open camera setup"), devicePanel, true);
+    openWebButton_->setObjectName(QStringLiteral("initializeCameraButton"));
+    openWebButton_->setToolTip(tr("Open the selected camera web interface inside Oxita. Complete its own setup, then rediscover to verify."));
     openWebButton_->setEnabled(false);
     deviceActions->addWidget(refreshDeviceButton_, 0, 0);
     deviceActions->addWidget(openWebButton_, 0, 1);
@@ -2943,18 +2946,47 @@ void MainWindow::editSelectedLabel()
 }
 
 
+QUrl MainWindow::selectedCameraWebUrl() const
+{
+    const int row = selectedDeviceRow();
+    if (row < 0 || !deviceTable_) return {};
+    const auto *item = deviceTable_->item(row, 1);
+    if (!item || item->text().trimmed().isEmpty()) return {};
+    const QString host = item->text().trimmed();
+    const QUrl url = host.startsWith(QStringLiteral("https://"), Qt::CaseInsensitive) ||
+                     host.startsWith(QStringLiteral("http://"), Qt::CaseInsensitive)
+        ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://") + host);
+    if (!url.isValid() || url.host().isEmpty() ||
+        (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")))
+        return {};
+    return url;
+}
+
 void MainWindow::openSelectedWebInterface()
 {
-    const int row=selectedDeviceRow();
-    if (row<0) return;
-    const auto *item=deviceTable_->item(row,1);
-    if (!item || item->text().isEmpty()) return;
-    const QString host=item->text().trimmed();
-    const QUrl url=host.startsWith(QStringLiteral("https://"),Qt::CaseInsensitive) || host.startsWith(QStringLiteral("http://"),Qt::CaseInsensitive)
-        ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://")+host);
-    if (!url.isValid() || url.host().isEmpty()) {
-        QMessageBox::warning(this,tr("Invalid address"),tr("Selected device has no valid web address."));
+    const int row = selectedDeviceRow();
+    if (row < 0) return;
+    const QUrl url = selectedCameraWebUrl();
+    if (!url.isValid()) {
+        QMessageBox::warning(this, tr("Invalid address"),
+                             tr("The selected device does not have a valid HTTP or HTTPS address."));
         return;
     }
-    QDesktopServices::openUrl(url);
+
+    const QString label = deviceTable_->item(row, 2)
+        ? deviceTable_->item(row, 2)->text().trimmed() : QString();
+    CameraBrowserDialog browser(url, label, this);
+    recordOperation(tr("Camera setup opened"), url.host(), tr("Started"),
+                    tr("Opened the camera's own web interface in Oxita. Camera activation is not assumed."));
+    const int result = browser.exec();
+    if (result != QDialog::Accepted) {
+        updateStatus(tr("Camera setup window closed. Initialization has not been verified."));
+        return;
+    }
+
+    recordOperation(tr("Camera setup completed by user"), url.host(), tr("Verification pending"),
+                    tr("User indicated setup is complete. A fresh discovery is required; web-page completion alone is not proof of activation."));
+    updateStatus(tr("Setup page closed. Rediscovering on the selected network interface to verify the camera…"));
+    const QString interfaceName = interfaceSelector_ ? interfaceSelector_->currentData().toString() : QString();
+    if (discovery_ && !discovery_->isRunning()) discovery_->start(interfaceName);
 }
