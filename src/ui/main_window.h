@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/device_record.h"
+#include <QUrl>
 
 #include <QMainWindow>
 #include <QSqlDatabase>
@@ -42,6 +43,7 @@ private:
     void refreshSavedInventory();
     void addManualDevice();
     void openSelectedWebInterface();
+    QUrl selectedCameraWebUrl() const;
     void applyFilters();
     void editSelectedLabel();
     DiscoveryService *discovery_{nullptr};
