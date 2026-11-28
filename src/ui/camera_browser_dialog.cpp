@@ -16,6 +16,7 @@
 #include <QWebEngineUrlRequestInfo>
 #include <QWebEngineUrlRequestInterceptor>
 #include <QWebEngineView>
+#include <utility>
 
 namespace {
 class CameraRequestInterceptor final : public QWebEngineUrlRequestInterceptor
