@@ -61,6 +61,12 @@ jobs:
           APP="package/camera-ip-search.app"
           test -d "$APP"
           test -x "$APP/Contents/MacOS/camera-ip-search"
+          # This application uses SQLite only. Prevent macdeployqt from trying to
+          # bundle unrelated Qt SQL drivers whose third-party libraries are not
+          # installed on the hosted runner (ODBC/PostgreSQL/Mimer).
+          if [ -d "$QT_ROOT_DIR/plugins/sqldrivers" ]; then
+            find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name 'libqsqlite.dylib' -delete
+          fi
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
           WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
           WEBENGINE_ENTITLEMENTS="$(find "$APP" -name 'QtWebEngineProcess.entitlements' -print -quit)"
