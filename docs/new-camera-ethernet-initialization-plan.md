@@ -34,14 +34,14 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 
 ## Workstream A — Ethernet and interface readiness
 
-- [ ] Detect link state changes on every eligible Ethernet/Wi-Fi interface without blocking the UI.
-- [ ] Show interface name, adapter description, link state, IPv4/IPv6 addresses, prefix, gateway, DHCP state and metric.
+- [x] Detect adapter link/address changes with a non-blocking 3-second Qt interface inventory refresh. OS event-driven notifications remain a future optimization.
+- [ ] Show interface name, adapter description, link state, IPv4/IPv6 addresses, prefix, gateway, DHCP state and metric. Current selected-interface summary shows name, hardware address, link state, IPv4/prefix and broadcast; gateway, DHCP and route metric remain pending.
 - [ ] Distinguish physical Ethernet from Wi-Fi, VPN, loopback, virtual adapters and disconnected interfaces.
 - [ ] Detect when a newly connected camera causes a new neighbor/ARP observation or subnet change.
-- [ ] Refresh interface inventory on link/address changes and provide manual refresh.
-- [ ] Handle multiple NICs, multiple IPv4 addresses, USB Ethernet adapters and route metrics.
+- [x] Refresh interface inventory on link/address changes via polling; manual refresh remains available through the existing interface refresh workflow.
+- [ ] Handle multiple NICs, multiple IPv4 addresses and USB Ethernet adapters. Multiple-address display exists; route metric handling and hardware validation remain pending.
 - [ ] Never assume the PC and camera share a subnet merely because an Ethernet cable is connected.
-- [ ] Explain direct-PC connection requirements: link, PoE/power, cable, adapter and compatible addressing.
+- [x] Show disabled/link-down/link-up-without-IPv4 states and explain cable, power/PoE and DHCP/link-local checks. Full guided addressing remains pending.
 - [ ] Detect likely self-assigned/link-local and common factory subnet situations without guessing camera addresses.
 - [ ] Provide safe guided instructions when PC and camera subnets do not match.
 - [ ] Do not silently change the PC's IP address, route, firewall or adapter settings.
