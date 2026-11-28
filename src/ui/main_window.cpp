@@ -1620,7 +1620,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
         if (QMessageBox::question(this, tr("Apply retention"),
                 tr("Delete saved records not seen in the last %1 days?").arg(days)) != QMessageBox::Yes) return;
         QSqlQuery prune(inventoryDb_);
-        prune.prepare(QStringLiteral("DELETE FROM devices WHERE datetime(last_seen) < datetime('now', :age)"));
+        prune.prepare(QStringLiteral("DELETE FROM devices WHERE julianday(COALESCE(NULLIF(last_seen,''),created_at)) < julianday('now', :age)"));
         prune.bindValue(QStringLiteral(":age"), QStringLiteral("-%1 days").arg(days));
         if (!prune.exec()) { updateStatus(tr("Retention failed: %1").arg(prune.lastError().text())); return; }
         const int removed = prune.numRowsAffected();
@@ -2500,7 +2500,7 @@ void MainWindow::initializeInventory()
         inventoryDb_.close();
         return;
     }
-    if (schemaVersion > 1) {
+    if (schemaVersion > 2) {
         updateStatus(tr("Inventory schema version %1 is newer than this application supports. The database was not modified.")
                          .arg(schemaVersion));
         inventoryDb_.close();
@@ -2527,7 +2527,7 @@ void MainWindow::initializeInventory()
 
     QString sqlError;
     const QStringList baseSchema = {
-        QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        QStringLiteral("CREATE TABLE IF NOT EXISTS devices (device_key TEXT PRIMARY KEY, ip TEXT, mac TEXT, manufacturer TEXT, model TEXT, firmware TEXT, serial TEXT, hardware TEXT, activation TEXT, source TEXT, is_candidate INTEGER, last_seen TEXT DEFAULT CURRENT_TIMESTAMP, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS operation_history (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, operation TEXT NOT NULL, target TEXT NOT NULL, outcome TEXT NOT NULL, details TEXT NOT NULL)")
     };
     for (const QString &sql : baseSchema) {
@@ -2572,7 +2572,8 @@ void MainWindow::initializeInventory()
         QStringLiteral("ipv4_gateway|ALTER TABLE devices ADD COLUMN ipv4_gateway TEXT DEFAULT ''"),
         QStringLiteral("ipv4_dns_server|ALTER TABLE devices ADD COLUMN ipv4_dns_server TEXT DEFAULT ''"),
         QStringLiteral("ipv4_dhcp_enabled|ALTER TABLE devices ADD COLUMN ipv4_dhcp_enabled INTEGER DEFAULT 0"),
-        QStringLiteral("ipv4_config_known|ALTER TABLE devices ADD COLUMN ipv4_config_known INTEGER DEFAULT 0")
+        QStringLiteral("ipv4_config_known|ALTER TABLE devices ADD COLUMN ipv4_config_known INTEGER DEFAULT 0"),
+        QStringLiteral("created_at|ALTER TABLE devices ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
     };
 
     for (const QString &migration : migrations) {
@@ -2586,8 +2587,13 @@ void MainWindow::initializeInventory()
         existingColumns << columnName;
     }
 
+    if (!executeMigrationSql(QStringLiteral("UPDATE devices SET created_at=COALESCE(NULLIF(last_seen,''),CURRENT_TIMESTAMP) WHERE created_at='' OR created_at IS NULL"), &sqlError)) {
+        failMigration(tr("Could not initialize saved-inventory creation timestamps: %1").arg(sqlError));
+        return;
+    }
     const QStringList indexes = {
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen DESC)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_devices_created_at ON devices(created_at DESC)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_time ON operation_history(occurred_at DESC)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_operation_history_target ON operation_history(target)")
     };
@@ -2598,7 +2604,7 @@ void MainWindow::initializeInventory()
         }
     }
 
-    if (!executeMigrationSql(QStringLiteral("PRAGMA user_version = 1"), &sqlError)) {
+    if (!executeMigrationSql(QStringLiteral("PRAGMA user_version = 2"), &sqlError)) {
         failMigration(tr("Could not update inventory schema version: %1").arg(sqlError));
         return;
     }
@@ -2706,7 +2712,7 @@ void MainWindow::refreshSavedInventory()
     QSqlQuery query(inventoryDb_);
     if (!query.exec(QStringLiteral(
             "SELECT device_key,ip,user_label,manufacturer,model,mac,last_seen,is_candidate "
-            "FROM devices ORDER BY last_seen DESC"))) {
+            "FROM devices ORDER BY COALESCE(NULLIF(last_seen,''),created_at) DESC"))) {
         updateStatus(tr("Could not load saved inventory: %1").arg(query.lastError().text()));
         return;
     }
