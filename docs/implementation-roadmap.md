@@ -130,6 +130,8 @@ See [new-camera Ethernet initialization plan](new-camera-ethernet-initialization
 - [x] Restrict top-level navigation to the selected camera host and reject pop-up windows.
 - [x] Prompt for HTTP authentication without storing credentials; reject invalid HTTPS certificates rather than bypassing validation.
 - [x] Start fresh discovery after the user indicates camera setup is complete.
+- [x] Require a strong MAC, serial-plus-manufacturer or ONVIF-endpoint identity match; do not use IP-only matches as proof of the same camera.
+- [x] Add unit tests for same-host browser navigation/resource policy, cross-host rejection and credential-bearing URL rejection.
 - [ ] Verify device identity and read back network/device configuration after setup before marking it Ready.
 - [ ] Test the embedded browser against camera web interfaces on Windows, macOS and Linux.
 - [ ] Validate Qt WebEngine runtime deployment, installer size, licensing and legacy camera browser compatibility.
