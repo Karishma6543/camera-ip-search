@@ -142,7 +142,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     interfaceRefreshTimer_->start();
     if (inventoryDb_.isOpen())
         updateStatus(tr("Ready — choose a local interface to scan your subnet."));
-    connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
+    connect(discovery_, &DiscoveryService::deviceFound, this, [this](const DeviceRecord &device) {
+        upsertDevice(device);
+        if (!pendingCameraVerificationActive_ || pendingCameraIdentityMatched_) return;
+        const bool hasStrongIdentity =
+            !pendingCameraVerification_.macAddress.trimmed().isEmpty() ||
+            !pendingCameraVerification_.serialNumber.trimmed().isEmpty() ||
+            !pendingCameraVerification_.onvifEndpoint.trimmed().isEmpty();
+        if (!hasStrongIdentity) return;
+        QHash<QString, DeviceRecord> expected;
+        expected.insert(QStringLiteral("pending-camera"), pendingCameraVerification_);
+        if (DeviceIdentity::findMatchingKey(expected, device) ==
+            QStringLiteral("pending-camera")) {
+            pendingCameraIdentityMatched_ = true;
+            updateStatus(tr("The camera was rediscovered and matched using its previous identity evidence. Initialization still requires device-side verification."));
+            recordOperation(tr("Post-setup camera identity check"), device.ipAddress,
+                            tr("Identity matched"),
+                            tr("Rediscovered device matched the selected camera by MAC, serial number or ONVIF endpoint. Activation status is not inferred."));
+        }
+    });
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
     connect(discovery_, &DiscoveryService::authenticationRequested, this,
             [this](QAuthenticator *authenticator) {
@@ -255,7 +273,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateDeviceSummary();
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
         refreshOperationHistory();
-        updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
+        if (pendingCameraVerificationActive_) {
+            const bool matched = pendingCameraIdentityMatched_;
+            pendingCameraVerificationActive_ = false;
+            pendingCameraIdentityMatched_ = false;
+            updateStatus(matched
+                ? tr("Camera identity was rediscovered. Review its reported status and network details; activation is not marked complete without explicit device evidence.")
+                : tr("The selected camera could not be matched after setup. It may have changed address, be outside this interface's subnet, or not support the active discovery protocols. Initialization remains unverified."));
+        } else {
+            updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
+        }
     });
     connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
     connect(subnetScanner_, &SubnetScanner::statusChanged, this, &MainWindow::updateStatus);
@@ -3043,6 +3070,31 @@ void MainWindow::openSelectedWebInterface()
 
     const QString label = deviceTable_->item(row, 2)
         ? deviceTable_->item(row, 2)->text().trimmed() : QString();
+    const auto *ipItem = deviceTable_->item(row, 1);
+    DeviceRecord expectedDevice;
+    expectedDevice.id = ipItem ? ipItem->text().trimmed() : url.host();
+    expectedDevice.ipAddress = ipItem ? ipItem->text().trimmed() : url.host();
+    expectedDevice.userLabel = label;
+    expectedDevice.manufacturer = deviceTable_->item(row, 3)
+        ? deviceTable_->item(row, 3)->text().trimmed() : QString();
+    expectedDevice.model = deviceTable_->item(row, 4)
+        ? deviceTable_->item(row, 4)->text().trimmed() : QString();
+    expectedDevice.macAddress = deviceTable_->item(row, 5)
+        ? deviceTable_->item(row, 5)->text().trimmed() : QString();
+    expectedDevice.serialNumber = deviceTable_->item(row, 9)
+        ? deviceTable_->item(row, 9)->text().trimmed() : QString();
+    expectedDevice.firmwareVersion = deviceTable_->item(row, 10)
+        ? deviceTable_->item(row, 10)->text().trimmed() : QString();
+    expectedDevice.discoverySources = deviceTable_->item(row, 8)
+        ? deviceTable_->item(row, 8)->text().split(QStringLiteral(", "), Qt::SkipEmptyParts)
+        : QStringList{};
+    if (ipItem) {
+        expectedDevice.onvifEndpoint = ipItem->data(Qt::UserRole + 2).toString();
+        expectedDevice.deviceServiceUrl = ipItem->data(Qt::UserRole + 3).toString();
+        expectedDevice.openPorts = ipItem->data(Qt::UserRole + 6).toString()
+            .split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        expectedDevice.networkInterfaceToken = ipItem->data(Qt::UserRole + 7).toString();
+    }
     CameraBrowserDialog browser(url, label, this);
     recordOperation(tr("Camera setup opened"), url.host(), tr("Started"),
                     tr("Opened the camera's own web interface in Oxita. Camera activation is not assumed."));
@@ -3052,8 +3104,11 @@ void MainWindow::openSelectedWebInterface()
         return;
     }
 
+    pendingCameraVerification_ = expectedDevice;
+    pendingCameraVerificationActive_ = true;
+    pendingCameraIdentityMatched_ = false;
     recordOperation(tr("Camera setup completed by user"), url.host(), tr("Verification pending"),
-                    tr("User indicated setup is complete. A fresh discovery is required; web-page completion alone is not proof of activation."));
+                    tr("User indicated setup is complete. A fresh discovery and strong identity match are required; web-page completion alone is not proof of activation."));
     updateStatus(tr("Setup page closed. Rediscovering on the selected network interface to verify the camera…"));
     // Reuse the normal discovery action so Live Scan Results are cleared
     // before the new scan; never leave the pre-initialization snapshot mixed in.
