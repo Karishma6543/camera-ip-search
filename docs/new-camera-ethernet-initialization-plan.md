@@ -20,7 +20,7 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 - [x] Keep the user inside the Oxita workflow; the Initialize action opens the in-app browser rather than silently launching an external browser.
 - [x] Handle HTTP authentication challenges with session-only prompts; never persist credentials or log passwords. (Camera HTML login forms remain the camera's own UI.)
 - [x] Restrict top-level navigation to HTTP/HTTPS on the selected device host; block cross-host navigation and pop-up windows.
-- [ ] Detect and explain browser limitations such as obsolete ActiveX/NPAPI plugins, unsupported TLS/ciphers, self-signed certificates, mixed content and vendor pages requiring legacy browser components; never claim these pages are supported merely because they load in a browser.
+- [ ] Detect each browser limitation automatically. The load-failure state now explicitly explains that ActiveX/NPAPI and legacy IE components are unsupported; TLS certificate errors are surfaced and rejected. Unsupported cipher/mixed-content diagnostics and model-specific plugin detection remain pending.
 - [x] Do not inject scripts, bypass login, defeat certificate checks, or automate password creation through undocumented page internals.
 - [ ] Provide a guided fallback when no web UI is reachable: standard protocol adapter, authorized vendor adapter, or a clear unsupported/manual recovery state.
 - [ ] Complete **Verify camera**: current flow starts fresh discovery and matches the selected camera only by MAC, serial-plus-manufacturer or ONVIF endpoint. Explicit reachability checks, network/device read-back and activation-state verification remain pending.
