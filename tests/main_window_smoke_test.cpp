@@ -16,6 +16,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPixmap>
 #include <QTableWidget>
 #include <QNetworkInterface>
