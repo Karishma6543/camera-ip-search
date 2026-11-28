@@ -3116,6 +3116,8 @@ void MainWindow::openSelectedWebInterface()
         discovery_ && !discovery_->isRunning() && !subnetScanner_->isRunning()) {
         scanButton_->click();
     } else {
-        updateStatus(tr("Could not start verification discovery because another network operation is active. Run Discover cameras when it finishes."));
+        pendingCameraVerificationActive_ = false;
+        pendingCameraIdentityMatched_ = false;
+        updateStatus(tr("Could not start verification discovery because another network operation is active. Run Discover cameras when it finishes; setup remains unverified."));
     }
 }
