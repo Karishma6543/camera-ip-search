@@ -16,7 +16,7 @@ Use discovery first. Subnet scanning can take longer and a TCP response does not
 
 Use the **Live Scan Results** tab for devices found by the most recent discovery or subnet scan. It starts empty on application launch; starting another scan clears the previous live set. Devices that do not answer a subsequent scan disappear from this tab.
 
-Use **Saved Inventory** for historical records and manually entered devices. Previously observed devices are labelled **Stale — historical**; manually entered records show **Not verified** until a scan observes them. Neither status proves current reachability. Select records and use **Delete selected**, **Clear saved inventory**, or choose a finite age in the retention selector and click **Apply retention**. Each destructive action requires confirmation. **Keep forever** disables age-based pruning.
+Use **Saved Inventory** for historical records and manually entered devices. Previously observed devices are labelled **Stale — historical**; manually entered records show **Not verified** until a scan observes them. Neither status proves current reachability. Select records and use **Delete selected**, **Clear saved inventory**, or choose a finite age in the retention selector and click **Apply retention**. Each destructive action requires confirmation. Age-based retention uses the last-seen time for observed devices and the creation time for never-observed manual entries. **Keep forever** disables age-based pruning.
 
 ## 3. Top bar and inventory filters
 
