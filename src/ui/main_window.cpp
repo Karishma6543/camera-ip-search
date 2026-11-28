@@ -2953,12 +2953,26 @@ QUrl MainWindow::selectedCameraWebUrl() const
     const auto *item = deviceTable_->item(row, 1);
     if (!item || item->text().trimmed().isEmpty()) return {};
     const QString host = item->text().trimmed();
-    const QUrl url = host.startsWith(QStringLiteral("https://"), Qt::CaseInsensitive) ||
-                     host.startsWith(QStringLiteral("http://"), Qt::CaseInsensitive)
+    QUrl url = host.startsWith(QStringLiteral("https://"), Qt::CaseInsensitive) ||
+               host.startsWith(QStringLiteral("http://"), Qt::CaseInsensitive)
         ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://") + host);
     if (!url.isValid() || url.host().isEmpty() ||
         (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")))
         return {};
+
+    const QString portsText = item->data(Qt::UserRole + 6).toString();
+    const QSet<QString> openPorts(portsText.split(QStringLiteral(", "), Qt::SkipEmptyParts).cbegin(),
+                                  portsText.split(QStringLiteral(", "), Qt::SkipEmptyParts).cend());
+    if (!host.startsWith(QStringLiteral("http"), Qt::CaseInsensitive)) {
+        if (openPorts.contains(QStringLiteral("443"))) {
+            url.setScheme(QStringLiteral("https"));
+        } else if (openPorts.contains(QStringLiteral("8443"))) {
+            url.setScheme(QStringLiteral("https"));
+            url.setPort(8443);
+        } else if (openPorts.contains(QStringLiteral("8080"))) {
+            url.setPort(8080);
+        }
+    }
     return url;
 }
 
