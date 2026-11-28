@@ -11,7 +11,7 @@ set(CMAKE_AUTORCC ON)
 
 include(CTest)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Sql Xml Concurrent WebEngineWidgets)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 endif()
@@ -80,6 +80,8 @@ set(CAMERA_CORE_SOURCES
     src/discovery/ip_conflict_probe.cpp
     src/discovery/ip_assignment_planner.h
     src/discovery/ip_assignment_planner.cpp
+    src/ui/camera_browser_dialog.h
+    src/ui/camera_browser_dialog.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
     src/ui/oxita_theme.h
@@ -87,7 +89,7 @@ set(CAMERA_CORE_SOURCES
 
 add_library(camera-core STATIC ${CAMERA_CORE_SOURCES})
 target_include_directories(camera-core PUBLIC src)
-target_link_libraries(camera-core PUBLIC Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent)
+target_link_libraries(camera-core PUBLIC Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Xml Qt6::Concurrent Qt6::WebEngineWidgets)
 
 if(WIN32)
     target_link_libraries(camera-core PUBLIC iphlpapi)
