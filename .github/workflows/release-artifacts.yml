@@ -57,22 +57,45 @@ jobs:
           if (!$webEngineLocale) { throw 'Qt WebEngine locale data is missing from the Windows package' }
       - name: Deploy Qt runtime (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
+          set -euo pipefail
           APP="package/camera-ip-search.app"
           test -d "$APP"
           test -x "$APP/Contents/MacOS/camera-ip-search"
-          # This application uses SQLite only. Prevent macdeployqt from trying to
-          # bundle unrelated Qt SQL drivers whose third-party libraries are not
-          # installed on the hosted runner (ODBC/PostgreSQL/Mimer).
+
+          # This application uses SQLite only. Keep the SQLite driver available
+          # while avoiding unrelated SQL plugins with unavailable third-party
+          # dependencies on the hosted runner.
           if [ -d "$QT_ROOT_DIR/plugins/sqldrivers" ]; then
             find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name 'libqsqlite.dylib' -delete
           fi
-          "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
-          WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
-          test -n "$WEBENGINE_PROCESS"
-          for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat v8_context_snapshot.bin en-US.pak; do
-            test -n "$(find "$APP" -name "$resource" -print -quit)"
+
+          "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite -verbose=2
+
+          WEBENGINE_PROCESS="$(find "$APP" -path '*/Helpers/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess' -print -quit)"
+          if [ -z "$WEBENGINE_PROCESS" ]; then
+            echo "::error::Qt WebEngine helper app was not deployed. Bundle contents:"
+            find "$APP/Contents" -maxdepth 5 -print | sort
+            exit 1
+          fi
+
+          for resource in qtwebengine_resources.pak qtwebengine_resources_100p.pak qtwebengine_resources_200p.pak icudtl.dat en-US.pak; do
+            if [ -z "$(find "$APP/Contents/Resources" -name "$resource" -print -quit)" ]; then
+              echo "::error::Required Qt WebEngine resource is missing: $resource"
+              find "$APP/Contents/Resources" -maxdepth 4 -type f -print | sort
+              exit 1
+            fi
           done
+
+          # Qt WebEngine names the V8 snapshot with the target architecture on
+          # macOS (for example v8_context_snapshot.arm64.bin), unlike Windows.
+          if [ -z "$(find "$APP/Contents/Resources" -name 'v8_context_snapshot*.bin' -print -quit)" ]; then
+            echo "::error::Qt WebEngine V8 context snapshot is missing from the macOS app bundle"
+            find "$APP/Contents/Resources" -maxdepth 4 -type f -print | sort
+            exit 1
+          fi
+
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
           test -s "camera-ip-search-macos.zip"
           shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"
