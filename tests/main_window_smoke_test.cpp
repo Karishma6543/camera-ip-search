@@ -365,6 +365,14 @@ void MainWindowSmokeTest::savedInventoryIsIsolatedAndRetentionWorks()
     QCOMPARE(saved->rowCount(), 1);
     QCOMPARE(saved->item(0, 0)->text(), QStringLiteral("192.0.2.10"));
     QCOMPARE(saved->item(0, 6)->text(), QStringLiteral("Stale — historical"));
+    QSqlQuery schema(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(schema.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(schema.next());
+    QCOMPARE(schema.value(0).toInt(), 2);
+    QSqlQuery manual(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(manual.exec(QStringLiteral(
+        "INSERT INTO devices(device_key,ip,last_seen,created_at) "
+        "VALUES('manual-old','192.0.2.11','',datetime('now','-60 days'))")));
     QVERIFY(window.findChild<QComboBox *>(QStringLiteral("savedInventoryRetention")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("deleteSavedInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("clearSavedInventoryButton")));
