@@ -53,7 +53,7 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 - [ ] Add directed IPv4 broadcast discovery where protocol documentation supports it.
 - [ ] Add passive neighbor-table/ARP observation using supported OS APIs; label MAC-only results as candidates.
 - [ ] Add bounded, cancellable TCP candidate scanning with preview, rate limits and clear scope.
-- [ ] Add vendor-specific discovery only from authorized official protocol/SDK documentation.
+- [ ] Add vendor-specific discovery only from authorized official protocol/SDK documentation. The official CP PLUS NVR manual documents CPUNC on TCP 25001; the bounded scanner now probes that port as an unverified candidate only. Full CPUNC discovery/activation protocol remains undocumented.
 - [ ] Keep the Oxita Contract B probe isolated to Oxita devices; never send it to unrelated vendors.
 - [ ] Record source interface, source protocol, observed address, MAC, timestamps and provenance for every observation.
 - [ ] Merge duplicate observations while preserving all sources and last-seen evidence.
