@@ -43,9 +43,9 @@ private slots:
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
-    void guidedManualEntryAndRenameDialogsWork();
+    void manualEntriesAreSavedOutsideLiveResults();
     void exportsInventoryAsUtf8CsvWithEscapedFields();
-    void searchAndManufacturerFiltersHideNonMatchingRows();
+    void savedInventoryIsIsolatedAndRetentionWorks();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
     void migratesLegacyInventorySchema();
@@ -234,7 +234,7 @@ void MainWindowSmokeTest::inventoryStartsWithGuidanceAndCompactColumns()
     QVERIFY(window.styleSheet().contains(QStringLiteral("#C62836")));
 }
 
-void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
+void MainWindowSmokeTest::manualEntriesAreSavedOutsideLiveResults()
 {
     QStandardPaths::setTestModeEnabled(true);
     const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -321,7 +321,7 @@ void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
     QVERIFY(contents.contains(QByteArrayLiteral("\"IP ADDRESS\"")));
 }
 
-void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
+void MainWindowSmokeTest::savedInventoryIsIsolatedAndRetentionWorks()
 {
     QStandardPaths::setTestModeEnabled(true);
     const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -340,7 +340,7 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
         QSqlQuery insert(seed);
         insert.prepare(QStringLiteral(
             "INSERT INTO devices(device_key,ip,mac,manufacturer,model,firmware,serial,hardware,"
-            "activation,source,is_candidate,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)"));
+            "activation,source,is_candidate,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now','-60 days'))"));
         insert.addBindValue(QStringLiteral("cam-a"));
         insert.addBindValue(QStringLiteral("192.0.2.10"));
         insert.addBindValue(QStringLiteral("02:00:00:00:00:10"));
@@ -367,7 +367,21 @@ void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
     QVERIFY(window.findChild<QComboBox *>(QStringLiteral("savedInventoryRetention")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("deleteSavedInventoryButton")));
     QVERIFY(window.findChild<QPushButton *>(QStringLiteral("clearSavedInventoryButton")));
-    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("applyInventoryRetentionButton")));
+    auto *retention = window.findChild<QComboBox *>(QStringLiteral("savedInventoryRetention"));
+    auto *applyRetention = window.findChild<QPushButton *>(QStringLiteral("applyInventoryRetentionButton"));
+    QVERIFY(retention && applyRetention);
+    retention->setCurrentIndex(retention->findData(30));
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        QTest::mouseClick(dialog->button(QMessageBox::Yes), Qt::LeftButton);
+    });
+    QTest::mouseClick(applyRetention, Qt::LeftButton);
+    QCOMPARE(saved->rowCount(), 0);
+    QSqlQuery remaining(QSqlDatabase::database(QStringLiteral("camera_inventory"), false));
+    QVERIFY(remaining.exec(QStringLiteral("SELECT COUNT(*) FROM devices")));
+    QVERIFY(remaining.next());
+    QCOMPARE(remaining.value(0).toInt(), 0);
 }
 
 void MainWindowSmokeTest::discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface()
