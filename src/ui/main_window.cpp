@@ -312,19 +312,21 @@ void MainWindow::populateInterfaces()
     const QString previousSelection = interfaceSelector_->currentData().toString();
     const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
     QStringList fingerprintParts;
+    int interfaceCount = 0;
     int activeInterfaceCount = 0;
     int activeIpv4Count = 0;
     for (const QNetworkInterface &interface : interfaces) {
         const auto flags = interface.flags();
-        if (!flags.testFlag(QNetworkInterface::IsUp) ||
-            !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
-        ++activeInterfaceCount;
+        if (flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        ++interfaceCount;
+        const bool active = flags.testFlag(QNetworkInterface::IsUp) &&
+                            flags.testFlag(QNetworkInterface::IsRunning);
+        if (active) ++activeInterfaceCount;
         QStringList addresses;
         for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
             if (entry.ip().isLoopback()) continue;
             addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) ++activeIpv4Count;
+            if (active && entry.ip().protocol() == QAbstractSocket::IPv4Protocol) ++activeIpv4Count;
         }
         addresses.sort();
         fingerprintParts << QStringLiteral("%1|%2|%3|%4")
@@ -342,9 +344,9 @@ void MainWindow::populateInterfaces()
         interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
     for (const QNetworkInterface &interface : interfaces) {
         const auto flags = interface.flags();
-        if (!flags.testFlag(QNetworkInterface::IsUp) ||
-            !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        if (flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        const bool isUp = flags.testFlag(QNetworkInterface::IsUp);
+        const bool isRunning = flags.testFlag(QNetworkInterface::IsRunning);
         bool hasIpv4 = false;
         for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
@@ -355,22 +357,25 @@ void MainWindow::populateInterfaces()
         }
         QString label = interface.humanReadableName().isEmpty()
             ? interface.name() : interface.humanReadableName();
-        if (!hasIpv4) label += tr(" (link up — waiting for IPv4)");
+        if (!isUp) label += tr(" (disabled)");
+        else if (!isRunning) label += tr(" (link down)");
+        else if (!hasIpv4) label += tr(" (link up — waiting for IPv4)");
         interfaceSelector_->addItem(label, interface.name());
     }
-    if (activeInterfaceCount == 0)
-        interfaceSelector_->addItem(tr("No active network interface"), QString());
+    if (interfaceCount == 0)
+        interfaceSelector_->addItem(tr("No network adapters available"), QString());
 
     const int previousIndex = interfaceSelector_->findData(previousSelection);
     if (previousIndex >= 0) interfaceSelector_->setCurrentIndex(previousIndex);
     updateLocalNetworkSummary();
     if (changed) {
-        updateStatus(tr("Network adapters or addresses changed. Interface list refreshed; select the camera-connected adapter if needed."));
+        updateStatus(tr("Network adapter state or addresses changed. Interface list refreshed; choose the camera-connected adapter if needed."));
+    } else if (activeInterfaceCount == 0 && interfaceCount > 0) {
+        updateStatus(tr("No network adapter currently has an active link. Connect the camera and check its power, PoE and Ethernet cable."));
     } else if (activeInterfaceCount > 0 && activeIpv4Count == 0) {
-        updateStatus(tr("A network link is active but no IPv4 address is assigned yet. Check camera power/PoE and wait for link-local or DHCP addressing."));
+        updateStatus(tr("A network link is active but no IPv4 address is assigned yet. Check DHCP or wait for link-local addressing."));
     }
 }
-
 void MainWindow::buildUi()
 {
     setWindowTitle(tr("Oxita | Camera Device Manager"));
@@ -2284,8 +2289,11 @@ void MainWindow::updateLocalNetworkSummary()
             details << tr("Broadcast: %1").arg(entry.broadcast().toString());
     }
     if (!foundIpv4) details << tr("IPv4 address: Not available");
-    details << tr("Link state: %1").arg(
-        interface.flags().testFlag(QNetworkInterface::IsRunning) ? tr("Running") : tr("Not running"));
+    const auto interfaceFlags = interface.flags();
+    const QString linkState = !interfaceFlags.testFlag(QNetworkInterface::IsUp)
+        ? tr("Disabled")
+        : (interfaceFlags.testFlag(QNetworkInterface::IsRunning) ? tr("Up") : tr("Link down"));
+    details << tr("Link state: %1").arg(linkState);
     localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
 }
 
