@@ -1,6 +1,6 @@
 # New-camera Ethernet onboarding and initialization plan
 
-Status: engineering plan opened 2026-11-28. This document is the acceptance checklist for the end-to-end workflow. A checked software item means implemented and tested in code; it does not mean a camera model is hardware-certified.
+Status: engineering plan opened 2026-11-28; implementation is in progress on a branch now based on main after PR #36 merged. CI validation for this branch is pending. A checked software item means implemented and tested in code; it does not mean a camera model is hardware-certified.
 
 ## Product outcome
 
