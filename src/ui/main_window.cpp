@@ -255,7 +255,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
                         tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
         refreshOperationHistory();
-        updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
+        if (pendingCameraVerificationActive_) {
+            pendingCameraVerificationActive_ = false;
+            pendingCameraIdentityMatched_ = false;
+            updateStatus(tr("Post-setup discovery was cancelled. Camera initialization remains unverified."));
+        } else {
+            updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
+        }
     });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover cameras"));
