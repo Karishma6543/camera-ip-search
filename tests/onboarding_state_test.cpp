@@ -95,6 +95,8 @@ void OnboardingStateTest::reportsReadyOnlyAfterVerification()
     evidence.networkReachable = true;
     evidence.identityVerified = true;
     evidence.supportedAdapterAvailable = true;
+    evidence.activationStatusKnown = true;
+    evidence.activationVerified = true;
     evidence.networkConfigurationVerified = true;
     QCOMPARE(OnboardingState::evaluate(evidence).state, OnboardingState::State::Ready);
 }
