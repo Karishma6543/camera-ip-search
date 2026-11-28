@@ -179,7 +179,7 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     connect(view_, &QWebEngineView::loadFinished, this, [this](bool ok) {
         statusLabel_->setText(ok
             ? tr("Camera page loaded. Complete the camera's own setup, then choose “Done — verify camera”.")
-            : tr("The camera page could not be loaded. Check the cable, power, address, authentication and browser compatibility."));
+            : tr("The camera page could not be loaded. Check cable/power, address, authentication and try HTTP/HTTPS. Some legacy cameras require ActiveX/NPAPI or Internet Explorer components that this modern embedded browser cannot run; use a documented vendor setup method for those models."));
     });
     connect(page, &CameraWebPage::externalNavigationBlocked, this, [this](const QUrl &url) {
         statusLabel_->setText(tr("Blocked navigation away from the selected camera: %1").arg(url.toString()));
