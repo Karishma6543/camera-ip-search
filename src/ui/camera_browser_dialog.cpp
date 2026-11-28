@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QWebEngineCertificateError>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
