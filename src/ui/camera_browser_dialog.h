@@ -15,6 +15,7 @@ public:
     explicit CameraBrowserDialog(const QUrl &cameraUrl,
                                   const QString &deviceLabel,
                                   QWidget *parent = nullptr);
+    ~CameraBrowserDialog() override;
 
     QUrl currentUrl() const;
 
