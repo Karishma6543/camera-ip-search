@@ -22,6 +22,9 @@ qt_standard_project_setup()
 # for every test target, keeping CI resource usage predictable.
 set(CAMERA_CORE_SOURCES
     src/adapters/device_adapter.h
+    src/adapters/initialization_adapter.h
+    src/adapters/initialization_adapter_registry.h
+    src/adapters/initialization_adapter_registry.cpp
     src/adapters/onvif_adapter.h
     src/adapters/onvif_adapter.cpp
     src/adapters/adapter_registry.h
@@ -121,6 +124,8 @@ if(BUILD_TESTING)
     add_camera_test(discovery-parser-tests tests/discovery_parser_test.cpp)
     add_camera_test(ssdp-parser-tests tests/ssdp_parser_test.cpp)
     add_camera_test(adapter-registry-tests tests/adapter_registry_test.cpp)
+    add_camera_test(initialization-contract-tests tests/initialization_contract_test.cpp)
+    add_camera_test(initialization-adapter-registry-tests tests/initialization_adapter_registry_test.cpp)
     add_camera_test(onvif-network-config-tests tests/onvif_network_config_test.cpp)
     add_camera_test(onvif-network-write-integration-tests tests/onvif_network_write_integration_test.cpp)
     add_camera_test(onvif-maintenance-operations-tests tests/onvif_maintenance_operations_test.cpp)
