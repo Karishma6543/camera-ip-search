@@ -90,6 +90,7 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     profile_ = new QWebEngineProfile(this);
     profile_->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
     profile_->setHttpCacheType(QWebEngineProfile::NoCache);
+    profile_->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
 
     view_ = new QWebEngineView(this);
     view_->setObjectName(QStringLiteral("cameraBrowserView"));
@@ -143,6 +144,11 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     });
     connect(page, &QWebEnginePage::authenticationRequired,
             this, &CameraBrowserDialog::showAuthenticationPrompt);
+    connect(page, &QWebEnginePage::certificateError, this,
+            [this](const QWebEngineCertificateError &error) {
+        statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation.")
+                                  .arg(error.description()));
+    });
     connect(page, &QWebEnginePage::renderProcessTerminated, this,
             [this](QWebEnginePage::RenderProcessTerminationStatus, int) {
         statusLabel_->setText(tr("The camera page renderer stopped. Reload the page or close this window."));
@@ -169,6 +175,7 @@ void CameraBrowserDialog::showAuthenticationPrompt(const QUrl &url, QAuthenticat
         this, tr("Camera authentication"),
         tr("Username for %1:").arg(url.host()), QLineEdit::Normal, QString(), &accepted);
     if (!accepted) {
+        *authenticator = QAuthenticator();
         statusLabel_->setText(tr("Authentication cancelled. No credentials were saved."));
         return;
     }
