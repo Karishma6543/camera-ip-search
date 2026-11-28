@@ -60,6 +60,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
+          modules: 'qtwebengine'
           cache: true
       - name: Configure with AddressSanitizer and UndefinedBehaviorSanitizer
         run: >-
