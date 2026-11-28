@@ -25,6 +25,8 @@ private:
     QLineEdit *addressBar_{nullptr};
     QLabel *statusLabel_{nullptr};
     QString allowedHost_;
+    bool certificateRejected_{false};
+    bool navigationBlocked_{false};
     void updateAddress(const QUrl &url);
     void showAuthenticationPrompt(const QUrl &url, class QAuthenticator *authenticator);
 };
