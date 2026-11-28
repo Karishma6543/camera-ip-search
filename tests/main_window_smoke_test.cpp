@@ -5,6 +5,9 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QTemporaryDir>
 #include <QFileInfo>
 #include <QTabWidget>
 #include <QTabBar>
@@ -36,10 +39,12 @@ class MainWindowSmokeTest final : public QObject
     Q_OBJECT
 private slots:
     void startupShowsOperationHistory();
+    void inventorySchemaDoesNotPersistCameraCredentials();
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
     void guidedManualEntryAndRenameDialogsWork();
+    void exportsInventoryAsUtf8CsvWithEscapedFields();
     void searchAndManufacturerFiltersHideNonMatchingRows();
     void discoveryServiceStartsAndCancelsOnSelectedPhysicalInterface();
     void leavesCorruptInventoryDatabaseUntouched();
@@ -102,6 +107,32 @@ void MainWindowSmokeTest::startupShowsOperationHistory()
 }
 
 
+
+void MainWindowSmokeTest::inventorySchemaDoesNotPersistCameraCredentials()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid() && database.isOpen());
+
+    const QStringList tables{QStringLiteral("devices"), QStringLiteral("operation_history")};
+    const QStringList forbiddenFragments{
+        QStringLiteral("username"), QStringLiteral("password"),
+        QStringLiteral("credential"), QStringLiteral("secret"),
+        QStringLiteral("authorization")
+    };
+    for (const QString &table : tables) {
+        QSqlQuery columns(database);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table)));
+        while (columns.next()) {
+            const QString column = columns.value(1).toString().toLower();
+            for (const QString &fragment : forbiddenFragments)
+                QVERIFY2(!column.contains(fragment),
+                         qPrintable(QStringLiteral("Sensitive credential column found: %1.%2")
+                                        .arg(table, column)));
+        }
+    }
+}
 
 void MainWindowSmokeTest::exposesAllWorkspacesAndAutomationControls()
 {
@@ -241,6 +272,64 @@ void MainWindowSmokeTest::guidedManualEntryAndRenameDialogsWork()
     });
     QTest::mouseClick(renameButton, Qt::LeftButton);
     QCOMPARE(table->item(0, 2)->text(), QStringLiteral("Loading bay"));
+
+    const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
+    QVERIFY(database.isValid() && database.isOpen());
+    QSqlQuery persisted(database);
+    persisted.prepare(QStringLiteral("SELECT user_label FROM devices WHERE ip=:ip"));
+    persisted.bindValue(QStringLiteral(":ip"), QStringLiteral("192.168.10.25"));
+    QVERIFY(persisted.exec());
+    QVERIFY(persisted.next());
+    QCOMPARE(persisted.value(0).toString(), QStringLiteral("Loading bay"));
+}
+
+void MainWindowSmokeTest::exportsInventoryAsUtf8CsvWithEscapedFields()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(QDir(appData).removeRecursively() || !QFileInfo::exists(appData));
+
+    MainWindow window;
+    auto *addButton = window.findChild<QPushButton *>(QStringLiteral("addDeviceButton"));
+    auto *exportButton = window.findChild<QPushButton *>(QStringLiteral("exportCsvButton"));
+    QVERIFY(addButton && exportButton);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *address = dialog->findChild<QLineEdit *>(QStringLiteral("manualAddress"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("manualDeviceName"));
+        auto *manufacturer = dialog->findChild<QLineEdit *>(QStringLiteral("manualManufacturer"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveManualDeviceButton"));
+        QVERIFY(address && name && manufacturer && save);
+        address->setText(QStringLiteral("192.168.10.25"));
+        name->setText(QStringLiteral("Front \"east\", gate"));
+        manufacturer->setText(QStringLiteral("Oxita"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+    QTest::mouseClick(addButton, Qt::LeftButton);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString csvPath = directory.filePath(QStringLiteral("inventory.csv"));
+    QTimer::singleShot(0, &window, [&window, csvPath] {
+        auto *dialog = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
+        QVERIFY2(dialog, "CSV export must present a file selection dialog.");
+        dialog->selectFile(csvPath);
+        auto *buttons = dialog->findChild<QDialogButtonBox *>();
+        QVERIFY2(buttons, "CSV export dialog must expose its standard action buttons.");
+        auto *saveButton = buttons->button(QDialogButtonBox::Save);
+        QVERIFY2(saveButton, "CSV export dialog must expose its Save/accept button.");
+        QTest::mouseClick(saveButton, Qt::LeftButton);
+    });
+    QTest::mouseClick(exportButton, Qt::LeftButton);
+
+    QFile csv(csvPath);
+    QVERIFY2(csv.open(QIODevice::ReadOnly), "The CSV export should create the selected file.");
+    const QByteArray contents = csv.readAll();
+    QVERIFY(contents.startsWith(QByteArray::fromHex("efbbbf")));
+    QVERIFY(contents.contains(QByteArrayLiteral("\"192.168.10.25\",\"Front \"\"east\"\", gate\",\"Oxita\"")));
+    QVERIFY(contents.contains(QByteArrayLiteral("\"IP ADDRESS\"")));
 }
 
 void MainWindowSmokeTest::searchAndManufacturerFiltersHideNonMatchingRows()
