@@ -195,7 +195,7 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
             this, &CameraBrowserDialog::showAuthenticationPrompt);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     connect(page, &QWebEnginePage::certificateError, this,
-            [this](const QWebEngineCertificateError &error) {
+            [this](QWebEngineCertificateError error) {
         error.rejectCertificate();
         certificateRejected_ = true;
         statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
