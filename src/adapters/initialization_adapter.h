@@ -4,7 +4,6 @@
 
 #include <QByteArrayView>
 #include <QDeadlineTimer>
-#include <QDeadlineTimer>
 #include <QString>
 
 #include <atomic>
