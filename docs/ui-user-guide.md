@@ -7,12 +7,18 @@ This guide describes the controls currently wired into the desktop UI source. La
 1. Open the application.
 2. In the network-interface selector, choose **All active IPv4 interfaces** to probe every active IPv4 adapter, or select one adapter such as Ethernet or Wi-Fi. Subnet scanning uses the selected interface.
 3. Click **Discover cameras**. This sends ONVIF WS-Discovery and the supported Oxita Contract B discovery probe. During a scan, the same button becomes **Cancel discovery**.
-4. Wait for the results in **Network inventory**. Discovery is local-link IPv4; it does not automatically cross routers or VLANs.
-5. If devices may not answer discovery, click **Scan subnet**. Select the scan scope in its dialog, review the host count and start the scan. It checks a defined set of TCP ports and adds unverified candidates. During the scan, the button becomes **Cancel subnet scan**.
+4. Wait for results in **Live Scan Results**. Each new scan replaces the previous live result set. Discovery is local-link IPv4; it does not automatically cross routers or VLANs.
+5. If devices may not answer discovery, click **Scan subnet**. Select the scan scope in its dialog, review the host count and start the scan. It replaces the live result set with unverified TCP candidates. During the scan, the button becomes **Cancel subnet scan**.
 
 Use discovery first. Subnet scanning can take longer and a TCP response does not prove that a host is a camera.
 
-## 2. Top bar and inventory filters
+## 2. Live results and Saved Inventory
+
+Use the **Live Scan Results** tab for devices found by the most recent discovery or subnet scan. It starts empty on application launch; starting another scan clears the previous live set. Devices that do not answer a subsequent scan disappear from this tab.
+
+Use **Saved Inventory** for historical records and manually entered devices. These are labelled **Stale — historical** and are not proof of current reachability. Select records and use **Delete selected**, **Clear saved inventory**, or choose a finite age in the retention selector and click **Apply retention**. Each destructive action requires confirmation. **Keep forever** disables age-based pruning.
+
+## 3. Top bar and inventory filters
 
 | Control | What it does / how to use it |
 |---|---|
