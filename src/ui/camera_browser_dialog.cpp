@@ -13,9 +13,34 @@
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QWebEngineUrlRequestInfo>
+#include <QWebEngineUrlRequestInterceptor>
 #include <QWebEngineView>
 
 namespace {
+class CameraRequestInterceptor final : public QWebEngineUrlRequestInterceptor
+{
+public:
+    CameraRequestInterceptor(QString allowedHost, QObject *parent)
+        : QWebEngineUrlRequestInterceptor(parent), allowedHost_(std::move(allowedHost)) {}
+
+    void interceptRequest(QWebEngineUrlRequestInfo &info) override
+    {
+        const QUrl url = info.requestUrl();
+        const QString scheme = url.scheme().toLower();
+        if (scheme == QStringLiteral("data") || scheme == QStringLiteral("blob") ||
+            scheme == QStringLiteral("about"))
+            return;
+        const bool webSocket = scheme == QStringLiteral("ws") || scheme == QStringLiteral("wss");
+        const bool webRequest = scheme == QStringLiteral("http") || scheme == QStringLiteral("https");
+        const bool sameHost = url.host().compare(allowedHost_, Qt::CaseInsensitive) == 0;
+        if ((!webRequest && !webSocket) || !sameHost) info.block(true);
+    }
+
+private:
+    QString allowedHost_;
+};
+
 class CameraWebPage final : public QWebEnginePage
 {
     Q_OBJECT
@@ -91,6 +116,7 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     profile_ = new QWebEngineProfile(this);
     profile_->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
     profile_->setHttpCacheType(QWebEngineProfile::NoCache);
+    profile_->setUrlRequestInterceptor(new CameraRequestInterceptor(allowedHost_, profile_));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     profile_->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
 #endif
