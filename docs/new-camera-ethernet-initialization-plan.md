@@ -8,6 +8,30 @@ A user connects a supported IP camera to the PC by Ethernet, opens Oxita Device 
 
 The application must not claim universal activation support merely because a camera is discoverable. ONVIF standardizes device discovery and selected management operations; it does not standardize every manufacturer's factory activation workflow.
 
+
+## Browser-first universal initialization experience
+
+The user-facing contract is browser-like: selecting a discovered camera and pressing **Initialize** must take the user into that camera's own setup experience inside Oxita, without requiring the user to choose a manufacturer or model.
+
+- [ ] Add a single **Initialize** action to each eligible live camera result and the selected-device action panel.
+- [ ] Resolve the camera's observed address and available web endpoints; try only safe, bounded HTTP/HTTPS endpoint checks and do not guess vendor CGI/API paths.
+- [ ] Prefer HTTPS when the device advertises a usable HTTPS web endpoint; explain certificate warnings and never silently weaken TLS validation for protocol/API traffic.
+- [ ] Embed the camera's web UI in an in-app browser surface with navigation, back/forward, reload, loading/error states and a visible device address/origin.
+- [ ] Keep the user inside the Oxita workflow; do not make the normal Initialize action silently launch an unrelated external browser.
+- [ ] Handle HTTP basic/digest authentication prompts and camera login pages without storing credentials by default; never log passwords or session tokens.
+- [ ] Support redirects and address changes safely, but prevent navigation from escaping the selected device without a clear user action and origin indication.
+- [ ] Detect and explain browser limitations such as obsolete ActiveX/NPAPI plugins, unsupported TLS/ciphers, self-signed certificates, mixed content and vendor pages requiring legacy browser components; never claim these pages are supported merely because they load in a browser.
+- [ ] Do not inject scripts, bypass login, defeat certificate checks, or automate password creation through undocumented page internals.
+- [ ] Provide a guided fallback when no web UI is reachable: standard protocol adapter, authorized vendor adapter, or a clear unsupported/manual recovery state.
+- [ ] After the user completes setup, provide **Verify camera**: rediscover, re-identify, re-check reachability and read back network/device information through supported protocols.
+- [ ] Detect address changes after setup and guide rediscovery/reconnection without assuming the previous IP remains valid.
+- [ ] Keep browser-page success separate from verified device initialization; only mark Initialized/Ready after supported evidence confirms it.
+- [ ] Evaluate Qt WebEngine packaging, security settings, licensing, binary size and Windows/macOS/Linux availability before selecting the embedded browser implementation.
+- [ ] Add browser navigation/auth/redirect/error tests plus simulated camera web pages for initialized, activation-required, login-required and unsupported cases.
+- [ ] Add physical tests against multiple camera web interfaces, including CP PLUS and Prama, and record model/firmware/browser compatibility separately.
+
+**Important boundary:** a browser-like in-app setup page is the universal user experience, not a universal vendor activation protocol. A camera's own web page remains responsible for its proprietary activation behavior. Some legacy camera pages may depend on browser plugins or TLS behavior that a modern embedded browser cannot support; Oxita must disclose that limitation rather than claim universal compatibility.
+
 ## Workstream A — Ethernet and interface readiness
 
 - [ ] Detect link state changes on every eligible Ethernet/Wi-Fi interface without blocking the UI.
