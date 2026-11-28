@@ -90,7 +90,9 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     profile_ = new QWebEngineProfile(this);
     profile_->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
     profile_->setHttpCacheType(QWebEngineProfile::NoCache);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     profile_->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
+#endif
 
     view_ = new QWebEngineView(this);
     view_->setObjectName(QStringLiteral("cameraBrowserView"));
