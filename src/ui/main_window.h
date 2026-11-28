@@ -13,6 +13,7 @@ class QPushButton;
 class QLineEdit;
 class QComboBox;
 class QProgressBar;
+class QTimer;
 class DiscoveryService;
 class SubnetScanner;
 class ReachabilityChecker;
@@ -89,4 +90,6 @@ private:
     QPushButton *openWebButton_{nullptr};
     QPushButton *refreshDeviceButton_{nullptr};
     QSqlDatabase inventoryDb_;
+    QTimer *interfaceRefreshTimer_{nullptr};
+    QString interfaceInventoryFingerprint_;
 };
