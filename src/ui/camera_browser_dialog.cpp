@@ -185,10 +185,37 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
             this, &CameraBrowserDialog::showAuthenticationPrompt);
     connect(page, &QWebEnginePage::certificateError, this,
             [this](QWebEngineCertificateError error) {
-        error.rejectCertificate();
         certificateRejected_ = true;
-        statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
-                                  .arg(error.description()));
+        if (!error.isOverridable()) {
+            error.rejectCertificate();
+            statusLabel_->setText(tr("The camera HTTPS certificate error cannot be overridden: %1.")
+                                      .arg(error.description()));
+            return;
+        }
+
+        QMessageBox prompt(this);
+        prompt.setIcon(QMessageBox::Warning);
+        prompt.setWindowTitle(tr("Camera HTTPS certificate warning"));
+        prompt.setText(tr("The HTTPS certificate presented by %1 cannot be verified.")
+                           .arg(allowedHost_));
+        prompt.setInformativeText(
+            tr("%1\\n\\nIf this is the camera you intentionally connected to your local network, "
+               "you may continue once for this browser session. Do not continue on an untrusted network "
+               "or if you do not recognize this device. Oxita will not save a certificate exception.")
+                .arg(error.description()));
+        prompt.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        prompt.button(QMessageBox::Yes)->setText(tr("Continue once"));
+        prompt.button(QMessageBox::No)->setText(tr("Go back"));
+        prompt.setDefaultButton(QMessageBox::No);
+        if (prompt.exec() == QMessageBox::Yes) {
+            error.acceptCertificate();
+            statusLabel_->setText(tr("You accepted this camera certificate for the current request only. "
+                                     "No certificate exception was saved."));
+        } else {
+            error.rejectCertificate();
+            statusLabel_->setText(tr("The camera certificate was rejected. You can try HTTP on a trusted "
+                                     "local network or inspect the camera certificate."));
+        }
     });
     connect(page, &QWebEnginePage::renderProcessTerminated, this,
             [this](QWebEnginePage::RenderProcessTerminationStatus, int) {
