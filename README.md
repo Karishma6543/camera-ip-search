@@ -1,6 +1,6 @@
 # Oxita Camera Device Manager
 
-A cross-platform Qt 6 desktop utility for discovering IP cameras and other network devices, inspecting device/network information, and performing a limited set of explicitly supported ONVIF operations.
+A cross-platform Qt 6 desktop utility for discovering IP cameras and other network devices, opening camera setup pages inside Oxita, inspecting device/network information, and performing a limited set of explicitly supported ONVIF operations.
 
 **Release status: Pre-production.** CI builds and automated tests run on Windows, Ubuntu and macOS, but CI is not proof of physical-camera compatibility. Real-device interoperability, exact model/firmware evidence, security review, and signed distribution packaging remain release gates. Do not treat a manufacturer name or an open TCP port as proof of compatibility.
 
@@ -73,7 +73,7 @@ The [compatibility matrix](docs/compatibility-matrix.md) is the source of truth 
 
 ## Build
 
-Requirements: CMake 3.21+, a C++20 compiler and Qt 6.5+ with Widgets, Network, Sql and Xml. Qt Test is required only when tests are enabled.
+Requirements: CMake 3.21+, a C++20 compiler and Qt 6.5+ with Widgets, Network, Sql, Xml and WebEngineWidgets. Qt Test is required only when tests are enabled. Qt WebEngine adds a substantial runtime dependency; package and distribute its required libraries, resources and third-party license notices.
 
 Production-style build without test dependencies:
 
