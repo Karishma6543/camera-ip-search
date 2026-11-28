@@ -136,6 +136,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     populateInterfaces();
     updateLocalNetworkSummary();
     interfaceRefreshTimer_ = new QTimer(this);
+    interfaceRefreshTimer_->setObjectName(QStringLiteral("interfaceRefreshTimer"));
     interfaceRefreshTimer_->setInterval(3000);
     connect(interfaceRefreshTimer_, &QTimer::timeout, this, &MainWindow::populateInterfaces);
     interfaceRefreshTimer_->start();
