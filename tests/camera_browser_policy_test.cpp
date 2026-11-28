@@ -28,6 +28,8 @@ void CameraBrowserPolicyTest::rejectsCrossHostAndUnsafeNavigation()
         QUrl(QStringLiteral("file:///etc/passwd")), QStringLiteral("192.168.1.20")));
     QVERIFY(!CameraBrowserPolicy::allowsMainFrameNavigation(
         QUrl(QStringLiteral("javascript:alert(1)")), QStringLiteral("192.168.1.20")));
+    QVERIFY(!CameraBrowserPolicy::allowsMainFrameNavigation(
+        QUrl(QStringLiteral("http://admin:secret@192.168.1.20/")), QStringLiteral("192.168.1.20")));
 }
 
 void CameraBrowserPolicyTest::allowsSameHostResourcesAndWebSockets()
