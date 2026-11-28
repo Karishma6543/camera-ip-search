@@ -50,14 +50,26 @@ OnboardingState::Result OnboardingState::evaluate(const OnboardingEvidence &evid
         return {State::Unsupported, QStringLiteral("Device identified — configuration unsupported"),
                 QStringLiteral("Discovery succeeded, but no compatible configuration adapter is available.")};
 
-    if (!evidence.networkConfigurationVerified)
-        return {State::VerificationPending, QStringLiteral("Verification pending"),
-                QStringLiteral("Read the network configuration and verify supported settings before marking ready.")};
+    if (!evidence.activationStatusKnown || !evidence.activationVerified)
+        return {State::VerificationPending, QStringLiteral("Activation verification pending"),
+                QStringLiteral("Confirm activation state through an authoritative adapter response before marking ready.")};
 
-    if (evidence.activationStatusKnown && evidence.activationRequired)
+    if (evidence.activationRequired)
         return {State::InitializationRequired, QStringLiteral("Initialization required"),
                 QStringLiteral("Complete activation through an authorized adapter.")};
 
+    if (evidence.configurationInProgress)
+        return {State::Configuring, QStringLiteral("Configuring network"),
+                QStringLiteral("Wait for configuration read-back and reconnection verification.")};
+
+    if (evidence.configurationRequired)
+        return {State::ConfigurationRequired, QStringLiteral("Network configuration required"),
+                QStringLiteral("Review the proposed network settings and confirm before applying them.")};
+
+    if (!evidence.networkConfigurationVerified)
+        return {State::VerificationPending, QStringLiteral("Network verification pending"),
+                QStringLiteral("Read back the network configuration before marking the device ready.")};
+
     return {State::Ready, QStringLiteral("Ready"),
-            QStringLiteral("Device identity and network configuration have been verified.")};
+            QStringLiteral("Device identity, activation state and network configuration have been verified.")};
 }
