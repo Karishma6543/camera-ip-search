@@ -46,17 +46,7 @@ public:
 
 signals:
     void externalNavigationBlocked(const QUrl &url);
-    void certificateRejected(const QString &description);
-
 protected:
-#if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
-    bool certificateError(const QWebEngineCertificateError &error) override
-    {
-        emit certificateRejected(error.description());
-        return false;
-    }
-#endif
-
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override
     {
         Q_UNUSED(type);
@@ -193,7 +183,6 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     });
     connect(page, &QWebEnginePage::authenticationRequired,
             this, &CameraBrowserDialog::showAuthenticationPrompt);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     connect(page, &QWebEnginePage::certificateError, this,
             [this](QWebEngineCertificateError error) {
         error.rejectCertificate();
@@ -201,14 +190,6 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
         statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
                                   .arg(error.description()));
     });
-#else
-    connect(page, &CameraBrowserInternal::CameraWebPage::certificateRejected, this,
-            [this](const QString &description) {
-        certificateRejected_ = true;
-        statusLabel_->setText(tr("The camera HTTPS certificate was rejected: %1. Oxita will not bypass certificate validation. You can try HTTP on a trusted local network.")
-                                  .arg(description));
-    });
-#endif
     connect(page, &QWebEnginePage::renderProcessTerminated, this,
             [this](QWebEnginePage::RenderProcessTerminationStatus, int) {
         statusLabel_->setText(tr("The camera page renderer stopped. Reload the page or close this window."));
