@@ -35,6 +35,8 @@ set(CAMERA_CORE_SOURCES
     src/app/batch_operation_runner.h
     src/app/batch_operation_runner.cpp
     src/core/device_record.h
+    src/core/onboarding_state.h
+    src/core/onboarding_state.cpp
     src/core/device_classifier.h
     src/core/device_classifier.cpp
     src/core/operation_compatibility.h
@@ -123,6 +125,7 @@ if(BUILD_TESTING)
     add_camera_test(reachability-checker-tests tests/reachability_checker_test.cpp)
     add_camera_test(device-identity-tests tests/device_identity_test.cpp)
     add_camera_test(device-classifier-tests tests/device_classifier_test.cpp)
+    add_camera_test(onboarding-state-tests tests/onboarding_state_test.cpp)
     add_camera_test(operation-compatibility-tests tests/operation_compatibility_test.cpp)
     add_camera_test(inventory-backup-tests tests/inventory_backup_test.cpp)
     add_camera_test(onvif-network-interface-parser-tests tests/onvif_network_interface_parser_test.cpp)
