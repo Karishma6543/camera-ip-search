@@ -258,6 +258,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         if (pendingCameraVerificationActive_) {
             pendingCameraVerificationActive_ = false;
             pendingCameraIdentityMatched_ = false;
+            ++pendingCameraVerificationGeneration_;
             updateStatus(tr("Post-setup discovery was cancelled. Camera initialization remains unverified."));
         } else {
             updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
@@ -272,12 +273,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
         refreshOperationHistory();
         if (pendingCameraVerificationActive_) {
-            const bool matched = pendingCameraIdentityMatched_;
-            pendingCameraVerificationActive_ = false;
-            pendingCameraIdentityMatched_ = false;
-            updateStatus(matched
-                ? tr("Camera identity was rediscovered. Review its reported status and network details; activation is not marked complete without explicit device evidence.")
-                : tr("The selected camera could not be matched after setup. It may have changed address, be outside this interface's subnet, or not support the active discovery protocols. Initialization remains unverified."));
+            const quint64 verificationGeneration = pendingCameraVerificationGeneration_;
+            QTimer::singleShot(5000, this, [this, verificationGeneration] {
+                if (!pendingCameraVerificationActive_ ||
+                    pendingCameraVerificationGeneration_ != verificationGeneration)
+                    return;
+                const bool matched = pendingCameraIdentityMatched_;
+                pendingCameraVerificationActive_ = false;
+                pendingCameraIdentityMatched_ = false;
+                updateStatus(matched
+                    ? tr("Camera identity was rediscovered. Review its reported status and network details; activation is not marked complete without explicit device evidence.")
+                    : tr("The selected camera could not be matched after setup. It may have changed address, be outside this interface's subnet, or not support the active discovery protocols. Initialization remains unverified."));
+            });
         } else {
             updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
         }
@@ -3117,6 +3124,7 @@ void MainWindow::openSelectedWebInterface()
     }
 
     pendingCameraVerification_ = expectedDevice;
+    ++pendingCameraVerificationGeneration_;
     pendingCameraVerificationActive_ = true;
     pendingCameraIdentityMatched_ = false;
     recordOperation(tr("Camera setup completed by user"), url.host(), tr("Verification pending"),
@@ -3130,6 +3138,7 @@ void MainWindow::openSelectedWebInterface()
     } else {
         pendingCameraVerificationActive_ = false;
         pendingCameraIdentityMatched_ = false;
+        ++pendingCameraVerificationGeneration_;
         updateStatus(tr("Could not start verification discovery because another network operation is active. Run Discover cameras when it finishes; setup remains unverified."));
     }
 }
