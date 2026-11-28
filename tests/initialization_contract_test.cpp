@@ -16,10 +16,38 @@ void InitializationContractTest::defaultsAreUnknownAndUnverified()
     const ActivationProbeResult probe;
     QCOMPARE(probe.status, ActivationStatus::Unknown);
     QVERIFY(!probe.evidence.authoritative);
+    QVERIFY(!probe.isAuthoritative());
 
     const ActivationResult result;
     QCOMPARE(result.outcome, ActivationOutcome::Failed);
     QVERIFY(!result.activationVerified);
+    QVERIFY(!result.isVerifiedSuccess());
+
+    ActivationProbeResult unauthenticated;
+    unauthenticated.status = ActivationStatus::AlreadyInitialized;
+    QVERIFY(!unauthenticated.isAuthoritative());
+
+    ActivationProbeResult authoritative;
+    authoritative.status = ActivationStatus::AlreadyInitialized;
+    authoritative.evidence.authoritative = true;
+    QVERIFY(authoritative.isAuthoritative());
+
+    ActivationResult accepted;
+    accepted.outcome = ActivationOutcome::AcceptedButUnverified;
+    accepted.activationVerified = false;
+    accepted.evidence.authoritative = true;
+    QVERIFY(!accepted.isVerifiedSuccess());
+
+    ActivationResult contradictory;
+    contradictory.outcome = ActivationOutcome::CompletedAndVerified;
+    contradictory.activationVerified = true;
+    QVERIFY(!contradictory.isVerifiedSuccess());
+
+    ActivationResult verified;
+    verified.outcome = ActivationOutcome::CompletedAndVerified;
+    verified.activationVerified = true;
+    verified.evidence.authoritative = true;
+    QVERIFY(verified.isVerifiedSuccess());
 }
 
 void InitializationContractTest::cancellationAndDeadlineAreExplicit()
