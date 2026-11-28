@@ -12,6 +12,10 @@ namespace DeviceIdentity {
 QString findMatchingKey(const QHash<QString, DeviceRecord> &devices,
                         const DeviceRecord &observation);
 
+// Strict post-operation identity check: never treats a shared IP address as
+// proof that the same physical device has returned.
+bool hasStrongMatch(const DeviceRecord &expected, const DeviceRecord &observation);
+
 // Merge only additive or missing information. Verified observations may
 // refresh an address; candidate scans may only contribute candidate ports.
 DeviceRecord mergeObservations(const DeviceRecord &existing,

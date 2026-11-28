@@ -7,11 +7,12 @@
 namespace {
 constexpr int kMaxHosts = 256;
 constexpr int kConnectTimeoutMs = 450;
-// Common management, printing, file-sharing and camera services. A positive
-// TCP response only creates an unverified candidate; it does not identify it.
+// Common management, printing, file-sharing and camera services. Port 25001
+// is listed for CPUNC in the official CP PLUS Orange NVR manual. A positive TCP
+// response only creates an unverified candidate; it does not identify a vendor.
 const QVector<quint16> kCommonDevicePorts{
     22, 23, 53, 80, 135, 139, 443, 445, 515, 554, 631, 1900,
-    2869, 3389, 5000, 5357, 7547, 8000, 8080, 8443, 8899, 9100, 34567
+    2869, 3389, 5000, 5357, 7547, 8000, 8080, 8443, 8899, 9100, 25001, 34567
 };
 }
 

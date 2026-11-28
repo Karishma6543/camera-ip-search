@@ -30,6 +30,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
+          modules: 'qtwebengine'
           cache: true
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
@@ -45,6 +46,10 @@ jobs:
           if (!(Test-Path $exe -PathType Leaf)) { throw 'Installed application executable is missing' }
           & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations --compiler-runtime --dir (Split-Path $exe) $exe
           if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
+          $webEngineProcess = Get-ChildItem 'package' -Recurse -Filter 'QtWebEngineProcess.exe' | Select-Object -First 1
+          $webEngineResources = Get-ChildItem 'package' -Recurse -Filter 'qtwebengine_resources.pak' | Select-Object -First 1
+          if (!$webEngineProcess) { throw 'QtWebEngineProcess.exe is missing from the Windows package' }
+          if (!$webEngineResources) { throw 'Qt WebEngine Chromium resources are missing from the Windows package' }
       - name: Deploy Qt runtime (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -52,6 +57,12 @@ jobs:
           test -d "$APP"
           test -x "$APP/Contents/MacOS/camera-ip-search"
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
+          WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
+          WEBENGINE_RESOURCES="$(find "$APP" -name 'qtwebengine_resources.pak' -print -quit)"
+          WEBENGINE_ENTITLEMENTS="$(find "$APP" -name 'QtWebEngineProcess.entitlements' -print -quit)"
+          test -n "$WEBENGINE_PROCESS"
+          test -n "$WEBENGINE_RESOURCES"
+          test -n "$WEBENGINE_ENTITLEMENTS"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
           test -s "camera-ip-search-macos.zip"
           shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"

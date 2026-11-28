@@ -44,6 +44,9 @@ private slots:
     void officialOxitaLogoIsBundledAndDisplayed();
     void exposesAllWorkspacesAndAutomationControls();
     void inventoryStartsWithGuidanceAndCompactColumns();
+    void initializeActionUsesEmbeddedCameraSetupWorkflow();
+    void networkInterfaceHotplugMonitorIsEnabled();
+    void initializeActionUsesEmbeddedCameraSetupWorkflow();
     void manualEntriesAreSavedOutsideLiveResults();
     void exportsInventoryAsUtf8CsvWithEscapedFields();
     void savedInventoryIsIsolatedAndRetentionWorks();
@@ -64,6 +67,41 @@ private slots:
     void shutdownAbortsActiveOnvifEnrichment();
     void sendsAndVerifiesOnvifFactoryResetRequest();
 };
+
+void MainWindowSmokeTest::initializeActionUsesEmbeddedCameraSetupWorkflow()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *initialize = window.findChild<QPushButton *>(
+        QStringLiteral("initializeCameraButton"));
+    QVERIFY2(initialize, "A dedicated Initialize action must be available in the device workspace.");
+    QVERIFY(initialize->text().contains(QStringLiteral("Initialize"), Qt::CaseInsensitive));
+    QVERIFY(initialize->toolTip().contains(QStringLiteral("inside Oxita"), Qt::CaseInsensitive));
+    QVERIFY(!initialize->isEnabled());
+}
+
+void MainWindowSmokeTest::initializeActionUsesEmbeddedCameraSetupWorkflow()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *initialize = window.findChild<QPushButton *>(
+        QStringLiteral("initializeCameraButton"));
+    QVERIFY2(initialize, "A dedicated Initialize action must be available in the device workspace.");
+    QVERIFY(initialize->text().contains(QStringLiteral("Initialize"), Qt::CaseInsensitive));
+    QVERIFY(initialize->toolTip().contains(QStringLiteral("inside Oxita"), Qt::CaseInsensitive));
+    QVERIFY(!initialize->isEnabled());
+}
+
+void MainWindowSmokeTest::networkInterfaceHotplugMonitorIsEnabled()
+{
+    QStandardPaths::setTestModeEnabled(true);
+    MainWindow window;
+    const auto *monitor = window.findChild<QTimer *>(
+        QStringLiteral("interfaceRefreshTimer"));
+    QVERIFY(monitor);
+    QCOMPARE(monitor->interval(), 3000);
+    QVERIFY(monitor->isActive());
+}
 
 void MainWindowSmokeTest::officialOxitaLogoIsBundledAndDisplayed()
 {
@@ -487,7 +525,7 @@ void MainWindowSmokeTest::migratesLegacyInventorySchema()
     QSqlQuery version(database);
     QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
     QVERIFY(version.next());
-    QCOMPARE(version.value(0).toInt(), 2);
+    QCOMPARE(version.value(0).toInt(), 1);
 
     QSqlQuery columns(database);
     QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(devices)")));

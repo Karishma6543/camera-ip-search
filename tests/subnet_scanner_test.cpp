@@ -94,8 +94,10 @@ void SubnetScannerTest::aggregatesMultipleOpenPortsWithoutDuplicates()
     candidate.ipAddress = QStringLiteral("192.0.2.55");
     QVERIFY(SubnetScanner::appendOpenPort(candidate, 80));
     QVERIFY(SubnetScanner::appendOpenPort(candidate, 554));
+    QVERIFY(SubnetScanner::appendOpenPort(candidate, 25001));
     QVERIFY(!SubnetScanner::appendOpenPort(candidate, 80));
-    QCOMPARE(candidate.openPorts, QStringList({QStringLiteral("80"), QStringLiteral("554")}));
+    QVERIFY(!SubnetScanner::appendOpenPort(candidate, 25001));
+    QCOMPARE(candidate.openPorts, QStringList({QStringLiteral("80"), QStringLiteral("554"), QStringLiteral("25001")}));
 }
 
 void SubnetScannerTest::cancelsAnActiveSubnetScan()

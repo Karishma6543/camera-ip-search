@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "camera_browser_dialog.h"
 #include "core/diagnostic_log.h"
 #include "core/device_identity.h"
 #include "core/device_classifier.h"
@@ -134,9 +135,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     refreshOperationHistory();
     populateInterfaces();
     updateLocalNetworkSummary();
+    interfaceRefreshTimer_ = new QTimer(this);
+    interfaceRefreshTimer_->setObjectName(QStringLiteral("interfaceRefreshTimer"));
+    interfaceRefreshTimer_->setInterval(3000);
+    connect(interfaceRefreshTimer_, &QTimer::timeout, this, &MainWindow::populateInterfaces);
+    interfaceRefreshTimer_->start();
     if (inventoryDb_.isOpen())
         updateStatus(tr("Ready — choose a local interface to scan your subnet."));
-    connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
+    connect(discovery_, &DiscoveryService::deviceFound, this, [this](const DeviceRecord &device) {
+        upsertDevice(device);
+        if (!pendingCameraVerificationActive_ || pendingCameraIdentityMatched_) return;
+        if (DeviceIdentity::hasStrongMatch(pendingCameraVerification_, device)) {
+            pendingCameraIdentityMatched_ = true;
+            updateStatus(tr("The camera was rediscovered and matched using its previous identity evidence. Initialization still requires device-side verification."));
+            recordOperation(tr("Post-setup camera identity check"), device.ipAddress,
+                            tr("Identity matched"),
+                            tr("Rediscovered device matched the selected camera by MAC, serial number or ONVIF endpoint. Activation status is not inferred."));
+        }
+    });
     connect(discovery_, &DiscoveryService::statusChanged, this, &MainWindow::updateStatus);
     connect(discovery_, &DiscoveryService::authenticationRequested, this,
             [this](QAuthenticator *authenticator) {
@@ -239,7 +255,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(),
                         tr("Cancelled"), tr("%1 device(s) found before cancellation").arg(count));
         refreshOperationHistory();
-        updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
+        if (pendingCameraVerificationActive_) {
+            pendingCameraVerificationActive_ = false;
+            pendingCameraIdentityMatched_ = false;
+            updateStatus(tr("Post-setup discovery was cancelled. Camera initialization remains unverified."));
+        } else {
+            updateStatus(tr("Discovery cancelled — %1 device(s) retained.").arg(count));
+        }
     });
     connect(discovery_, &DiscoveryService::finished, this, [this](int count) {
         scanButton_->setText(tr("Discover cameras"));
@@ -249,7 +271,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         updateDeviceSummary();
         recordOperation(tr("Discovery"), interfaceSelector_ ? interfaceSelector_->currentText() : QString(), tr("Completed"), tr("%1 device(s) reported").arg(count));
         refreshOperationHistory();
-        updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
+        if (pendingCameraVerificationActive_) {
+            const bool matched = pendingCameraIdentityMatched_;
+            pendingCameraVerificationActive_ = false;
+            pendingCameraIdentityMatched_ = false;
+            updateStatus(matched
+                ? tr("Camera identity was rediscovered. Review its reported status and network details; activation is not marked complete without explicit device evidence.")
+                : tr("The selected camera could not be matched after setup. It may have changed address, be outside this interface's subnet, or not support the active discovery protocols. Initialization remains unverified."));
+        } else {
+            updateStatus(tr("Discovery finished — %1 device(s) found.").arg(count));
+        }
     });
     connect(subnetScanner_, &SubnetScanner::candidateFound, this, &MainWindow::upsertDevice);
     connect(subnetScanner_, &SubnetScanner::statusChanged, this, &MainWindow::updateStatus);
@@ -304,28 +335,73 @@ MainWindow::~MainWindow()
 void MainWindow::populateInterfaces()
 {
     if (!interfaceSelector_) return;
-    interfaceSelector_->clear();
-    bool foundInterface = false;
-    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+    const QString previousSelection = interfaceSelector_->currentData().toString();
+    const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    QStringList fingerprintParts;
+    int interfaceCount = 0;
+    int activeInterfaceCount = 0;
+    int activeIpv4Count = 0;
+    for (const QNetworkInterface &interface : interfaces) {
         const auto flags = interface.flags();
-        if (!flags.testFlag(QNetworkInterface::IsUp) ||
-            !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
-        bool hasIpv4 = false;
-        for (const auto &entry : interface.addressEntries())
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                !entry.ip().isLoopback() && entry.prefixLength() >= 1) hasIpv4 = true;
-        if (hasIpv4) {
-            if (!foundInterface)
-                interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
-            interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
-            foundInterface = true;
+        if (flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        ++interfaceCount;
+        const bool active = flags.testFlag(QNetworkInterface::IsUp) &&
+                            flags.testFlag(QNetworkInterface::IsRunning);
+        if (active) ++activeInterfaceCount;
+        QStringList addresses;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().isLoopback()) continue;
+            addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
+            if (active && entry.ip().protocol() == QAbstractSocket::IPv4Protocol) ++activeIpv4Count;
         }
+        addresses.sort();
+        fingerprintParts << QStringLiteral("%1|%2|%3|%4")
+            .arg(interface.name()).arg(static_cast<int>(flags))
+            .arg(interface.hardwareAddress(), addresses.join(QLatin1Char(',')));
     }
-    if (!foundInterface)
-        interfaceSelector_->addItem(tr("No active IPv4 interface"), QString());
-}
+    fingerprintParts.sort();
+    const QString fingerprint = fingerprintParts.join(QLatin1Char(';'));
+    if (fingerprint == interfaceInventoryFingerprint_) return;
+    const bool changed = !interfaceInventoryFingerprint_.isEmpty();
+    interfaceInventoryFingerprint_ = fingerprint;
 
+    interfaceSelector_->clear();
+    if (activeIpv4Count > 0)
+        interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
+    for (const QNetworkInterface &interface : interfaces) {
+        const auto flags = interface.flags();
+        if (flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        const bool isUp = flags.testFlag(QNetworkInterface::IsUp);
+        const bool isRunning = flags.testFlag(QNetworkInterface::IsRunning);
+        bool hasIpv4 = false;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
+                !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
+                hasIpv4 = true;
+                break;
+            }
+        }
+        QString label = interface.humanReadableName().isEmpty()
+            ? interface.name() : interface.humanReadableName();
+        if (!isUp) label += tr(" (disabled)");
+        else if (!isRunning) label += tr(" (link down)");
+        else if (!hasIpv4) label += tr(" (link up — waiting for IPv4)");
+        interfaceSelector_->addItem(label, interface.name());
+    }
+    if (interfaceCount == 0)
+        interfaceSelector_->addItem(tr("No network adapters available"), QString());
+
+    const int previousIndex = interfaceSelector_->findData(previousSelection);
+    if (previousIndex >= 0) interfaceSelector_->setCurrentIndex(previousIndex);
+    updateLocalNetworkSummary();
+    if (changed) {
+        updateStatus(tr("Network adapter state or addresses changed. Interface list refreshed; choose the camera-connected adapter if needed."));
+    } else if (activeInterfaceCount == 0 && interfaceCount > 0) {
+        updateStatus(tr("No network adapter currently has an active link. Connect the camera and check its power, PoE and Ethernet cable."));
+    } else if (activeInterfaceCount > 0 && activeIpv4Count == 0) {
+        updateStatus(tr("A network link is active but no IPv4 address is assigned yet. Check DHCP or wait for link-local addressing."));
+    }
+}
 void MainWindow::buildUi()
 {
     setWindowTitle(tr("Oxita | Camera Device Manager"));
@@ -977,6 +1053,8 @@ void MainWindow::buildUi()
                "<b>Scan selected subnet</b><br>Checks candidate addresses on the selected IPv4 interface. "
                "A TCP response is reachability evidence, not proof of ONVIF compatibility or camera identity.<br><br>"
                "<b>Device information</b><br>Select a device and use Refresh device info to query its reachable ONVIF device service. "
+                "<b>Initialize / open camera setup</b><br>Opens the selected device web interface inside Oxita. Complete activation on the camera page itself. " 
+                "The Done action starts fresh discovery; it does not by itself prove that activation succeeded. "
                "Reported fields depend on the camera and its firmware.<br><br>"
                "<b>Network configuration</b><br>Static IPv4 changes require a verified ONVIF interface token and current interface details. "
                "Bulk IPv4 mode assigns a different address to each checked camera and processes them sequentially. "
@@ -1176,7 +1254,7 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     auto *deviceLayout = new QVBoxLayout(devicePanel);
     deviceLayout->setSpacing(8);
     auto *deviceDescription = mutedLabel(
-        tr("Refresh retrieves available ONVIF device information. Open web interface launches the camera's HTTP page in your default browser."),
+        tr("Initialize opens the selected camera's own setup page inside Oxita. The camera controls its activation process; Oxita verifies the device again after setup."),
         devicePanel);
     deviceLayout->addWidget(deviceDescription);
     auto *deviceActions = new QGridLayout();
@@ -1184,7 +1262,9 @@ QWidget *MainWindow::makeMaintenanceTab(QWidget *parent)
     deviceActions->setVerticalSpacing(8);
     refreshDeviceButton_ = actionButton(tr("Refresh device info"), devicePanel);
     refreshDeviceButton_->setEnabled(false);
-    openWebButton_ = actionButton(tr("Open web interface"), devicePanel);
+    openWebButton_ = actionButton(tr("Initialize / open camera setup"), devicePanel, true);
+    openWebButton_->setObjectName(QStringLiteral("initializeCameraButton"));
+    openWebButton_->setToolTip(tr("Open the selected camera web interface inside Oxita. Complete its own setup, then rediscover to verify."));
     openWebButton_->setEnabled(false);
     deviceActions->addWidget(refreshDeviceButton_, 0, 0);
     deviceActions->addWidget(openWebButton_, 0, 1);
@@ -2234,9 +2314,19 @@ void MainWindow::updateLocalNetworkSummary()
         if (!entry.broadcast().isNull())
             details << tr("Broadcast: %1").arg(entry.broadcast().toString());
     }
-    if (!foundIpv4) details << tr("IPv4 address: Not available");
-    details << tr("Link state: %1").arg(
-        interface.flags().testFlag(QNetworkInterface::IsRunning) ? tr("Running") : tr("Not running"));
+    const auto interfaceFlags = interface.flags();
+    const QString linkState = !interfaceFlags.testFlag(QNetworkInterface::IsUp)
+        ? tr("Disabled")
+        : (interfaceFlags.testFlag(QNetworkInterface::IsRunning) ? tr("Up") : tr("Link down"));
+    details << tr("Link state: %1").arg(linkState);
+    if (!foundIpv4) {
+        details << tr("IPv4 address: Not available");
+        if (!interfaceFlags.testFlag(QNetworkInterface::IsRunning)) {
+            details << tr("Check the Ethernet cable, camera power/PoE and selected PC adapter.");
+        } else {
+            details << tr("Wait for DHCP or automatic link-local addressing. If the camera uses a factory static IP, consult its exact model manual and set a temporary PC adapter address in the same subnet yourself. Oxita will not change PC network settings silently.");
+        }
+    }
     localNetworkSummary_->setText(details.join(QLatin1Char('\n')));
 }
 
@@ -2943,18 +3033,96 @@ void MainWindow::editSelectedLabel()
 }
 
 
+QUrl MainWindow::selectedCameraWebUrl() const
+{
+    const int row = selectedDeviceRow();
+    if (row < 0 || !deviceTable_) return {};
+    const auto *item = deviceTable_->item(row, 1);
+    if (!item || item->text().trimmed().isEmpty()) return {};
+    const QString host = item->text().trimmed();
+    QUrl url = host.startsWith(QStringLiteral("https://"), Qt::CaseInsensitive) ||
+               host.startsWith(QStringLiteral("http://"), Qt::CaseInsensitive)
+        ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://") + host);
+    if (!url.isValid() || url.host().isEmpty() ||
+        (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")))
+        return {};
+
+    const QStringList openPorts = item->data(Qt::UserRole + 6).toString()
+        .split(QStringLiteral(", "), Qt::SkipEmptyParts);
+    if (!host.startsWith(QStringLiteral("http"), Qt::CaseInsensitive)) {
+        if (openPorts.contains(QStringLiteral("443"))) {
+            url.setScheme(QStringLiteral("https"));
+        } else if (openPorts.contains(QStringLiteral("8443"))) {
+            url.setScheme(QStringLiteral("https"));
+            url.setPort(8443);
+        } else if (openPorts.contains(QStringLiteral("8080"))) {
+            url.setPort(8080);
+        }
+    }
+    return url;
+}
+
 void MainWindow::openSelectedWebInterface()
 {
-    const int row=selectedDeviceRow();
-    if (row<0) return;
-    const auto *item=deviceTable_->item(row,1);
-    if (!item || item->text().isEmpty()) return;
-    const QString host=item->text().trimmed();
-    const QUrl url=host.startsWith(QStringLiteral("https://"),Qt::CaseInsensitive) || host.startsWith(QStringLiteral("http://"),Qt::CaseInsensitive)
-        ? QUrl::fromUserInput(host) : QUrl(QStringLiteral("http://")+host);
-    if (!url.isValid() || url.host().isEmpty()) {
-        QMessageBox::warning(this,tr("Invalid address"),tr("Selected device has no valid web address."));
+    const int row = selectedDeviceRow();
+    if (row < 0) return;
+    const QUrl url = selectedCameraWebUrl();
+    if (!url.isValid()) {
+        QMessageBox::warning(this, tr("Invalid address"),
+                             tr("The selected device does not have a valid HTTP or HTTPS address."));
         return;
     }
-    QDesktopServices::openUrl(url);
+
+    const QString label = deviceTable_->item(row, 2)
+        ? deviceTable_->item(row, 2)->text().trimmed() : QString();
+    const auto *ipItem = deviceTable_->item(row, 1);
+    DeviceRecord expectedDevice;
+    expectedDevice.id = ipItem ? ipItem->text().trimmed() : url.host();
+    expectedDevice.ipAddress = ipItem ? ipItem->text().trimmed() : url.host();
+    expectedDevice.userLabel = label;
+    expectedDevice.manufacturer = deviceTable_->item(row, 3)
+        ? deviceTable_->item(row, 3)->text().trimmed() : QString();
+    expectedDevice.model = deviceTable_->item(row, 4)
+        ? deviceTable_->item(row, 4)->text().trimmed() : QString();
+    expectedDevice.macAddress = deviceTable_->item(row, 5)
+        ? deviceTable_->item(row, 5)->text().trimmed() : QString();
+    expectedDevice.serialNumber = deviceTable_->item(row, 9)
+        ? deviceTable_->item(row, 9)->text().trimmed() : QString();
+    expectedDevice.firmwareVersion = deviceTable_->item(row, 10)
+        ? deviceTable_->item(row, 10)->text().trimmed() : QString();
+    expectedDevice.discoverySources = deviceTable_->item(row, 8)
+        ? deviceTable_->item(row, 8)->text().split(QStringLiteral(", "), Qt::SkipEmptyParts)
+        : QStringList{};
+    if (ipItem) {
+        expectedDevice.onvifEndpoint = ipItem->data(Qt::UserRole + 2).toString();
+        expectedDevice.deviceServiceUrl = ipItem->data(Qt::UserRole + 3).toString();
+        expectedDevice.openPorts = ipItem->data(Qt::UserRole + 6).toString()
+            .split(QStringLiteral(", "), Qt::SkipEmptyParts);
+        expectedDevice.networkInterfaceToken = ipItem->data(Qt::UserRole + 7).toString();
+    }
+    CameraBrowserDialog browser(url, label, this);
+    recordOperation(tr("Camera setup opened"), url.host(), tr("Started"),
+                    tr("Opened the camera's own web interface in Oxita. Camera activation is not assumed."));
+    const int result = browser.exec();
+    if (result != QDialog::Accepted) {
+        updateStatus(tr("Camera setup window closed. Initialization has not been verified."));
+        return;
+    }
+
+    pendingCameraVerification_ = expectedDevice;
+    pendingCameraVerificationActive_ = true;
+    pendingCameraIdentityMatched_ = false;
+    recordOperation(tr("Camera setup completed by user"), url.host(), tr("Verification pending"),
+                    tr("User indicated setup is complete. A fresh discovery and strong identity match are required; web-page completion alone is not proof of activation."));
+    updateStatus(tr("Setup page closed. Rediscovering on the selected network interface to verify the camera…"));
+    // Reuse the normal discovery action so Live Scan Results are cleared
+    // before the new scan; never leave the pre-initialization snapshot mixed in.
+    if (scanButton_ && scanButton_->isEnabled() &&
+        discovery_ && !discovery_->isRunning() && !subnetScanner_->isRunning()) {
+        scanButton_->click();
+    } else {
+        pendingCameraVerificationActive_ = false;
+        pendingCameraIdentityMatched_ = false;
+        updateStatus(tr("Could not start verification discovery because another network operation is active. Run Discover cameras when it finishes; setup remains unverified."));
+    }
 }
