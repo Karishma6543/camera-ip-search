@@ -38,6 +38,10 @@ Checkboxes distinguish code present from validation evidence. A checked implemen
 - [ ] Test VLAN, multiple NIC, Wi-Fi/Ethernet, firewall and routed-network limitations.
 
 ## Milestone 3 — Device information and inventory
+- [x] Keep the live scan result set session-only and empty on application startup; never hydrate it from persisted inventory.
+- [x] Separate Saved Inventory from Live Scan Results; discovery and subnet scans replace only the live set.
+- [x] Add explicit saved-record deletion and user-confirmed retention policies (forever, 30, 90 or 365 days).
+- [ ] Add repeated-scan, missing-device, cancellation-race and large-inventory acceptance tests.
 - [x] ONVIF GetDeviceInformation request/response handling.
 - [x] ONVIF GetCapabilities, GetNetworkInterfaces and GetDNS request/response handling.
 - [x] Select the ONVIF network interface matching the discovered camera IPv4 address before exposing its token for configuration; cover multi-interface selection in parser tests.
