@@ -16,10 +16,11 @@ An adapter must be tied to exact vendor, model family, hardware revision and fir
 - `Unsupported`: the adapter has no documented operation for this exact target.
 - `Unknown`: no authoritative state could be established.
 - `Error`: a bounded protocol failure occurred; retain a sanitized diagnostic.
+- A probe result is authoritative only when its evidence is marked authoritative and its status is neither `Unknown` nor `Error`.
 
 ## Activation semantics
 
-Only `CompletedAndVerified` permits the application to mark activation complete. `AcceptedButUnverified` is explicitly not success. Rejected, timeout, cancelled, unsupported and failed outcomes must remain distinct. Adapters must define idempotency, duplicate-request behavior, safe retry rules, password policy and recovery behavior before they are enabled.
+Only `CompletedAndVerified` with both `activationVerified=true` and authoritative evidence passes the `isVerifiedSuccess()` guard and permits the application to mark activation complete. Contradictory or incomplete results fail closed. `AcceptedButUnverified` is explicitly not success. Rejected, timeout, cancelled, unsupported and failed outcomes must remain distinct. Adapters must define idempotency, duplicate-request behavior, safe retry rules, password policy and recovery behavior before they are enabled.
 
 ## Security and execution requirements
 
