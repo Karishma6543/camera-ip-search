@@ -14,20 +14,20 @@ The application must not claim universal activation support merely because a cam
 The user-facing contract is browser-like: selecting a discovered camera and pressing **Initialize** must take the user into that camera's own setup experience inside Oxita, without requiring the user to choose a manufacturer or model.
 
 - [x] Add a single **Initialize / open camera setup** action to the selected-device action panel. (Live-row shortcut remains pending.)
-- [ ] Resolve the camera's observed address and available web endpoints; try only safe, bounded HTTP/HTTPS endpoint checks and do not guess vendor CGI/API paths.
-- [ ] Prefer HTTPS when the device advertises a usable HTTPS web endpoint; explain certificate warnings and never silently weaken TLS validation for protocol/API traffic.
+- [ ] Complete safe, bounded HTTP/HTTPS endpoint validation. Current slice uses the selected camera address and observed TCP ports 443/8443/8080 to choose an initial scheme; it does not yet prove that the open port serves HTTP.
+- [x] Prefer HTTPS when a TCP scan observed port 443 or 8443 and provide an explicit HTTP/HTTPS switch; TLS certificate validation is not bypassed. Actual HTTPS endpoint validation remains pending.
 - [x] Embed the camera's web UI in an in-app browser surface with navigation, back/forward, reload, loading/error states and a visible device address/origin.
-- [ ] Keep the user inside the Oxita workflow; do not make the normal Initialize action silently launch an unrelated external browser.
+- [x] Keep the user inside the Oxita workflow; the Initialize action opens the in-app browser rather than silently launching an external browser.
 - [x] Handle HTTP authentication challenges with session-only prompts; never persist credentials or log passwords. (Camera HTML login forms remain the camera's own UI.)
 - [x] Restrict top-level navigation to HTTP/HTTPS on the selected device host; block cross-host navigation and pop-up windows.
 - [ ] Detect and explain browser limitations such as obsolete ActiveX/NPAPI plugins, unsupported TLS/ciphers, self-signed certificates, mixed content and vendor pages requiring legacy browser components; never claim these pages are supported merely because they load in a browser.
-- [ ] Do not inject scripts, bypass login, defeat certificate checks, or automate password creation through undocumented page internals.
+- [x] Do not inject scripts, bypass login, defeat certificate checks, or automate password creation through undocumented page internals.
 - [ ] Provide a guided fallback when no web UI is reachable: standard protocol adapter, authorized vendor adapter, or a clear unsupported/manual recovery state.
-- [ ] Complete **Verify camera**: the current flow starts fresh discovery and attempts a strong identity match using prior MAC, serial number or ONVIF endpoint evidence. Explicit reachability checks, network/device read-back and activation-state verification remain pending. (Current first slice starts fresh discovery; explicit identity/read-back verification is pending.)
-- [ ] Detect address changes after setup and guide rediscovery/reconnection without assuming the previous IP remains valid.
+- [ ] Complete **Verify camera**: current flow starts fresh discovery and matches the selected camera only by MAC, serial-plus-manufacturer or ONVIF endpoint. Explicit reachability checks, network/device read-back and activation-state verification remain pending.
+- [ ] Complete address-change recovery: strong identity matching can recognize the same camera at a new address when discovery reports it, but guided reconnection when the new address is unreachable or on another subnet remains pending.
 - [ ] Keep browser-page success separate from verified device initialization; only mark Initialized/Ready after supported evidence confirms it.
 - [x] Select Qt WebEngine as the embedded browser implementation; add the module to build and release CI. (Runtime packaging/security/license/binary-size validation remains pending.)
-- [ ] Add browser navigation/auth/redirect/error tests plus simulated camera web pages for initialized, activation-required, login-required and unsupported cases.
+- [ ] Complete browser integration tests and simulated camera pages for initialized, activation-required, login-required and unsupported cases. Unit tests currently cover same-host navigation/resource policy and cross-host/credential URL rejection.
 - [ ] Add physical tests against multiple camera web interfaces, including CP PLUS and Prama, and record model/firmware/browser compatibility separately.
 
 **Important boundary:** a browser-like in-app setup page is the universal user experience, not a universal vendor activation protocol. A camera's own web page remains responsible for its proprietary activation behavior. Some legacy camera pages may depend on browser plugins or TLS behavior that a modern embedded browser cannot support; Oxita must disclose that limitation rather than claim universal compatibility.
