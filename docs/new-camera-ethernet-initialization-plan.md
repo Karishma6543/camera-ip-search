@@ -23,7 +23,7 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 - [ ] Detect and explain browser limitations such as obsolete ActiveX/NPAPI plugins, unsupported TLS/ciphers, self-signed certificates, mixed content and vendor pages requiring legacy browser components; never claim these pages are supported merely because they load in a browser.
 - [ ] Do not inject scripts, bypass login, defeat certificate checks, or automate password creation through undocumented page internals.
 - [ ] Provide a guided fallback when no web UI is reachable: standard protocol adapter, authorized vendor adapter, or a clear unsupported/manual recovery state.
-- [ ] After the user completes setup, provide **Verify camera**: rediscover, re-identify, re-check reachability and read back network/device information through supported protocols. (Current first slice starts fresh discovery; explicit identity/read-back verification is pending.)
+- [ ] Complete **Verify camera**: the current flow starts fresh discovery and attempts a strong identity match using prior MAC, serial number or ONVIF endpoint evidence. Explicit reachability checks, network/device read-back and activation-state verification remain pending. (Current first slice starts fresh discovery; explicit identity/read-back verification is pending.)
 - [ ] Detect address changes after setup and guide rediscovery/reconnection without assuming the previous IP remains valid.
 - [ ] Keep browser-page success separate from verified device initialization; only mark Initialized/Ready after supported evidence confirms it.
 - [x] Select Qt WebEngine as the embedded browser implementation; add the module to build and release CI. (Runtime packaging/security/license/binary-size validation remains pending.)
