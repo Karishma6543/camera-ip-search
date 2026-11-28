@@ -59,8 +59,10 @@ jobs:
           "$QT_ROOT_DIR/bin/macdeployqt" "$APP" -always-overwrite
           WEBENGINE_PROCESS="$(find "$APP" -name 'QtWebEngineProcess*' -print -quit)"
           WEBENGINE_RESOURCES="$(find "$APP" -name 'qtwebengine_resources.pak' -print -quit)"
+          WEBENGINE_ENTITLEMENTS="$(find "$APP" -name 'QtWebEngineProcess.entitlements' -print -quit)"
           test -n "$WEBENGINE_PROCESS"
           test -n "$WEBENGINE_RESOURCES"
+          test -n "$WEBENGINE_ENTITLEMENTS"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "camera-ip-search-macos.zip"
           test -s "camera-ip-search-macos.zip"
           shasum -a 256 "camera-ip-search-macos.zip" > "camera-ip-search-macos.zip.sha256"
