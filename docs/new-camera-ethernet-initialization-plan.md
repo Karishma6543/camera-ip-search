@@ -80,10 +80,10 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 - [ ] Define a vendor-neutral initialization request/result contract with typed outcomes and structured diagnostics.
 - [ ] Define adapter capability declarations for activation detection, activation, password policy, initial network setup and post-activation verification.
 - [ ] Implement an ONVIF generic path only for operations actually standardized and supported; never label ONVIF discovery as activation.
-- [ ] Research CP PLUS official IP Finder behavior and authorized SDK/API documentation by exact camera model/family.
+- [x] Research CP PLUS public IP Finder catalogue/manual evidence: official IP Finder V4.0 exists and is described for LAN discovery/configuration. Authorized protocol/SDK documentation and exact model/family contract remain pending.
 - [ ] Confirm CP PLUS SDK/API licensing, redistribution and supported OS constraints before integration.
 - [ ] Implement CP PLUS adapter only after an authorized protocol contract and simulator fixture exist.
-- [ ] Research Prama official discovery/activation API and authorized documentation by exact model/family.
+- [x] Research Prama public local-discovery evidence: official Prama Online Pro describes same-network device search. A documented desktop activation API/SDK and exact model/family contract remain pending.
 - [ ] Implement Prama adapter only after an authorized protocol contract and simulator fixture exist.
 - [ ] Keep vendor adapters isolated; no guessed CGI paths, undocumented ports, default passwords or reverse-engineered authentication bypass.
 - [ ] Support user-created initial password only when the device's documented protocol supports it.
