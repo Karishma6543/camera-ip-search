@@ -68,6 +68,8 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     auto *forwardButton = new QPushButton(tr("Forward"), this);
     forwardButton->setObjectName(QStringLiteral("cameraBrowserForward"));
     auto *reloadButton = new QPushButton(tr("Reload"), this);
+    auto *schemeButton = new QPushButton(tr("Try HTTPS"), this);
+    schemeButton->setObjectName(QStringLiteral("cameraBrowserSchemeToggle"));
     reloadButton->setObjectName(QStringLiteral("cameraBrowserReload"));
     addressBar_ = new QLineEdit(this);
     addressBar_->setObjectName(QStringLiteral("cameraBrowserAddress"));
@@ -76,6 +78,7 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     toolbar->addWidget(backButton);
     toolbar->addWidget(forwardButton);
     toolbar->addWidget(reloadButton);
+    toolbar->addWidget(schemeButton);
     toolbar->addWidget(addressBar_, 1);
     root->addLayout(toolbar);
 
@@ -106,9 +109,27 @@ CameraBrowserDialog::CameraBrowserDialog(const QUrl &cameraUrl,
     connect(backButton, &QPushButton::clicked, view_, &QWebEngineView::back);
     connect(forwardButton, &QPushButton::clicked, view_, &QWebEngineView::forward);
     connect(reloadButton, &QPushButton::clicked, view_, &QWebEngineView::reload);
+    connect(schemeButton, &QPushButton::clicked, this, [this, schemeButton] {
+        QUrl next = view_->url();
+        if (next.scheme() == QStringLiteral("https")) {
+            next.setScheme(QStringLiteral("http"));
+            if (next.port() == 443) next.setPort(-1);
+            else if (next.port() == 8443) next.setPort(8080);
+            schemeButton->setText(tr("Try HTTPS"));
+        } else {
+            next.setScheme(QStringLiteral("https"));
+            if (next.port() == -1) next.setPort(443);
+            else if (next.port() == 8080) next.setPort(8443);
+            schemeButton->setText(tr("Try HTTP"));
+        }
+        view_->setUrl(next);
+    });
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    connect(view_, &QWebEngineView::urlChanged, this, &CameraBrowserDialog::updateAddress);
+    connect(view_, &QWebEngineView::urlChanged, this, [this, schemeButton](const QUrl &url) {
+        updateAddress(url);
+        schemeButton->setText(url.scheme() == QStringLiteral("https") ? tr("Try HTTP") : tr("Try HTTPS"));
+    });
     connect(view_, &QWebEngineView::loadProgress, this, [this](int progress) {
         statusLabel_->setText(tr("Loading camera page… %1%").arg(progress));
     });
