@@ -31,6 +31,10 @@ Only `CompletedAndVerified` permits the application to mark activation complete.
 - Bound request/response sizes and retries; reject redirects or endpoints outside the verified device origin unless the documented protocol explicitly requires a separately validated service endpoint.
 - Record protocol evidence and sanitized outcome, never secrets.
 
+## Adapter registry selection
+
+The initialization registry is separate from the existing read/configuration adapter registry. It rejects null adapters, blank identifiers and duplicate identifiers (case-insensitive). A device is selected only when exactly one registered initialization adapter claims it. Zero matches means unsupported; multiple matches are treated as ambiguous and no adapter is selected. Registration order is never used to break a tie. This prevents an overlapping vendor adapter from silently taking ownership of a camera.
+
 ## Current implementation status
 
 The C++ interface and contract tests establish the extension boundary. There are no CP PLUS, Prama or Hikvision activation adapters in this repository yet. Those cannot responsibly be implemented from brand names alone: obtain the authorized SDK/protocol documentation and exact hardware/firmware test units first.
