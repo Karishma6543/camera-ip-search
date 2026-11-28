@@ -135,6 +135,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     refreshOperationHistory();
     populateInterfaces();
     updateLocalNetworkSummary();
+    interfaceRefreshTimer_ = new QTimer(this);
+    interfaceRefreshTimer_->setInterval(3000);
+    connect(interfaceRefreshTimer_, &QTimer::timeout, this, &MainWindow::populateInterfaces);
+    interfaceRefreshTimer_->start();
     if (inventoryDb_.isOpen())
         updateStatus(tr("Ready — choose a local interface to scan your subnet."));
     connect(discovery_, &DiscoveryService::deviceFound, this, &MainWindow::upsertDevice);
@@ -305,26 +309,66 @@ MainWindow::~MainWindow()
 void MainWindow::populateInterfaces()
 {
     if (!interfaceSelector_) return;
+    const QString previousSelection = interfaceSelector_->currentData().toString();
+    const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    QStringList fingerprintParts;
+    int activeInterfaceCount = 0;
+    int activeIpv4Count = 0;
+    for (const QNetworkInterface &interface : interfaces) {
+        const auto flags = interface.flags();
+        if (!flags.testFlag(QNetworkInterface::IsUp) ||
+            !flags.testFlag(QNetworkInterface::IsRunning) ||
+            flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
+        ++activeInterfaceCount;
+        QStringList addresses;
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            if (entry.ip().isLoopback()) continue;
+            addresses << QStringLiteral("%1/%2").arg(entry.ip().toString()).arg(entry.prefixLength());
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) ++activeIpv4Count;
+        }
+        addresses.sort();
+        fingerprintParts << QStringLiteral("%1|%2|%3|%4")
+            .arg(interface.name()).arg(static_cast<int>(flags))
+            .arg(interface.hardwareAddress(), addresses.join(QLatin1Char(',')));
+    }
+    fingerprintParts.sort();
+    const QString fingerprint = fingerprintParts.join(QLatin1Char(';'));
+    if (fingerprint == interfaceInventoryFingerprint_) return;
+    const bool changed = !interfaceInventoryFingerprint_.isEmpty();
+    interfaceInventoryFingerprint_ = fingerprint;
+
     interfaceSelector_->clear();
-    bool foundInterface = false;
-    for (const QNetworkInterface &interface : QNetworkInterface::allInterfaces()) {
+    if (activeIpv4Count > 0)
+        interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
+    for (const QNetworkInterface &interface : interfaces) {
         const auto flags = interface.flags();
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
             !flags.testFlag(QNetworkInterface::IsRunning) ||
             flags.testFlag(QNetworkInterface::IsLoopBack)) continue;
         bool hasIpv4 = false;
-        for (const auto &entry : interface.addressEntries())
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol &&
-                !entry.ip().isLoopback() && entry.prefixLength() >= 1) hasIpv4 = true;
-        if (hasIpv4) {
-            if (!foundInterface)
-                interfaceSelector_->addItem(tr("All active IPv4 interfaces"), QString());
-            interfaceSelector_->addItem(interface.humanReadableName(), interface.name());
-            foundInterface = true;
+                !entry.ip().isLoopback() && entry.prefixLength() >= 1) {
+                hasIpv4 = true;
+                break;
+            }
         }
+        QString label = interface.humanReadableName().isEmpty()
+            ? interface.name() : interface.humanReadableName();
+        if (!hasIpv4) label += tr(" (link up — waiting for IPv4)");
+        interfaceSelector_->addItem(label, interface.name());
     }
-    if (!foundInterface)
-        interfaceSelector_->addItem(tr("No active IPv4 interface"), QString());
+    if (activeInterfaceCount == 0)
+        interfaceSelector_->addItem(tr("No active network interface"), QString());
+
+    const int previousIndex = interfaceSelector_->findData(previousSelection);
+    if (previousIndex >= 0) interfaceSelector_->setCurrentIndex(previousIndex);
+    updateLocalNetworkSummary();
+    if (changed) {
+        updateStatus(tr("Network adapters or addresses changed. Interface list refreshed; select the camera-connected adapter if needed."));
+    } else if (activeInterfaceCount > 0 && activeIpv4Count == 0) {
+        updateStatus(tr("A network link is active but no IPv4 address is assigned yet. Check camera power/PoE and wait for link-local or DHCP addressing."));
+    }
 }
 
 void MainWindow::buildUi()
