@@ -118,4 +118,19 @@ Do not mark a whole brand as supported based on one model.
 - [x] Add end-to-end changed-IP reconnect, stale-address read-back mismatch and gateway-failure partial-outcome fixtures (this PR). Remaining: transport-loss/reboot-required and wrong-prefix/gateway-read-back edge cases.
 - [ ] Validate representative CP Plus and Prama camera models and firmware versions on physical hardware.
 - [ ] Add vendor-specific adapters only where protocol behavior is documented and testable.
-\n\n## Milestone 8 — New-camera Ethernet onboarding\n\nSee [new-camera Ethernet initialization plan](new-camera-ethernet-initialization-plan.md) for the complete work breakdown and acceptance criteria. The first implementation slice adds a typed, evidence-based onboarding state evaluator. It deliberately does not infer factory activation from vendor name, reachability, open ports or missing credentials.\n
+## Milestone 8 — New-camera Ethernet onboarding\n\nSee [new-camera Ethernet initialization plan](new-camera-ethernet-initialization-plan.md) for the complete work breakdown and acceptance criteria. The first implementation slice adds a typed, evidence-based onboarding state evaluator. It deliberately does not infer factory activation from vendor name, reachability, open ports or missing credentials.\n
+ 
+## Milestone 9 — Browser-first camera setup
+
+See [new-camera Ethernet initialization plan](new-camera-ethernet-initialization-plan.md), section “Browser-first universal initialization experience”.
+
+- [x] Add a selected-device Initialize action that opens the camera web interface inside Oxita.
+- [x] Add an embedded Qt WebEngine view with navigation, loading feedback and HTTP/HTTPS switching.
+- [x] Keep browser cookies/cache session-only and do not persist camera credentials.
+- [x] Restrict top-level navigation to the selected camera host and reject pop-up windows.
+- [x] Prompt for HTTP authentication without storing credentials; reject invalid HTTPS certificates rather than bypassing validation.
+- [x] Start fresh discovery after the user indicates camera setup is complete.
+- [ ] Verify device identity and read back network/device configuration after setup before marking it Ready.
+- [ ] Test the embedded browser against camera web interfaces on Windows, macOS and Linux.
+- [ ] Validate Qt WebEngine runtime deployment, installer size, licensing and legacy camera browser compatibility.
+- [ ] Add per-model physical hardware evidence for CP PLUS, Prama and other manufacturers.
