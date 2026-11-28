@@ -3,7 +3,7 @@
 namespace {
 bool sameCameraHost(const QUrl &url, const QString &cameraHost)
 {
-    return !cameraHost.trimmed().isEmpty() &&
+    return !cameraHost.trimmed().isEmpty() && url.userInfo().isEmpty() &&
            url.host().compare(cameraHost.trimmed(), Qt::CaseInsensitive) == 0;
 }
 }
