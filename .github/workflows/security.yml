@@ -37,7 +37,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.10.1'
-          modules: 'qtwebengine'
+          modules: 'qtwebengine qtwebchannel'
           cache: true
       - name: Build C++ application
         if: matrix.language == 'cpp'
