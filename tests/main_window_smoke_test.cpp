@@ -262,7 +262,7 @@ void MainWindowSmokeTest::manualEntriesAreSavedOutsideLiveResults()
     QCOMPARE(saved->item(0, 0)->text(), QStringLiteral("192.168.10.25"));
     QCOMPARE(saved->item(0, 1)->text(), QStringLiteral("Front entrance"));
     QCOMPARE(saved->item(0, 5)->text(), QStringLiteral("Not observed"));
-    QCOMPARE(saved->item(0, 6)->text(), QStringLiteral("Stale — historical"));
+    QCOMPARE(saved->item(0, 6)->text(), QStringLiteral("Not verified"));
     const QSqlDatabase database = QSqlDatabase::database(QStringLiteral("camera_inventory"), false);
     QVERIFY(database.isValid() && database.isOpen());
     QSqlQuery persisted(database);
