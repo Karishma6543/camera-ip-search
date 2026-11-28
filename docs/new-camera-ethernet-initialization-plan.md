@@ -80,10 +80,10 @@ The user-facing contract is browser-like: selecting a discovered camera and pres
 - [ ] Define a vendor-neutral initialization request/result contract with typed outcomes and structured diagnostics.
 - [ ] Define adapter capability declarations for activation detection, activation, password policy, initial network setup and post-activation verification.
 - [ ] Implement an ONVIF generic path only for operations actually standardized and supported; never label ONVIF discovery as activation.
-- [x] Research CP PLUS public IP Finder catalogue/manual evidence: official IP Finder V4.0 exists and is described for LAN discovery/configuration. Authorized protocol/SDK documentation and exact model/family contract remain pending.
+- [x] Research CP PLUS public IP Finder and product evidence: official IP Finder V4.0 is listed; selected product pages state SDK/API support and ONVIF/HTTP(S) support. Obtain the actual authorized SDK/protocol reference, redistribution terms and exact model/firmware contract before implementing activation.
 - [ ] Confirm CP PLUS SDK/API licensing, redistribution and supported OS constraints before integration.
 - [ ] Implement CP PLUS adapter only after an authorized protocol contract and simulator fixture exist.
-- [x] Research Prama public local-discovery evidence: official Prama Online Pro describes same-network device search. A documented desktop activation API/SDK and exact model/family contract remain pending.
+- [x] Research Prama public tooling evidence: Online Pro describes same-network search and the official support portal exposes Tools/SDK categories. Obtain the actual SDK package, activation API reference, redistribution terms and exact model/firmware contract before implementing activation.
 - [ ] Implement Prama adapter only after an authorized protocol contract and simulator fixture exist.
 - [ ] Keep vendor adapters isolated; no guessed CGI paths, undocumented ports, default passwords or reverse-engineered authentication bypass.
 - [ ] Support user-created initial password only when the device's documented protocol supports it.
