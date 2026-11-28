@@ -145,15 +145,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(discovery_, &DiscoveryService::deviceFound, this, [this](const DeviceRecord &device) {
         upsertDevice(device);
         if (!pendingCameraVerificationActive_ || pendingCameraIdentityMatched_) return;
-        const bool hasStrongIdentity =
-            !pendingCameraVerification_.macAddress.trimmed().isEmpty() ||
-            !pendingCameraVerification_.serialNumber.trimmed().isEmpty() ||
-            !pendingCameraVerification_.onvifEndpoint.trimmed().isEmpty();
-        if (!hasStrongIdentity) return;
-        QHash<QString, DeviceRecord> expected;
-        expected.insert(QStringLiteral("pending-camera"), pendingCameraVerification_);
-        if (DeviceIdentity::findMatchingKey(expected, device) ==
-            QStringLiteral("pending-camera")) {
+        if (DeviceIdentity::hasStrongMatch(pendingCameraVerification_, device)) {
             pendingCameraIdentityMatched_ = true;
             updateStatus(tr("The camera was rediscovered and matched using its previous identity evidence. Initialization still requires device-side verification."));
             recordOperation(tr("Post-setup camera identity check"), device.ipAddress,
