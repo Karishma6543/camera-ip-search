@@ -3046,6 +3046,12 @@ void MainWindow::openSelectedWebInterface()
     recordOperation(tr("Camera setup completed by user"), url.host(), tr("Verification pending"),
                     tr("User indicated setup is complete. A fresh discovery is required; web-page completion alone is not proof of activation."));
     updateStatus(tr("Setup page closed. Rediscovering on the selected network interface to verify the camera…"));
-    const QString interfaceName = interfaceSelector_ ? interfaceSelector_->currentData().toString() : QString();
-    if (discovery_ && !discovery_->isRunning()) discovery_->start(interfaceName);
+    // Reuse the normal discovery action so Live Scan Results are cleared
+    // before the new scan; never leave the pre-initialization snapshot mixed in.
+    if (scanButton_ && scanButton_->isEnabled() &&
+        discovery_ && !discovery_->isRunning() && !subnetScanner_->isRunning()) {
+        scanButton_->click();
+    } else {
+        updateStatus(tr("Could not start verification discovery because another network operation is active. Run Discover cameras when it finishes."));
+    }
 }
