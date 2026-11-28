@@ -47,6 +47,13 @@ struct ActivationProbeResult
     ActivationStatus status{ActivationStatus::Unknown};
     QString diagnostic;
     InitializationEvidence evidence;
+
+    bool isAuthoritative() const
+    {
+        return evidence.authoritative &&
+               status != ActivationStatus::Unknown &&
+               status != ActivationStatus::Error;
+    }
 };
 
 struct InitializationContext
@@ -80,6 +87,12 @@ struct ActivationResult
     QString diagnostic;
     InitializationEvidence evidence;
     bool activationVerified{false};
+
+    bool isVerifiedSuccess() const
+    {
+        return outcome == ActivationOutcome::CompletedAndVerified &&
+               activationVerified && evidence.authoritative;
+    }
 };
 
 // This interface deliberately contains no guessed endpoint or generic HTTP
